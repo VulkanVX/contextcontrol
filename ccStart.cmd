@@ -1,4 +1,4 @@
-@echo off
+@echo off s
 REM CC-DESC: Windows launcher for Context Control's ccStart command from the contextcontrol\ tool folder.
 setlocal
 set "SCRIPT_DIR=%~dp0"
