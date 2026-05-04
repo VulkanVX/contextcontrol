@@ -222,10 +222,74 @@ function Write-TextFileUtf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
 }
 
-function Add-Line {
-    param([string]$Text)
+$script:OutputLines = New-Object System.Collections.Generic.List[string]
 
-    Add-Content -LiteralPath $OutputFile -Value $Text -Encoding UTF8
+function Add-Line {
+    param([AllowNull()][string]$Text)
+
+    if ($null -eq $Text) {
+        $Text = ""
+    }
+
+    [void]$script:OutputLines.Add($Text)
+}
+
+function Get-OutputText {
+    $text = [string]::Join([Environment]::NewLine, [string[]]$script:OutputLines.ToArray())
+
+    if (-not $text.EndsWith([Environment]::NewLine)) {
+        $text += [Environment]::NewLine
+    }
+
+    return $text
+}
+
+function Save-OutputFile {
+    param([string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $dir = [System.IO.Path]::GetDirectoryName($fullPath)
+
+    if ([string]::IsNullOrWhiteSpace($dir)) {
+        $dir = (Get-Location).Path
+    }
+
+    if (-not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir | Out-Null
+    }
+
+    $leaf = [System.IO.Path]::GetFileName($fullPath)
+    $tmpPath = Join-Path $dir (".$leaf.$PID.$([System.Guid]::NewGuid().ToString('N')).tmp")
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+    [System.IO.File]::WriteAllText($tmpPath, (Get-OutputText), $utf8NoBom)
+
+    $lastError = $null
+
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        try {
+            if ([System.IO.File]::Exists($fullPath)) {
+                try {
+                    [System.IO.File]::Replace($tmpPath, $fullPath, $null, $true)
+                }
+                catch {
+                    Copy-Item -LiteralPath $tmpPath -Destination $fullPath -Force -ErrorAction Stop
+                    Remove-Item -LiteralPath $tmpPath -Force -ErrorAction SilentlyContinue
+                }
+            }
+            else {
+                Move-Item -LiteralPath $tmpPath -Destination $fullPath -Force -ErrorAction Stop
+            }
+
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds ([Math]::Min(1000, 50 * $attempt))
+        }
+    }
+
+    throw "Failed to write '$Path' after retries. Close any editor/preview/indexer using it and try again. Temp output was left at: $tmpPath. Last error: $lastError"
 }
 
 function Get-CodeFenceLanguage {
@@ -1862,12 +1926,6 @@ if ($InputPaths.Count -eq 0 -and $InputFunctions.Count -eq 0 -and $InputSymbolSe
 
 $InputPaths = @(Expand-InputPathsWithAutoDependencies $InputPaths)
 
-if (Test-Path -LiteralPath $OutputFile) {
-    Remove-Item -LiteralPath $OutputFile
-}
-
-Write-TextFileUtf8NoBom $OutputFile ""
-
 Add-Line "# Code export"
 Add-Line ""
 Add-Line "Generated from project files."
@@ -1904,13 +1962,15 @@ foreach ($symbol in $InputSymbolSearches) {
     Add-SymbolSearchExport $symbol
 }
 
+Save-OutputFile $OutputFile
+
 Write-Host ""
 Write-Host "Done."
 Write-Host "Created: $OutputFile"
 
 if (-not $NoClipboard) {
     try {
-        Get-Content -LiteralPath $OutputFile -Raw | Set-Clipboard
+        Get-OutputText | Set-Clipboard
         Write-Host "Copied export to clipboard too."
     }
     catch {
