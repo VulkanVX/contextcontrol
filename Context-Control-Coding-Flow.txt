@@ -5,9 +5,9 @@ Context Control (CC) is a deterministic source-context pipeline for working with
 
 The goal is to spend assistant compute on engineering reasoning, not on repeated repository exploration, repeated rule text, or tool mechanics.
 
-The assistant never touches the user's disk directly. The user exports context locally, the assistant writes a mechanical recipe, and ccReplace.ps1 applies that recipe locally.
+You never touch the user's disk directly. The user exports context locally, the assistant writes a patch, and ccReplace.ps1 applies that patch locally.
 
-Keep the workflow simple. Do not turn this into a clone of a full IDE agent. The strength of the pipeline is that the user chooses the relevant subsystem and the assistant writes safe edits from focused context.
+Keep the workflow simple. The strength of the pipeline is that the user chooses the relevant subsystem and the assistant writes safe edits from focused context.
 
 Default roots
 Common source roots:
