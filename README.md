@@ -4,9 +4,9 @@
 
 A deterministic source-context pipeline for working with large codebases through any chat assistant.
 
-ContextControl reduces context bloat and drives the LLM compute toward reasoning about your problem instead of wasting it on repository exploration, repeated rule text, or tool mechanics. It works with **any LLM**: ChatGPT, Claude, Codex, GitHub Copilot, Gemini, DeepSeek, local models, or any other assistant that can read text and return a patch recipe.
+ContextControl reduces context bloat and drives the LLM compute toward reasoning about your problem instead of wasting it on repository exploration, repeated rule text, or tool mechanics. It works with **any LLM**: ChatGPT, Claude, Codex, GitHub Copilot, Gemini, DeepSeek, local models, or any other assistant that supports instructions.
 
-The assistant **never touches your disk**. You export context locally, the assistant writes a mechanical patch recipe, and ContextControl applies that recipe locally on your machine.
+The LLM model **never touches your disk**. You export context locally, the assistant writes a mechanical patch recipe, and ContextControl applies that recipe locally on your machine.
 
 ---
 
@@ -29,6 +29,8 @@ macOS/Linux require **PowerShell 7+** so the `pwsh` command exists. After that, 
 ## Why ContextControl
 
 If you have worked on a codebase larger than a few thousand lines through a chat LLM, you know the pattern: the assistant burns half its tokens re-exploring the repo, asking for the same files over and over, and dumping rule preambles instead of solving your actual problem.
+
+Moreover, it became an extreme pain due to recent price increases and rate-limits.
 
 ContextControl flips that. You ship the assistant exactly what it needs: first a filtered project tree, then specific files or functions. The assistant ships back a `patch.txt` of mechanical edits. No browsing your disk. No guessing. No full-agent drift.
 
