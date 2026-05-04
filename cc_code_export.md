@@ -1,3 +1,29 @@
+# Code export
+
+Generated from project files.
+
+Project root: D:\projects\vulkanas
+
+## Instructions for Context Control
+
+This export is source context only. Use the standing Context Control instructions for workflow rules and patch format.
+
+Minimal rules for this turn:
+- Spend reasoning on the requested code fix, not tool mechanics.
+- Prefer a single patch.txt containing raw BEGIN CC-REPLACE blocks. Inline only if tiny.
+- Keep the existing architecture and modular ownership boundaries.
+- Use MODE: insert_include for include-only edits.
+- If this export contains Hash hints, copy the matching HASH: value into function/replace_region patch headers. If no hash hint is present, omit HASH:.
+- If critical context is missing, ask only for the exact missing files/functions, one path per line, ending with END.
+
+Default CMake build, when applicable: cmake --build build --config Release -j
+
+
+## ccReplace.ps1
+
+Description: Applies CC-REPLACE patch blocks from pasted text or a file.
+
+````powershell
 # CC-DESC: Applies CC-REPLACE patch blocks from pasted text or a file.
 # ccReplace.ps1
 # Supports:
@@ -17,7 +43,6 @@
 #
 # Important:
 #   Patch files must contain raw CC-REPLACE blocks, not PowerShell here-string commands.
-#   When stored in contextcontrol/, target FILE/DIR paths resolve against the parent project root by default.
 
 param(
     [string]$InputFile = "",
@@ -333,7 +358,7 @@ function Resolve-TargetPath {
         return $clean
     }
 
-    return Join-Path (Get-CcProjectRoot) $clean
+    return Join-Path (Get-Location).Path $clean
 }
 
 function Get-HeaderValue {
@@ -1144,14 +1169,6 @@ function Confirm-AlreadyImplementedProceedOrSkip {
 
 function New-CcReplaceDefaultSettings {
     return [pscustomobject]@{
-        # ProjectRoot is resolved relative to this ccReplace.ps1 file when it is not absolute.
-        # Default layout: <project-root>/contextcontrol/ccReplace.ps1, so ".." means the parent project folder.
-        ProjectRoot = ".."
-
-        # OutputRoot is where Context Control working files live by default.
-        # Default "." means the contextcontrol/ folder, keeping the project root clean.
-        OutputRoot = "."
-
         DefaultPatchFile = "patch.txt"
         ShowPreflightStatistics = $true
         ShowFileDetails = $true
@@ -1159,102 +1176,13 @@ function New-CcReplaceDefaultSettings {
         ShowDirectoryPrefixes = $true
         ConfirmationStage = $true
         RepeatInvalidInput = $false
-
-        # Enabled by default: first successful edits capture a baseline and then
-        # a post-apply version snapshot unless -NoBackup is used or the user
-        # explicitly disables this in Settings.
-        VersionCacheEnabled = $true
-
-        # Relative paths are resolved from OutputRoot, so the default cache lives
-        # in contextcontrol/.ccReplace.versions instead of cluttering project root.
+        VersionCacheEnabled = $false
         VersionCacheRoot = ".ccReplace.versions"
     }
 }
 
-function Get-CcReplaceScriptDirectory {
-    if ($PSScriptRoot -ne "") {
-        return $PSScriptRoot
-    }
-
-    return (Get-Location).Path
-}
-
 function Get-CcReplaceSettingsPath {
-    # Keep Context Control settings with the tool, not loose in the project root.
-    return (Join-Path (Get-CcReplaceScriptDirectory) ".ccReplace.settings.json")
-}
-
-function Resolve-CcPathRelativeToScript {
-    param([string]$PathText)
-
-    if ([string]::IsNullOrWhiteSpace($PathText)) {
-        return (Get-Location).Path
-    }
-
-    $clean = $PathText.Trim()
-    $clean = $clean -replace '/', [System.IO.Path]::DirectorySeparatorChar
-
-    if ([System.IO.Path]::IsPathRooted($clean)) {
-        return [System.IO.Path]::GetFullPath($clean)
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-CcReplaceScriptDirectory) $clean))
-}
-
-function Resolve-CcProjectRoot {
-    param($Settings)
-
-    $root = ".."
-    if ($null -ne $Settings -and
-        ($Settings.PSObject.Properties.Name -contains "ProjectRoot") -and
-        -not [string]::IsNullOrWhiteSpace([string]$Settings.ProjectRoot)) {
-        $root = [string]$Settings.ProjectRoot
-    }
-
-    return Resolve-CcPathRelativeToScript $root
-}
-
-function Resolve-CcOutputRoot {
-    param($Settings)
-
-    $root = "."
-    if ($null -ne $Settings -and
-        ($Settings.PSObject.Properties.Name -contains "OutputRoot") -and
-        -not [string]::IsNullOrWhiteSpace([string]$Settings.OutputRoot)) {
-        $root = [string]$Settings.OutputRoot
-    }
-
-    return Resolve-CcPathRelativeToScript $root
-}
-
-function Resolve-CcOutputPath {
-    param(
-        [string]$PathText,
-        $Settings = $null
-    )
-
-    if ([string]::IsNullOrWhiteSpace($PathText)) {
-        throw "Missing output path."
-    }
-
-    $clean = $PathText.Trim()
-    $clean = $clean -replace '/', [System.IO.Path]::DirectorySeparatorChar
-
-    if ([System.IO.Path]::IsPathRooted($clean)) {
-        return [System.IO.Path]::GetFullPath($clean)
-    }
-
-    if ($null -eq $Settings) {
-        $Settings = Read-CcReplaceSettings
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Resolve-CcOutputRoot $Settings) $clean))
-}
-
-
-function Get-CcProjectRoot {
-    $settings = Read-CcReplaceSettings
-    return Resolve-CcProjectRoot $settings
+    return (Join-Path (Get-Location).Path ".ccReplace.settings.json")
 }
 
 function Merge-CcReplaceSettings {
@@ -1279,44 +1207,20 @@ function Read-CcReplaceSettings {
     $path = Get-CcReplaceSettingsPath
 
     if (-not (Test-Path -LiteralPath $path)) {
-        $settings = New-CcReplaceDefaultSettings
-        Save-CcReplaceSettings $settings
-        return $settings
+        return New-CcReplaceDefaultSettings
     }
 
     try {
         $json = Read-TextFileAutoEncoding $path
         if ($json.Trim() -eq "") {
-            $settings = New-CcReplaceDefaultSettings
-            Save-CcReplaceSettings $settings
-            return $settings
+            return New-CcReplaceDefaultSettings
         }
 
-        $loaded = $json | ConvertFrom-Json
-        $settings = Merge-CcReplaceSettings $loaded
-
-        # Persist newly introduced settings on first run after an update. Do not
-        # override existing user choices; only normalize missing keys into the
-        # settings file so Windows/macOS/Linux all start from the same durable state.
-        $shouldSave = $false
-        foreach ($prop in $settings.PSObject.Properties.Name) {
-            if (-not ($loaded.PSObject.Properties.Name -contains $prop)) {
-                $shouldSave = $true
-                break
-            }
-        }
-
-        if ($shouldSave) {
-            Save-CcReplaceSettings $settings
-        }
-
-        return $settings
+        return Merge-CcReplaceSettings ($json | ConvertFrom-Json)
     }
     catch {
-        Write-Host "Settings file is invalid, rewriting defaults: $path" -ForegroundColor Yellow
-        $settings = New-CcReplaceDefaultSettings
-        Save-CcReplaceSettings $settings
-        return $settings
+        Write-Host "Settings file is invalid, using defaults: $path" -ForegroundColor Yellow
+        return New-CcReplaceDefaultSettings
     }
 }
 
@@ -1338,9 +1242,7 @@ function Get-CcReplaceVersionRoot {
         $root = [string]$Settings.VersionCacheRoot
     }
 
-    # Keep relative version-cache paths with the Context Control output folder.
-    # Absolute paths still work for users who want the cache somewhere else.
-    return Resolve-CcOutputPath $root $Settings
+    return Resolve-TargetPath $root
 }
 
 function Get-CcReplaceVersionIndexPath {
@@ -1841,15 +1743,7 @@ function Show-CcReplaceSettingsMenu {
         Write-Host "7. Reconfigure default patch file: $($settings.DefaultPatchFile)"
         Write-CcReplaceBoolLine 8 "Version cache" ([bool]$settings.VersionCacheEnabled)
         Write-Host "9. Version log / rollback / remove cached versions"
-        $resolvedProjectRoot = Resolve-CcProjectRoot $settings
-        $resolvedOutputRoot = Resolve-CcOutputRoot $settings
-        $resolvedVersionRoot = Get-CcReplaceVersionRoot $settings
         Write-Host "10. Reconfigure version cache directory: $($settings.VersionCacheRoot)"
-        Write-Host "    Resolved version cache: $resolvedVersionRoot" -ForegroundColor DarkGray
-        Write-Host "11. Reconfigure project root: $($settings.ProjectRoot)"
-        Write-Host "    Resolved project root: $resolvedProjectRoot" -ForegroundColor DarkGray
-        Write-Host "12. Reconfigure Context Control output folder: $($settings.OutputRoot)"
-        Write-Host "    Resolved output folder: $resolvedOutputRoot" -ForegroundColor DarkGray
         Write-Host "0. Back"
         Write-Host ""
         Write-Host "Pick setting: " -NoNewline
@@ -1866,9 +1760,7 @@ function Show-CcReplaceSettingsMenu {
             "5" { $settings.ConfirmationStage = -not [bool]$settings.ConfirmationStage }
             "6" { $settings.RepeatInvalidInput = -not [bool]$settings.RepeatInvalidInput }
             "7" {
-                Write-Host "Enter new default patch file path. Relative paths are resolved from the Context Control output folder." -ForegroundColor DarkGray
-                Write-Host "Default: patch.txt" -ForegroundColor DarkGray
-                Write-Host "Patch file: " -NoNewline
+                Write-Host "Enter new default patch file path: " -NoNewline
                 $path = [Console]::ReadLine()
                 if ($null -ne $path -and $path.Trim() -ne "") {
                     $settings.DefaultPatchFile = $path.Trim()
@@ -1877,30 +1769,10 @@ function Show-CcReplaceSettingsMenu {
             "8" { $settings.VersionCacheEnabled = -not [bool]$settings.VersionCacheEnabled }
             "9" { Show-CcReplaceVersionLogMenu }
             "10" {
-                Write-Host "Enter new version cache directory. Relative paths are resolved from the Context Control output folder." -ForegroundColor DarkGray
-                Write-Host "Default: .ccReplace.versions" -ForegroundColor DarkGray
-                Write-Host "Version cache directory: " -NoNewline
+                Write-Host "Enter new version cache directory: " -NoNewline
                 $path = [Console]::ReadLine()
                 if ($null -ne $path -and $path.Trim() -ne "") {
                     $settings.VersionCacheRoot = $path.Trim()
-                }
-            }
-            "11" {
-                Write-Host "Enter project root path. Relative paths are resolved from the Context Control folder." -ForegroundColor DarkGray
-                Write-Host "Default for <project>/contextcontrol is: .." -ForegroundColor DarkGray
-                Write-Host "Project root: " -NoNewline
-                $path = [Console]::ReadLine()
-                if ($null -ne $path -and $path.Trim() -ne "") {
-                    $settings.ProjectRoot = $path.Trim()
-                }
-            }
-            "12" {
-                Write-Host "Enter output folder path. Relative paths are resolved from the Context Control folder." -ForegroundColor DarkGray
-                Write-Host "Default: .  (the contextcontrol folder)" -ForegroundColor DarkGray
-                Write-Host "Output folder: " -NoNewline
-                $path = [Console]::ReadLine()
-                if ($null -ne $path -and $path.Trim() -ne "") {
-                    $settings.OutputRoot = $path.Trim()
                 }
             }
             "0" {
@@ -1927,10 +1799,6 @@ function Show-CcReplaceHelp {
     Write-Host "  .\ccReplace.ps1 -InputFile .\patch.txt -NoBackup"
     Write-Host "  .\ccReplace.ps1"
     Write-Host "  .\ccReplace.ps1 -AgentMode"
-    Write-Host ""
-    Write-Host "Project root:"
-    Write-Host "  By default, contextcontrol/ccReplace.ps1 resolves patch targets relative to .."
-    Write-Host "  Change this in contextcontrol/.ccReplace.settings.json or Settings option 11."
     Write-Host "  .\ccStart.ps1"
     Write-Host "  .\ccReplace.ps1 -Help"
     Write-Host ""
@@ -1942,12 +1810,6 @@ function Show-CcReplaceHelp {
     Write-Host "  5. Agent Mode: watch the default patch file and apply when it changes"
     Write-Host "  6. Run ccDir.ps1 directory export"
     Write-Host "  7. Run cc.ps1 source/function export"
-    Write-Host "  8. GO: paste CC-REPLACE blocks and apply with the normal preflight confirmation"
-    Write-Host ""
-    Write-Host "Agent / confirmation commands:"
-    Write-Host "  DIR  Run ccDir.ps1 directory export"
-    Write-Host "  CC   Run cc.ps1 source/function export"
-    Write-Host "  GO   Paste CC-REPLACE blocks and apply them immediately after preflight confirmation"
     Write-Host ""
     Write-Host "Settings file: $(Get-CcReplaceSettingsPath)"
     Write-Host "Settings include UI blocks, directory prefixes, default patch file, confirmation stage, repeat-invalid-input, and version cache."
@@ -3082,9 +2944,7 @@ function Invoke-CcPipelineCommand {
         return $false
     }
 
-    $settings = Read-CcReplaceSettings
-    $projectRoot = Resolve-CcProjectRoot $settings
-    $outputRoot = Resolve-CcOutputRoot $settings
+    $projectRoot = (Get-Location).Path
 
     if ($clean -ieq "DIR") {
         $scriptPath = Get-CcPipelineScriptPath "ccDir.ps1"
@@ -3093,19 +2953,13 @@ function Invoke-CcPipelineCommand {
             return $true
         }
 
-        $outputFile = Join-Path $outputRoot "cc_project_dir.md"
+        $outputFile = Join-Path $projectRoot "cc_project_dir.md"
 
         Write-Host ""
         Write-Host "Running Context Control directory export..." -ForegroundColor Cyan
         Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
         Write-Host "Output file:  $outputFile" -ForegroundColor DarkGray
-        Push-Location $projectRoot
-        try {
-            & $scriptPath -OutputFile $outputFile
-        }
-        finally {
-            Pop-Location
-        }
+        & $scriptPath -OutputFile $outputFile
 
         if (Test-Path -LiteralPath $outputFile) {
             Write-Host "Agent export verified: $outputFile" -ForegroundColor Green
@@ -3125,48 +2979,19 @@ function Invoke-CcPipelineCommand {
             return $true
         }
 
-        $outputFile = Join-Path $outputRoot "cc_code_export.md"
+        $outputFile = Join-Path $projectRoot "cc_code_export.md"
 
         Write-Host ""
         Write-Host "Running Context Control source export..." -ForegroundColor Cyan
         Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
         Write-Host "Output file:  $outputFile" -ForegroundColor DarkGray
-        Push-Location $projectRoot
-        try {
-            & $scriptPath -OutputFile $outputFile
-        }
-        finally {
-            Pop-Location
-        }
+        & $scriptPath -OutputFile $outputFile
 
         if (Test-Path -LiteralPath $outputFile) {
             Write-Host "Agent export verified: $outputFile" -ForegroundColor Green
         }
         else {
             Write-Host "WARNING: cc.ps1 returned, but expected output was not found: $outputFile" -ForegroundColor Yellow
-        }
-
-        Write-Host "Returned to Context Control." -ForegroundColor DarkGray
-        return $true
-    }
-
-    if ($clean -ieq "GO") {
-        Write-Host ""
-        Write-Host "Paste patch mode." -ForegroundColor Cyan
-        Write-Host "Paste raw BEGIN CC-REPLACE blocks. Finish with ENDCC." -ForegroundColor DarkGray
-        Write-Host "This uses the same preflight and confirmation stage as patch.txt." -ForegroundColor DarkGray
-
-        $patchText = Read-PasteInputText
-        if ([string]::IsNullOrWhiteSpace($patchText)) {
-            Write-Host "No pasted patch text." -ForegroundColor Yellow
-            return $true
-        }
-
-        try {
-            [void](Invoke-CcReplaceText $patchText -NoExitOnCancel)
-        }
-        catch {
-            Write-Host "GO patch failed: $($_.Exception.Message)" -ForegroundColor Red
         }
 
         Write-Host "Returned to Context Control." -ForegroundColor DarkGray
@@ -3181,7 +3006,6 @@ function Write-CcPipelineActionHints {
     Write-Host "Pipeline helpers:" -ForegroundColor DarkCyan
     Write-Host "DIR. Run ccDir.ps1 to export the project tree without leaving this screen." -ForegroundColor Cyan
     Write-Host "CC.  Run cc.ps1 to export selected files/functions without leaving this screen." -ForegroundColor Cyan
-    Write-Host "GO.  Paste CC-REPLACE blocks and apply them with the normal preflight confirmation." -ForegroundColor Cyan
 }
 
 function Get-CcReplacePreflightDecision {
@@ -3446,10 +3270,9 @@ function Show-CcReplaceMainMenu {
         Write-Host "2. Provide your own filepath to another patch file"
         Write-Host "3. Paste your own text"
         Write-Host "4. Settings"
-        Write-Host "5. Agent Mode - watch $($settings.DefaultPatchFile) and apply when it changes"
+        Write-Host "5. Agent Mode - watch patch.txt and apply when it changes"
         Write-Host "6. Run ccDir.ps1 directory export"
         Write-Host "7. Run cc.ps1 source/function export"
-        Write-Host "8. GO - paste CC-REPLACE blocks and apply with preflight confirmation"
         Write-Host "0. Exit"
         Write-Host ""
         Write-Host "Pick option: " -NoNewline
@@ -3459,7 +3282,7 @@ function Show-CcReplaceMainMenu {
         $choice = $choice.Trim()
 
         switch ($choice) {
-            "1" { Invoke-CcReplaceFile (Resolve-CcOutputPath $settings.DefaultPatchFile $settings); return }
+            "1" { Invoke-CcReplaceFile (Resolve-TargetPath $settings.DefaultPatchFile); return }
             "2" {
                 Write-Host "Patch file path: " -NoNewline
                 $path = [Console]::ReadLine()
@@ -3473,97 +3296,65 @@ function Show-CcReplaceMainMenu {
             "5" { Invoke-CcReplaceAgentMode; return }
             "6" { [void](Invoke-CcPipelineCommand "DIR") }
             "7" { [void](Invoke-CcPipelineCommand "CC") }
-            "8" { [void](Invoke-CcPipelineCommand "GO") }
             "0" { return }
             default { Write-Host "Unknown menu option." -ForegroundColor Yellow }
         }
     }
 }
 
-function Test-CcAgentConsoleKeyAvailable {
-    try {
-        if ([Console]::IsInputRedirected) {
-            return $false
-        }
-
-        return [Console]::KeyAvailable
-    }
-    catch {
-        # macOS/Linux shells, IDE terminals, and redirected runs can throw here.
-        # Patch watching must continue even when interactive DIR/CC shortcuts are
-        # unavailable, so treat this as "no key pressed" instead of spamming errors.
-        return $false
-    }
-}
-
 function Invoke-CcReplaceAgentMode {
     $settings = Read-CcReplaceSettings
-    $path = Resolve-CcOutputPath $settings.DefaultPatchFile $settings
+    $path = Resolve-TargetPath $settings.DefaultPatchFile
     $lastWrite = $null
-
-    $parent = Split-Path -Parent $path
-    if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path -LiteralPath $parent)) {
-        New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    }
-
-    if (-not (Test-Path -LiteralPath $path)) {
-        Write-TextFileUtf8NoBom $path ""
-    }
 
     Write-Host ""
     Write-Host "Agent Mode active. Watching: $path"
     Write-Host "Update the patch file to trigger a run. Press Ctrl+C to stop."
-    Write-Host "Type DIR + Enter to run ccDir.ps1, CC + Enter to run cc.ps1, or GO + Enter to paste/apply a patch." -ForegroundColor DarkCyan
+    Write-Host "Type DIR + Enter to run ccDir.ps1, or CC + Enter to run cc.ps1 while the watcher stays alive." -ForegroundColor DarkCyan
 
     while ($true) {
         try {
-            if (Test-CcAgentConsoleKeyAvailable) {
+            if ([Console]::KeyAvailable) {
                 Write-Host ""
                 Write-Host "Agent command: " -ForegroundColor Cyan -NoNewline
                 $agentCommand = [Console]::ReadLine()
-                if ($null -ne $agentCommand) {
-                    if (-not (Invoke-CcPipelineCommand $agentCommand)) {
-                        Write-Host "Unknown agent command: $agentCommand" -ForegroundColor Yellow
+                if (-not (Invoke-CcPipelineCommand $agentCommand)) {
+                    if ($null -ne $agentCommand -and $agentCommand.Trim() -ne "") {
+                        Write-Host "Unknown agent command. Use DIR, CC, or Ctrl+C." -ForegroundColor Yellow
                     }
                 }
                 Write-Host "Agent Mode waiting for next patch update..." -ForegroundColor DarkGray
-                Start-Sleep -Milliseconds 150
-                continue
             }
+        }
+        catch {
+            # Some hosts do not support Console.KeyAvailable. Patch watching still works.
+        }
 
-            if (-not (Test-Path -LiteralPath $path)) {
-                Start-Sleep -Milliseconds 250
-                continue
-            }
+        if (Test-Path -LiteralPath $path) {
+            $item = Get-Item -LiteralPath $path
+            $write = $item.LastWriteTimeUtc
 
-            $write = (Get-Item -LiteralPath $path).LastWriteTimeUtc
             if ($null -eq $lastWrite) {
                 $lastWrite = $write
-                Start-Sleep -Milliseconds 250
-                continue
             }
-
-            if ($write -ne $lastWrite) {
-                $lastWrite = $write
-                Start-Sleep -Milliseconds 150
+            elseif ($write -ne $lastWrite) {
+                Start-Sleep -Milliseconds 250
+                $lastWrite = (Get-Item -LiteralPath $path).LastWriteTimeUtc
+                Write-Host ""
+                Write-Host "Patch update detected: $path"
                 try {
-                    $success = Invoke-CcReplaceFile $path -NoExitOnCancel
-                    if ($success) {
-                        Write-Host "Agent Mode waiting for next patch update..." -ForegroundColor DarkGray
-                    }
+                    [void](Invoke-CcReplaceFile $path -NoExitOnCancel)
+                    Write-Host ""
+                    Write-Host "Agent Mode waiting for next patch update..." -ForegroundColor DarkGray
                 }
                 catch {
                     Write-Host "Agent Mode patch failed: $($_.Exception.Message)" -ForegroundColor Red
                     Write-Host "Agent Mode waiting for next patch update..." -ForegroundColor DarkGray
                 }
             }
+        }
 
-            Start-Sleep -Milliseconds 250
-        }
-        catch {
-            Write-Host "Agent Mode error: $($_.Exception.Message)" -ForegroundColor Red
-            Start-Sleep -Milliseconds 500
-        }
+        Start-Sleep -Milliseconds 750
     }
 }
 
@@ -3656,4 +3447,11 @@ if ($InputFile -eq "") {
     exit 0
 }
 
-Invoke-CcReplaceFile (Resolve-TargetPath $InputFile)
+Invoke-CcReplaceFile $InputFile
+
+````
+
+## MISSING: README.md
+
+
+## MISSING: Context-Control-Coding-Flow.txt
