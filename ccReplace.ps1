@@ -2918,6 +2918,8 @@ function Invoke-CcPipelineCommand {
         return $false
     }
 
+    $projectRoot = (Get-Location).Path
+
     if ($clean -ieq "DIR") {
         $scriptPath = Get-CcPipelineScriptPath "ccDir.ps1"
         if ($scriptPath -eq "") {
@@ -2925,9 +2927,21 @@ function Invoke-CcPipelineCommand {
             return $true
         }
 
+        $outputFile = Join-Path $projectRoot "cc_project_dir.md"
+
         Write-Host ""
         Write-Host "Running Context Control directory export..." -ForegroundColor Cyan
-        & $scriptPath
+        Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
+        Write-Host "Output file:  $outputFile" -ForegroundColor DarkGray
+        & $scriptPath -OutputFile $outputFile
+
+        if (Test-Path -LiteralPath $outputFile) {
+            Write-Host "Agent export verified: $outputFile" -ForegroundColor Green
+        }
+        else {
+            Write-Host "WARNING: ccDir.ps1 returned, but expected output was not found: $outputFile" -ForegroundColor Yellow
+        }
+
         Write-Host "Returned to Context Control." -ForegroundColor DarkGray
         return $true
     }
@@ -2939,9 +2953,21 @@ function Invoke-CcPipelineCommand {
             return $true
         }
 
+        $outputFile = Join-Path $projectRoot "cc_code_export.md"
+
         Write-Host ""
         Write-Host "Running Context Control source export..." -ForegroundColor Cyan
-        & $scriptPath
+        Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
+        Write-Host "Output file:  $outputFile" -ForegroundColor DarkGray
+        & $scriptPath -OutputFile $outputFile
+
+        if (Test-Path -LiteralPath $outputFile) {
+            Write-Host "Agent export verified: $outputFile" -ForegroundColor Green
+        }
+        else {
+            Write-Host "WARNING: cc.ps1 returned, but expected output was not found: $outputFile" -ForegroundColor Yellow
+        }
+
         Write-Host "Returned to Context Control." -ForegroundColor DarkGray
         return $true
     }

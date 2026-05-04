@@ -161,7 +161,11 @@ function Save-OutputFile {
                 Move-Item -LiteralPath $tmpPath -Destination $fullPath -Force -ErrorAction Stop
             }
 
-            return
+            if (-not [System.IO.File]::Exists($fullPath)) {
+                throw "Export write reported success, but final file does not exist: $fullPath"
+            }
+
+            return $fullPath
         }
         catch {
             $lastError = $_.Exception.Message
@@ -348,17 +352,32 @@ Add-Line "$rootName/"
 Add-Tree $rootPath "" 0
 Add-Line "$Fence3"
 
-Save-OutputFile $OutputFile
+$SavedOutputFile = Save-OutputFile $OutputFile
 
 Write-Host ""
 Write-Host "Done."
-Write-Host "Created: $OutputFile"
+Write-Host "Created: $SavedOutputFile"
 Write-Host "Detected profile: $ResolvedProfile"
+Write-Host "Open it: code `"$SavedOutputFile`""
+Write-Host "Fallback copy: Get-Content -LiteralPath `"$SavedOutputFile`" -Raw | Set-Clipboard"
 
+$exportText = Get-OutputText
 try {
-    Get-OutputText | Set-Clipboard
+    Set-Clipboard -Value $exportText -ErrorAction Stop
     Write-Host "Copied project tree + prompt to clipboard."
 }
 catch {
-    Write-Host "Clipboard copy skipped."
+    $setClipboardError = $_.Exception.Message
+    try {
+        $clipExe = Join-Path $env:SystemRoot "System32\clip.exe"
+        if (-not (Test-Path -LiteralPath $clipExe)) {
+            throw "clip.exe not found; Set-Clipboard failed: $setClipboardError"
+        }
+
+        $exportText | & $clipExe
+        Write-Host "Copied project tree + prompt to clipboard via clip.exe."
+    }
+    catch {
+        Write-Host "Clipboard copy skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
