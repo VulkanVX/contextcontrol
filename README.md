@@ -1,3 +1,6 @@
+<img width="175" height="61" alt="ccbanner" src="https://github.com/user-attachments/assets/020bf199-cbf2-4e68-b2cf-342b9b870585" />
+
+
 # ContextControl
 
 A deterministic source-context pipeline for working with large codebases through any chat assistant.
