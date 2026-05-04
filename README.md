@@ -580,6 +580,8 @@ ContextControl is currently free.
 
 A subscription product is planned at a maximum of **$10/month** with a more advanced UI. Anyone using the GitHub release before **May 31st, 2026** gets **free access to the paid product on release**. After that date, the lifetime-access window is closed.
 
+You are eligible for it, as long as you reach out to me, and let me know.
+
 ---
 
 ## License
