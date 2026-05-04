@@ -1,5 +1,4 @@
-<img width="1280" height="640" alt="ccbanner" src="https://github.com/user-attachments/assets/64d21e55-c3bc-4077-a074-be76b8f3c36f" />
-
+<img width="1280" height="640" alt="ccbanner" src="https://github.com/user-attachments/assets/25b89f87-e4a7-4470-a9aa-1e8d4580c518" />
 
 # ContextControl
 
