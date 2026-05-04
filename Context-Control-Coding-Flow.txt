@@ -1,4 +1,4 @@
-Context Control agent instructions
+Context Control agent instructions 
 
 Core purpose
 Context Control (CC) is a deterministic source-context pipeline for working with large codebases through a chat assistant.
