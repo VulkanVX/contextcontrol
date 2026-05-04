@@ -22,7 +22,7 @@ The core is PowerShell, and the platform launchers make the pipeline behave the 
 | macOS | extensionless shell files | `cc*.ps1` through `pwsh` |
 | Linux | extensionless shell files | `cc*.ps1` through `pwsh` |
 
-macOS/Linux require **PowerShell 7+** so the `pwsh` command exists. After that, the ContextControl pipeline has the same functional flow as Windows: `DIR`, `CC`, agent-mode patch watching, generated exports, settings, and version cache.
+macOS/Linux require **PowerShell 7+** so the `pwsh` command exists. After that, the ContextControl pipeline has the same functional flow as Windows: `DIR`, `CC`, `GO` agent-mode patch watching, generated exports, settings, and version cache.
 
 ---
 
@@ -190,6 +190,11 @@ Once `ccStart` is running:
    Save or drop that patch into `contextcontrol/patch.txt`.
 
 5. **Agent Mode detects the file change**, shows a preflight plan, and applies it after confirmation.
+
+6. **Type `CC`.**
+   Paste the patch, to perform an application, without the need of updating patch.txt
+
+7. **Agent fetches the patch** shows a preflight plan, and applies it after confirmation.
 
 You stay in one terminal the entire time.
 
