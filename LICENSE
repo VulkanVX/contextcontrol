@@ -1,0 +1,130 @@
+Context Control Source-Available License v1.0
+
+Copyright (c) 2026 Voxxyzc
+
+This license applies to the software project known as "Context Control" and all source files,
+scripts, documentation, examples, and related materials included with it, unless a file clearly
+states otherwise.
+
+IMPORTANT SUMMARY
+
+You may download, inspect, run, and modify Context Control for your own personal or internal use.
+You may not sell it, redistribute it, publish modified versions, rebrand it as your own, remove
+author notices, or offer it as a hosted service without written permission from the copyright holder.
+
+This is a source-available license. It is not an open-source license.
+
+1. DEFINITIONS
+
+"Software" means Context Control, including but not limited to cc.ps1, ccDir.ps1,
+ccReplace.ps1, ccStart.ps1, launcher scripts, documentation, examples, and related files.
+
+"Licensor" means the copyright holder of the Software.
+
+"You" means any person or organization receiving, downloading, copying, running, or modifying
+the Software.
+
+"Personal Use" means use by an individual for private projects, learning, testing, research,
+or non-commercial development.
+
+"Internal Use" means use inside your own organization, company, team, or private workflow, without
+redistributing the Software or making it available as a product or hosted service to third parties.
+
+"Modified Version" means any version of the Software that you change, patch, rename, translate,
+repackage, extend, or combine into another tool.
+
+2. PERMITTED USES
+
+Subject to the restrictions below, you may:
+
+a. Download and store copies of the Software.
+b. Read, inspect, and study the source code.
+c. Run the Software for Personal Use or Internal Use.
+d. Modify the Software for Personal Use or Internal Use.
+e. Make private backups or private forks.
+f. Share screenshots, videos, written reviews, bug reports, and usage feedback.
+g. Submit patches, ideas, or pull requests to the original project repository.
+
+3. RESTRICTIONS
+
+You may not, without prior written permission from the Licensor:
+
+a. Sell, rent, lease, sublicense, or commercially license the Software.
+b. Redistribute the Software, whether modified or unmodified.
+c. Publish, upload, mirror, or share copies of the Software outside the original project repository.
+d. Publish or distribute Modified Versions.
+e. Rebrand, rename, or present the Software or a Modified Version as your own work.
+f. Remove, hide, or alter copyright notices, license notices, author credits, or attribution.
+g. Use the Software as part of a paid product, paid service, consulting package, SaaS platform,
+   hosted agent, marketplace product, or commercial developer tool.
+h. Use the Software to build or distribute a substantially similar competing product.
+i. Circumvent license checks, attribution notices, usage notices, or technical restrictions if any
+   are added in future versions.
+j. Claim trademark rights over the names "Context Control", "CC" as used by this project, or any
+   confusingly similar project identity.
+
+4. ATTRIBUTION
+
+Any permitted private copy or Modified Version must retain the following notice in the source code
+and documentation:
+
+Context Control
+Copyright (c) 2026 Voxxyzc
+Licensed under the Context Control Source-Available License v1.0
+
+Public discussion, review, or demonstration of the Software should clearly identify the original
+project as "Context Control" by Voxxyzc.
+
+5. CONTRIBUTIONS
+
+Unless a separate written agreement says otherwise, any contribution, pull request, patch, issue
+suggestion, documentation change, or idea submitted to the original project may be used, modified,
+relicensed, or rejected by the Licensor for the project.
+
+By submitting a contribution, you confirm that you have the right to submit it and that it does not
+knowingly violate another person's rights.
+
+6. NO TRANSFER OF OWNERSHIP
+
+The Software is licensed, not sold. The Licensor keeps all copyright, ownership, and other rights
+not explicitly granted by this license.
+
+7. TERMINATION
+
+Your rights under this license automatically terminate if you violate any term of this license.
+
+After termination, you must stop using the Software and delete all copies of the Software and any
+Modified Versions in your possession or control, unless the Licensor gives written permission to
+continue using them.
+
+8. THIRD-PARTY COMPONENTS
+
+Third-party components, dependencies, snippets, or tools included with or referenced by the Software
+may be governed by their own licenses. This license does not override those third-party licenses.
+
+9. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, SECURITY,
+ACCURACY, OR NON-INFRINGEMENT.
+
+You use the Software at your own risk.
+
+10. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR WILL NOT BE LIABLE FOR ANY CLAIM, DAMAGE,
+LOSS, COST, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE, INCLUDING BUT NOT LIMITED
+TO LOST PROFITS, LOST DATA, COMPUTER DAMAGE, SECURITY ISSUES, BUSINESS INTERRUPTION, OR ANY
+INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.
+
+11. PERMISSION REQUESTS
+
+To request permission for redistribution, commercial use, publishing Modified Versions, integration
+into another product, or any use not allowed by this license, contact the Licensor directly.
+
+12. SEVERABILITY
+
+If any part of this license is found unenforceable, the remaining parts remain in effect as much as
+the law allows.
+
+END OF LICENSE
