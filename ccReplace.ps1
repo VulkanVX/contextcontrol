@@ -3070,6 +3070,127 @@ function Get-CcPipelineScriptPath {
     return ""
 }
 
+function Test-CcGoPatchLooksLikePatch {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    try {
+        $normalized = [regex]::Replace($Text, "\r\n|\r|\n|\x85|\u2028|\u2029", "`n")
+        return (($normalized -match '(?m)^\s*BEGIN\s+CC-REPLACE\s*$') -and
+                ($normalized -match '(?m)^\s*END\s+CC-REPLACE\s*$'))
+    }
+    catch {
+        return $false
+    }
+}
+
+function Read-CcGoClipboardText {
+    try {
+        $cmd = Get-Command Get-Clipboard -ErrorAction SilentlyContinue
+        if ($null -eq $cmd) {
+            return ""
+        }
+
+        try {
+            $raw = Get-Clipboard -Raw -ErrorAction Stop
+            if ($null -ne $raw) {
+                return [string]$raw
+            }
+        }
+        catch {
+            $items = Get-Clipboard -ErrorAction Stop
+            if ($null -ne $items) {
+                return ($items -join [Environment]::NewLine)
+            }
+        }
+    }
+    catch {
+        return ""
+    }
+
+    return ""
+}
+
+function Test-CcGoConsoleHasQueuedInput {
+    try {
+        return [Console]::KeyAvailable
+    }
+    catch {
+        return $false
+    }
+}
+
+function Read-CcGoManualPatchText {
+    Write-Host ""
+    Write-Host "Paste raw BEGIN CC-REPLACE blocks." -ForegroundColor Cyan
+    Write-Host "GO accepts normal patch syntax. ENDCC is optional as an emergency/manual terminator." -ForegroundColor DarkGray
+    Write-Host ""
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $sawPatchBlock = $false
+    $openPatchBlocks = 0
+
+    while ($true) {
+        $line = [Console]::ReadLine()
+
+        if ($null -eq $line) {
+            break
+        }
+
+        if ($line -eq "ENDCC") {
+            break
+        }
+
+        $lines.Add($line)
+
+        $sentinel = Normalize-CcReplaceLine $line
+        if ($sentinel -match '^BEGIN\s+CC-REPLACE$') {
+            $sawPatchBlock = $true
+            $openPatchBlocks++
+        }
+        elseif ($sentinel -match '^END\s+CC-REPLACE$') {
+            if ($openPatchBlocks -gt 0) {
+                $openPatchBlocks--
+            }
+
+            if ($sawPatchBlock -and $openPatchBlocks -eq 0) {
+                # A whole paste normally arrives in the console input buffer at once.
+                # Give the terminal a brief chance to expose remaining queued lines so
+                # multi-block patches keep being consumed, then auto-finish without
+                # requiring a separate ENDCC line.
+                $hasMoreInput = $false
+                for ($attempt = 0; $attempt -lt 15; $attempt++) {
+                    Start-Sleep -Milliseconds 20
+                    if (Test-CcGoConsoleHasQueuedInput) {
+                        $hasMoreInput = $true
+                        break
+                    }
+                }
+
+                if (-not $hasMoreInput) {
+                    break
+                }
+            }
+        }
+    }
+
+    return ($lines -join [Environment]::NewLine)
+}
+
+function Read-CcGoPatchText {
+    $clipboardText = Read-CcGoClipboardText
+    if (Test-CcGoPatchLooksLikePatch $clipboardText) {
+        Write-Host "Loaded CC-REPLACE blocks from clipboard. No Ctrl+V/ENDCC needed." -ForegroundColor Green
+        return $clipboardText
+    }
+
+    Write-Host "Clipboard does not contain raw CC-REPLACE blocks; falling back to manual paste." -ForegroundColor DarkGray
+    return Read-CcGoManualPatchText
+}
+
 function Invoke-CcPipelineCommand {
     param([string]$Command)
 
@@ -3152,13 +3273,20 @@ function Invoke-CcPipelineCommand {
 
     if ($clean -ieq "GO") {
         Write-Host ""
-        Write-Host "Paste patch mode." -ForegroundColor Cyan
-        Write-Host "Paste raw BEGIN CC-REPLACE blocks. Finish with ENDCC." -ForegroundColor DarkGray
+        Write-Host "GO patch mode." -ForegroundColor Cyan
+        Write-Host "Paste raw BEGIN CC-REPLACE blocks into this terminal." -ForegroundColor DarkGray
         Write-Host "This uses the same preflight and confirmation stage as patch.txt." -ForegroundColor DarkGray
+        Write-Host "Clipboard auto-load is disabled; GO will not read or apply clipboard text by itself." -ForegroundColor DarkGray
 
-        $patchText = Read-PasteInputText
+        if (Get-Command Read-CcGoManualPatchText -ErrorAction SilentlyContinue) {
+            $patchText = Read-CcGoManualPatchText
+        }
+        else {
+            $patchText = Read-PasteInputText
+        }
+
         if ([string]::IsNullOrWhiteSpace($patchText)) {
-            Write-Host "No pasted patch text." -ForegroundColor Yellow
+            Write-Host "No GO patch text." -ForegroundColor Yellow
             return $true
         }
 
