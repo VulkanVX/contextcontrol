@@ -3,6 +3,7 @@
 
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows.Input;
@@ -15,10 +16,12 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class ContextControlViewModel
 {
+    private const double CodexUsageBarTrackWidth = 98;
+
     private async Task SendAsync()
     {
         var currentMessage = PromptText.Trim();
-        if (IsImageGenWorkspaceActive && IsMessagePromptMode)
+        if (IsImageGenPromptMode && IsMessagePromptMode)
         {
             await SendImageGenerationAsync(currentMessage);
             return;
@@ -32,7 +35,7 @@ public sealed partial class ContextControlViewModel
             && !HasIncludedAttachmentKind("patch"))
         {
             PhaseTitle = "CC request detected";
-            PhaseDetail = "Send detected file/function/FIND lines and is running CC export instead of asking the model again.";
+            PhaseDetail = "Send detected file/function lines and is running CC export instead of asking the model again.";
             AppendTerminalOutput("Send detected a CC request list; running CC export.");
             await RunCcAsync();
             return;
@@ -129,10 +132,10 @@ public sealed partial class ContextControlViewModel
             return false;
         }
 
-        _lastUserRequest = resolverSource;
+        RememberWorkflowTask(resolverSource);
         PromptText = EnsureEndsWithEnd(result.RequestText);
         IsPromptOpen = true;
-        PromptModeKey = "context";
+        PreserveCodexOrUseContextPromptMode();
         SelectDockPanel("chat");
 
         var exactCount = result.RequestLines.Count(line => !line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase));
@@ -164,14 +167,6 @@ public sealed partial class ContextControlViewModel
 
     private string SelectResolverSourceText(string currentMessage)
     {
-        if ((string.IsNullOrWhiteSpace(currentMessage)
-                || LooksLikeAttachmentDiagnostic(currentMessage)
-                || LooksLikeContextOnlyPrompt(currentMessage))
-            && !string.IsNullOrWhiteSpace(_lastUserRequest))
-        {
-            return _lastUserRequest;
-        }
-
         return currentMessage;
     }
 
@@ -208,9 +203,16 @@ public sealed partial class ContextControlViewModel
     {
         if (Attachments.Any(attachment => attachment.Kind.Equals("code", StringComparison.OrdinalIgnoreCase) && attachment.IncludeInPrompt))
         {
-            return string.IsNullOrWhiteSpace(_lastUserRequest)
-                ? "Audit the attached CC source context. If the task is not clear, ask for the missing user request."
-                : _lastUserRequest;
+            var task = ResolveWorkflowTaskText();
+            if (string.IsNullOrWhiteSpace(task))
+            {
+                PhaseTitle = "Task missing";
+                PhaseDetail = "Source context is attached, but there is no saved workflow task. Type the task or run DIR with a concrete request first.";
+                AppendTerminalOutput("Empty send cancelled: CC source is attached, but no workflow task is saved for this session.");
+                return "";
+            }
+
+            return $"Task: {task}{Environment.NewLine}{Environment.NewLine}Use the attached CC source export. If more context is needed, return only the next narrow CC request list ending with END. If enough context is present, emit GO-ready CC-REPLACE blocks.";
         }
 
         if (Attachments.Any(attachment => attachment.Kind.Equals("patch", StringComparison.OrdinalIgnoreCase) && attachment.IncludeInPrompt))
@@ -220,15 +222,18 @@ public sealed partial class ContextControlViewModel
 
         if (Attachments.Any(attachment => attachment.Kind.Equals("dir", StringComparison.OrdinalIgnoreCase) && attachment.IncludeInPrompt))
         {
-            return string.IsNullOrWhiteSpace(_lastUserRequest)
-                ? "Identify the smallest useful next CC request from the attached DIR project tree."
-                : _lastUserRequest;
+            return "";
         }
 
         return "";
     }
 
     private async Task SendCodexChatAsync(string message)
+    {
+        await SendCodexChatAsync(message, 0, "");
+    }
+
+    private async Task SendCodexChatAsync(string message, int retryAttempt, string retryCorrection)
     {
         if (IsBusy)
         {
@@ -254,16 +259,28 @@ public sealed partial class ContextControlViewModel
         IsCodexRequestRunning = true;
         CodexStatus = "Preparing Codex capsule...";
         ChatRequestProgressViewModel? progressItem = null;
+        LocalLlmChatMessageViewModel? liveAssistant = null;
+        ChatSessionViewModel? targetSession = null;
+        string? retryAfterCompletion = null;
+        IReadOnlyList<ContextCapsuleAttachment> retryAttachments = [];
         try
         {
-            var targetSession = EnsureSelectedChatSession();
+            targetSession = EnsureSelectedChatSession();
             var phase = ResolveCapsulePhase(message);
+            var codexExecutionSettings = ResolveCodexExecutionSettings(phase);
+            var codexExecutionStatus = BuildCodexExecutionStatus(phase);
+            var codexModelLabel = BuildCodexChatModelLabel();
             var capsuleMessage = phase is ContextCapsulePhase.PatchWrite or ContextCapsulePhase.PatchReview
                 ? ResolvePatchTaskMessage(message)
                 : message;
+            if (!string.IsNullOrWhiteSpace(retryCorrection))
+            {
+                capsuleMessage = $"{retryCorrection.Trim()}{Environment.NewLine}{Environment.NewLine}Original user task:{Environment.NewLine}{message.Trim()}";
+            }
+
             if (phase == ContextCapsulePhase.FileRequest && IsMeaningfulTaskPrompt(message))
             {
-                _lastUserRequest = message;
+                RememberWorkflowTask(message);
             }
 
             MoveToCcStage(phase switch
@@ -280,37 +297,78 @@ public sealed partial class ContextControlViewModel
                 _processService.ContextRoot,
                 capsuleAttachments,
                 _skillbookService.BuildCodexInstructionText(phase),
-                _skillbookService.BuildEnabledInstructionText());
+                _skillbookService.BuildEnabledInstructionText(),
+                codexExecutionSettings.Model,
+                codexExecutionSettings.ReasoningEffort);
             var diagnosticPrompt = CodexHarnessService.BuildPrompt(codexRequest);
             var attachmentSnapshot = BuildSentAttachmentSnapshot(capsuleAttachments);
 
             AppendChatMessageToSession(targetSession, new LocalLlmChatMessageViewModel(
                 "user",
                 capsuleMessage,
-                "Codex CLI",
+                codexModelLabel,
                 FormatCodexPhase(phase),
                 BuildCodexCapsuleSummary(diagnosticPrompt, capsuleAttachments),
                 attachments: attachmentSnapshot,
                 diagnosticPrompt: diagnosticPrompt));
             ConsumeSentAttachments(attachmentSnapshot);
+            liveAssistant = new LocalLlmChatMessageViewModel(
+                "assistant",
+                "Codex is preparing the CC capsule...",
+                codexModelLabel,
+                FormatCodexPhase(phase),
+                "live Codex response");
+            AppendChatMessageToSession(targetSession, liveAssistant);
             PromptText = "";
             PhaseTitle = "Codex CC chat";
-            PhaseDetail = $"{FormatCodexPhase(phase)} through read-only Codex harness.";
-            ProviderStatus = "Codex CLI read-only harness";
+            PhaseDetail = $"{FormatCodexPhase(phase)} through read-only Codex harness; {codexExecutionStatus}.";
+            ProviderStatus = $"Codex CLI read-only harness; {codexExecutionStatus}";
             CodexStatus = $"Running {FormatCodexPhase(phase)}...";
+            CodexUsageSummary = "Codex prompt running; waiting for token usage...";
+            CodexRateLimitSummary = "Waiting for Codex to report 5h and weekly limit windows.";
 
-            var generationProgress = CreateGenerationProgress(targetSession, "Codex CLI", FormatCodexPhase(phase), isCancellable: true);
+            var generationProgress = CreateGenerationProgress(targetSession, codexModelLabel, FormatCodexPhase(phase), isCancellable: true);
             progressItem = generationProgress.Item;
             _codexProgressItem = progressItem;
             var terminal = CreateTerminalProgress();
             terminal.Report($"Sending {FormatCodexPhase(phase)} capsule to Codex CLI...");
+            terminal.Report($"Codex model settings: {codexExecutionStatus}.");
             terminal.Report("Codex is instructed to use CC attachments only and avoid repo navigation/actions.");
             ReportCapsuleAttachments(terminal, capsuleAttachments);
+            var liveResponse = new StringBuilder();
+            var hasLiveResponseText = false;
             var codexProgress = new Progress<LocalLlmGenerationProgress>(progress =>
             {
                 if (!string.IsNullOrWhiteSpace(progress.Status))
                 {
                     CodexStatus = progress.Status;
+                    if (!hasLiveResponseText)
+                    {
+                        liveAssistant.UpdateLiveStatus(progress.Status);
+                    }
+                }
+
+                if (progress.CodexUsage is not null)
+                {
+                    ApplyCodexUsageSnapshot(progress.CodexUsage);
+                }
+
+                if (!string.IsNullOrWhiteSpace(progress.ThinkingDelta))
+                {
+                    liveAssistant.AppendLiveThinking(progress.ThinkingDelta);
+                }
+
+                if (!string.IsNullOrWhiteSpace(progress.Delta))
+                {
+                    var delta = progress.Delta.Trim();
+                    if (liveResponse.Length > 0)
+                    {
+                        liveResponse.AppendLine();
+                    }
+
+                    liveResponse.Append(delta);
+                    liveAssistant.UpdateLiveStatus(liveResponse.ToString().Trim());
+                    hasLiveResponseText = true;
                 }
 
                 generationProgress.Progress.Report(progress);
@@ -321,40 +379,61 @@ public sealed partial class ContextControlViewModel
                 codexProgress,
                 terminal,
                 codexCancellation.Token);
+            var auditContext = BuildCodexPhaseAuditContext(phase, capsuleAttachments);
             var audit = string.IsNullOrWhiteSpace(result.Message)
                 ? null
-                : CodexPhaseAuditor.Audit(phase, result.Message, _promptBuilder);
+                : CodexPhaseAuditor.Audit(phase, result.Message, _promptBuilder, diagnosticPrompt, auditContext);
             if (audit is not null)
             {
                 ReportCodexPhaseAudit(audit);
+            }
+
+            if (phase == ContextCapsulePhase.FileRequest
+                && audit is { Passed: false }
+                && retryAttempt == 0
+                && capsuleAttachments.Any(attachment => attachment.Included && attachment.Kind.Equals("dir", StringComparison.OrdinalIgnoreCase)))
+            {
+                retryAfterCompletion = BuildCodexFileRequestRetryInstruction(audit);
+                retryAttachments = capsuleAttachments;
+                AppendTerminalOutput("Codex DIR request retry queued: previous output failed manifest validation.");
             }
 
             var assistantText = BuildCodexAssistantText(result, audit);
             var phaseHandled = false;
             if (!string.IsNullOrWhiteSpace(assistantText))
             {
-                var assistant = new LocalLlmChatMessageViewModel(
-                    "assistant",
+                liveAssistant.UpdateContent(
                     assistantText,
-                    "Codex CLI",
-                    FormatCodexPhase(phase),
-                    result.EventTrace);
-                AppendChatMessageToSession(targetSession, assistant);
-                var latestPatch = assistant.Snippets.LastOrDefault(snippet => snippet.IsPatch);
-                if (latestPatch is not null && ReferenceEquals(SelectedChatSession, targetSession))
+                    result.EventTrace,
+                    result.UsageSnapshot?.LastTokenUsage?.ToLocalLlmUsageStats());
+                RefreshLiveAssistantMessage(targetSession, liveAssistant);
+                var latestPatchBlocks = _promptBuilder.ExtractPatchBlocks(result.Message);
+                if (!string.IsNullOrWhiteSpace(latestPatchBlocks)
+                    && ReferenceEquals(SelectedChatSession, targetSession)
+                    && audit?.Passed != false)
                 {
-                    _lastAssistantPatchBlocks = latestPatch.Text;
+                    _lastAssistantPatchBlocks = latestPatchBlocks;
                 }
 
                 if (phase == ContextCapsulePhase.FileRequest)
                 {
-                    HandleFileRequestAnswer(targetSession, assistant);
+                    if (audit?.Passed == false)
+                    {
+                        PhaseTitle = retryAfterCompletion is not null ? "Retrying CC request" : "CC request invalid";
+                        PhaseDetail = audit.Summary;
+                        AppendTerminalOutput("Invalid Codex file-request output was not loaded into the prompt.");
+                    }
+                    else
+                    {
+                        HandleFileRequestAnswer(targetSession, liveAssistant);
+                    }
+
                     phaseHandled = true;
                 }
-                else if (phase == ContextCapsulePhase.PatchWrite && LooksLikeWrongPatchWriteAnswer(assistant))
+                else if (phase == ContextCapsulePhase.PatchWrite && LooksLikeWrongPatchWriteAnswer(liveAssistant))
                 {
                     PhaseTitle = "Patch answer missing";
-                    PhaseDetail = "Codex answered like DIR/file-request phase even though CC source context was attached.";
+                    PhaseDetail = "Codex answered like DIR + Request even though CC source context was attached.";
                     AppendTerminalOutput("Codex patch write warning: no CC-REPLACE patch blocks were returned.");
                     phaseHandled = true;
                 }
@@ -362,6 +441,16 @@ public sealed partial class ContextControlViewModel
 
             ProviderStatus = result.Status;
             CodexStatus = result.Status;
+            if (result.UsageSnapshot is not null)
+            {
+                ApplyCodexUsageSnapshot(result.UsageSnapshot);
+            }
+
+            if (result.UsageSnapshot?.RateLimits is null)
+            {
+                CodexRateLimitSummary = "Codex did not report 5h/weekly limits for this exec run.";
+            }
+
             if (!result.Succeeded && CodexHarnessService.IsLoginRequiredText(result.Status))
             {
                 IsCodexAuthenticated = false;
@@ -392,6 +481,8 @@ public sealed partial class ContextControlViewModel
             ProviderStatus = CodexStatus;
             PhaseTitle = "Codex stopped";
             PhaseDetail = CodexStatus;
+            liveAssistant?.UpdateContent(CodexStatus);
+            RefreshLiveAssistantMessage(targetSession, liveAssistant);
             Log("warn", CodexStatus);
         }
         catch (Exception ex)
@@ -400,6 +491,8 @@ public sealed partial class ContextControlViewModel
             ProviderStatus = ex.Message;
             PhaseTitle = "Codex failed";
             PhaseDetail = ex.Message;
+            liveAssistant?.UpdateContent($"Codex failed: {ex.Message}");
+            RefreshLiveAssistantMessage(targetSession, liveAssistant);
             Log("error", ex.Message);
         }
         finally
@@ -414,6 +507,12 @@ public sealed partial class ContextControlViewModel
             codexCancellation.Dispose();
             IsCodexRequestRunning = false;
             IsBusy = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(retryAfterCompletion))
+        {
+            RestoreIncludedAttachmentsForRetry(retryAttachments, "dir");
+            await SendCodexChatAsync(message, retryAttempt + 1, retryAfterCompletion);
         }
     }
 
@@ -439,6 +538,182 @@ public sealed partial class ContextControlViewModel
         (CancelCodexRequestCommand as RelayCommand<ChatRequestProgressViewModel>)?.RaiseCanExecuteChanged();
     }
 
+    private void RefreshLiveAssistantMessage(ChatSessionViewModel? targetSession, LocalLlmChatMessageViewModel? liveAssistant)
+    {
+        if (targetSession is null || liveAssistant is null || !ChatSessions.Contains(targetSession))
+        {
+            return;
+        }
+
+        targetSession.RefreshMessage(liveAssistant);
+        OnPropertyChanged(nameof(ChatHistorySummary));
+        if (ReferenceEquals(SelectedChatSession, targetSession))
+        {
+            OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
+        }
+
+        SaveChatHistory();
+    }
+
+    private void ApplyCodexUsageSnapshot(CodexUsageSnapshot snapshot)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot.UsageSummary))
+        {
+            CodexUsageSummary = snapshot.UsageSummary;
+        }
+
+        if (!string.IsNullOrWhiteSpace(snapshot.RateLimitSummary))
+        {
+            CodexRateLimitSummary = snapshot.RateLimitSummary;
+        }
+
+        if (snapshot.RateLimits is not null)
+        {
+            ApplyCodexRateLimitSnapshot(snapshot.RateLimits);
+        }
+    }
+
+    private void ApplyCodexRateLimitSnapshot(CodexRateLimitSnapshot? rateLimits)
+    {
+        var fiveHour = FindCodexRateLimitWindow(rateLimits, 300);
+        var weekly = FindCodexRateLimitWindow(rateLimits, 10080);
+
+        var fiveHourUsage = BuildCodexUsageLeft(fiveHour);
+        CodexFiveHourPercentLeftLabel = fiveHourUsage.Label;
+        CodexFiveHourPercentLeftValue = fiveHourUsage.Value;
+        CodexFiveHourUsageBarFillWidth = BuildCodexUsageBarFillWidth(fiveHourUsage.Value);
+        IsCodexFiveHourLimitDepleted = fiveHourUsage.IsDepleted;
+
+        var weeklyUsage = BuildCodexUsageLeft(weekly);
+        CodexWeeklyPercentLeftLabel = weeklyUsage.Label;
+        CodexWeeklyPercentLeftValue = weeklyUsage.Value;
+        CodexWeeklyUsageBarFillWidth = BuildCodexUsageBarFillWidth(weeklyUsage.Value);
+        IsCodexWeeklyLimitDepleted = weeklyUsage.IsDepleted;
+
+        CodexFiveHourResetLabel = FormatCodexUsageReset("5h", fiveHour);
+        CodexWeeklyResetLabel = FormatCodexUsageReset("weekly", weekly);
+        CodexUsageResetLabel = CodexFiveHourResetLabel;
+    }
+
+    private static CodexRateLimitWindow? FindCodexRateLimitWindow(CodexRateLimitSnapshot? rateLimits, int windowMinutes)
+    {
+        if (rateLimits is null)
+        {
+            return null;
+        }
+
+        if (rateLimits.Primary?.WindowMinutes == windowMinutes)
+        {
+            return rateLimits.Primary;
+        }
+
+        if (rateLimits.Secondary?.WindowMinutes == windowMinutes)
+        {
+            return rateLimits.Secondary;
+        }
+
+        return windowMinutes == 300
+            ? rateLimits.Primary
+            : rateLimits.Secondary;
+    }
+
+    private static (string Label, double Value, bool IsDepleted) BuildCodexUsageLeft(CodexRateLimitWindow? window)
+    {
+        if (window?.UsedPercent is not { } usedPercent)
+        {
+            return ("--", 0, true);
+        }
+
+        if (window.ResetsAt is { } resetAt && resetAt < DateTimeOffset.Now.AddMinutes(-1))
+        {
+            return ("100%", 100, false);
+        }
+
+        var left = Math.Clamp(100 - usedPercent, 0, 100);
+        return ($"{left:0.#}%", left, left <= 0.05);
+    }
+
+    private static double BuildCodexUsageBarFillWidth(double value)
+    {
+        return CodexUsageBarTrackWidth * Math.Clamp(value, 0, 100) / 100;
+    }
+
+    private static string FormatCodexUsageReset(string label, CodexRateLimitWindow? window)
+    {
+        if (window?.ResetsAt is not { } resetAt)
+        {
+            return $"{label} reset --";
+        }
+
+        var normalizedReset = NormalizeCodexReset(resetAt, window.WindowMinutes);
+        var formatted = normalizedReset.ToLocalTime().ToString("MMM d HH:mm", CultureInfo.InvariantCulture);
+        return $"{label} reset {formatted}";
+    }
+
+    private static DateTimeOffset NormalizeCodexReset(DateTimeOffset resetAt, int? windowMinutes)
+    {
+        if (windowMinutes is not > 0)
+        {
+            return resetAt;
+        }
+
+        var normalized = resetAt;
+        var now = DateTimeOffset.Now.AddMinutes(-1);
+        while (normalized < now)
+        {
+            normalized = normalized.AddMinutes(windowMinutes.Value);
+        }
+
+        return normalized;
+    }
+
+    private void PreserveCodexOrUseContextPromptMode()
+    {
+        if (!IsCodexPromptMode)
+        {
+            PromptModeKey = "context";
+        }
+    }
+
+    private async Task RefreshCodexUsageFromLogsAsync(bool showChecking = true)
+    {
+        if (_isRefreshingCodexUsage)
+        {
+            return;
+        }
+
+        _isRefreshingCodexUsage = true;
+        if (showChecking)
+        {
+            CodexUsageSummary = "Checking local Codex usage snapshots...";
+            CodexRateLimitSummary = "Checking for Codex 5h and weekly limit snapshots...";
+        }
+
+        try
+        {
+            var snapshot = await Task.Run(() => CodexHarnessService.TryReadLatestUsageSnapshotFromSessionLogs());
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (snapshot is null)
+                {
+                    CodexUsageSummary = "No local Codex usage snapshot found yet.";
+                    CodexRateLimitSummary = "Codex CLI has not reported 5h/weekly limits in local session logs.";
+                    return;
+                }
+
+                ApplyCodexUsageSnapshot(snapshot);
+                if (snapshot.RateLimits is null)
+                {
+                    CodexRateLimitSummary = "Latest Codex session reported tokens, but no 5h/weekly limit windows.";
+                }
+            });
+        }
+        finally
+        {
+            _isRefreshingCodexUsage = false;
+        }
+    }
+
     private async Task RefreshCodexStatusAsync()
     {
         if (IsRefreshingCodexStatus)
@@ -454,6 +729,10 @@ public sealed partial class ContextControlViewModel
             {
                 IsRefreshingCodexStatus = false;
                 ApplyCodexAvailability(result);
+                if (IsCodexUsagePanelVisible)
+                {
+                    _ = RefreshCodexUsageFromLogsAsync(false);
+                }
             });
         }
         catch (Exception ex)
@@ -463,6 +742,7 @@ public sealed partial class ContextControlViewModel
                 IsRefreshingCodexStatus = false;
                 var status = $"Codex CLI status check failed: {ex.Message}";
                 CodexStatus = status;
+                IsCodexCliInstalled = false;
                 IsCodexAuthenticated = false;
                 IsCodexLoginRequired = true;
                 Log("warn", status);
@@ -478,6 +758,7 @@ public sealed partial class ContextControlViewModel
         }
 
         CodexStatus = result.Status;
+        IsCodexCliInstalled = result.Available && !result.RequiresInstall;
         IsCodexAuthenticated = result.IsAuthenticated;
         IsCodexLoginRequired = result.RequiresLogin || (result.Available && !result.IsAuthenticated);
         if (IsCodexPromptAuthBlocked)
@@ -488,9 +769,20 @@ public sealed partial class ContextControlViewModel
         Log(result.Available && result.IsAuthenticated ? "ok" : "warn", result.Status);
     }
 
+    private void SwitchPromptModeFromButton(string promptModeKey)
+    {
+        PromptModeKey = promptModeKey;
+        _promptModeWorkspaceRequester?.Invoke();
+    }
+
     private void ActivateCodexPromptMode()
     {
         PromptModeKey = "codex";
+        if (IsCodexUsagePanelExpanded)
+        {
+            _ = RefreshCodexUsageFromLogsAsync(false);
+        }
+
         if (IsCodexPromptAuthBlocked)
         {
             ShowCodexPromptAuthRequired();
@@ -500,17 +792,53 @@ public sealed partial class ContextControlViewModel
 
     private void ShowCodexPromptAuthRequired()
     {
-        PhaseTitle = "Codex login required";
-        PhaseDetail = CodexPromptAuthorizeMessage;
-        CodexStatus = CodexPromptLoginMessage;
-        ProviderStatus = CodexPromptLoginMessage;
+        PhaseTitle = IsCodexCliInstalled ? "Codex login required" : "Codex install required";
+        PhaseDetail = CodexPromptAuthTitle;
+        CodexStatus = CodexPromptAuthMessage;
+        ProviderStatus = CodexPromptAuthMessage;
         IsCodexLoginRequired = true;
+    }
+
+    private void InstallCodex()
+    {
+        IsPromptOpen = true;
+        PromptModeKey = "codex";
+        IsInstallingCodex = true;
+        var result = _codexHarnessService.LaunchInstall();
+        PhaseTitle = result.Succeeded ? "Codex installer opened" : "Codex install setup";
+        PhaseDetail = result.Status;
+        ProviderStatus = result.Status;
+        CodexStatus = result.Status;
+        AppendTerminalOutput(result.Status);
+        Log(result.Succeeded ? "info" : "warn", result.Status);
+        if (result.Succeeded)
+        {
+            StartCodexLoginWatcher();
+        }
+
+        IsInstallingCodex = false;
+    }
+
+    private void OpenCodexGuide()
+    {
+        var result = _codexHarnessService.OpenOfficialGuide();
+        PhaseTitle = result.Succeeded ? "Codex guide opened" : "Codex guide";
+        PhaseDetail = result.Status;
+        ProviderStatus = result.Status;
+        AppendTerminalOutput(result.Status);
+        Log(result.Succeeded ? "info" : "warn", result.Status);
     }
 
     private void OpenCodexLogin()
     {
         IsPromptOpen = true;
         PromptModeKey = "codex";
+        if (!IsCodexCliInstalled)
+        {
+            InstallCodex();
+            return;
+        }
+
         var result = _codexHarnessService.LaunchInteractiveLogin();
         CodexStatus = result.Status;
         IsCodexAuthenticated = false;
@@ -642,7 +970,7 @@ public sealed partial class ContextControlViewModel
         IsPromptOpen = true;
         PromptModeKey = "terminal";
         PhaseTitle = "Codex doctor";
-        PhaseDetail = "Running codex doctor for install/auth/runtime diagnostics.";
+        PhaseDetail = "Running Codex doctor for install/auth/runtime diagnostics.";
         ProviderStatus = "Codex doctor running";
         var terminal = CreateTerminalProgress();
         try
@@ -677,7 +1005,7 @@ public sealed partial class ContextControlViewModel
             : message;
         if (phase == ContextCapsulePhase.FileRequest && IsMeaningfulTaskPrompt(message))
         {
-            _lastUserRequest = message;
+            RememberWorkflowTask(message);
         }
 
         MoveToCcStage(phase switch
@@ -707,8 +1035,9 @@ public sealed partial class ContextControlViewModel
             model.Id,
             model.ComfortableContext,
             requestedContextTokens,
-                _skillbookService.BuildEnabledInstructionText(),
-                capsuleAttachments));
+            _skillbookService.BuildFlowInstructionText(phase),
+            _skillbookService.BuildEnabledInstructionText(),
+            capsuleAttachments));
 
         var attachmentSnapshot = BuildSentAttachmentSnapshot(capsuleAttachments);
         var displayedAttachmentSnapshot = attachmentSnapshot
@@ -761,10 +1090,10 @@ public sealed partial class ContextControlViewModel
                     capsule.Summary,
                     result.Stats);
                 AppendChatMessageToSession(targetSession, assistant);
-                var latestPatch = assistant.Snippets.LastOrDefault(snippet => snippet.IsPatch);
-                if (latestPatch is not null && ReferenceEquals(SelectedChatSession, targetSession))
+                var latestPatchBlocks = _promptBuilder.ExtractPatchBlocks(result.Message);
+                if (!string.IsNullOrWhiteSpace(latestPatchBlocks) && ReferenceEquals(SelectedChatSession, targetSession))
                 {
-                    _lastAssistantPatchBlocks = latestPatch.Text;
+                    _lastAssistantPatchBlocks = latestPatchBlocks;
                 }
 
                 if (phase == ContextCapsulePhase.FileRequest)
@@ -774,8 +1103,8 @@ public sealed partial class ContextControlViewModel
                 else if (phase == ContextCapsulePhase.PatchWrite && LooksLikeWrongPatchWriteAnswer(assistant))
                 {
                     PhaseTitle = "Patch answer missing";
-                    PhaseDetail = "The model answered like DIR/file-request phase even though CC source context was attached.";
-                    AppendTerminalOutput("Patch write warning: model returned DIR/FIND/request-list output instead of CC-REPLACE patch blocks.");
+                    PhaseDetail = "The model answered like DIR + Request even though CC source context was attached.";
+                    AppendTerminalOutput("Patch write warning: model returned DIR/request-list output instead of CC-REPLACE patch blocks.");
                 }
 
                 if (assistant.HasThinking)
@@ -883,7 +1212,7 @@ public sealed partial class ContextControlViewModel
     {
         if (!IsImageGenConversationKind(_activeConversationKind))
         {
-            SwitchConversationKindForWorkspace();
+            SwitchConversationKindForPromptMode();
         }
 
         var targetSession = EnsureSelectedChatSession();
@@ -893,7 +1222,7 @@ public sealed partial class ContextControlViewModel
         if (model is null || (!model.IsInstalled && !model.CanUseManualBackend))
         {
             PhaseTitle = "No image gen model";
-            PhaseDetail = "Install or ready the required image generation backend, then select a model in Image Gen.";
+            PhaseDetail = "Install or ready the required image generation backend, then select a model in ImageGen mode.";
             Log("warn", "Image generation cancelled: no ready image generation model selected.");
             return;
         }
@@ -913,7 +1242,7 @@ public sealed partial class ContextControlViewModel
             "image gen",
             "prompt-only image generation"));
         PromptText = "";
-        PhaseTitle = "Image Gen";
+        PhaseTitle = "ImageGen";
         PhaseDetail = $"Generating with {model.DisplayName}.";
         ProviderStatus = model.CanUseManualBackend
             ? $"{model.BackendRequirementLabel} image gen: {model.Id}"
@@ -1158,7 +1487,75 @@ public sealed partial class ContextControlViewModel
 
     private static string FormatCodexPhase(ContextCapsulePhase phase)
     {
-        return $"codex {FormatCapsulePhase(phase)}";
+        return $"Codex {FormatCapsulePhase(phase)}";
+    }
+
+    private string BuildCodexChatModelLabel()
+    {
+        var model = string.IsNullOrWhiteSpace(_codexModelId) ? "Codex" : _codexModelId;
+        return string.IsNullOrWhiteSpace(_codexReasoningEffort)
+            ? model
+            : $"{model} / {_codexReasoningEffort}";
+    }
+
+    private CodexPhaseAuditContext? BuildCodexPhaseAuditContext(
+        ContextCapsulePhase phase,
+        IReadOnlyList<ContextCapsuleAttachment> attachments)
+    {
+        if (phase != ContextCapsulePhase.FileRequest)
+        {
+            return null;
+        }
+
+        var dirText = attachments
+            .FirstOrDefault(attachment => attachment.Included && attachment.Kind.Equals("dir", StringComparison.OrdinalIgnoreCase))
+            ?.Text;
+        if (string.IsNullOrWhiteSpace(dirText))
+        {
+            return null;
+        }
+
+        return new CodexPhaseAuditContext(
+            ContextDirManifestParser.Parse(dirText),
+            ResolveEffectiveProjectRootPath(),
+            _lastFindDiscoveryRequestPaths);
+    }
+
+    private static string BuildCodexFileRequestRetryInstruction(CodexPhaseAuditResult audit)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("Previous DIR request output was invalid for the attached DIR manifest.");
+        foreach (var detail in audit.Details.Take(6))
+        {
+            builder.AppendLine($"- {detail}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Retry once. Output only valid CC request lines ending with END.");
+        builder.AppendLine("Copy EXPAND paths exactly from visible ROOT/SCOPE records. Do not use EXPAND: ., EXPAND: ./, absolute paths, markdown, prose, or patch blocks.");
+        return builder.ToString().TrimEnd();
+    }
+
+    private void RestoreIncludedAttachmentsForRetry(
+        IReadOnlyList<ContextCapsuleAttachment> attachments,
+        params string[] kinds)
+    {
+        var kindSet = new HashSet<string>(kinds ?? [], StringComparer.OrdinalIgnoreCase);
+        foreach (var attachment in attachments ?? [])
+        {
+            if (!attachment.Included
+                || !kindSet.Contains(attachment.Kind)
+                || string.IsNullOrWhiteSpace(attachment.Path)
+                || !File.Exists(attachment.Path)
+                || Attachments.Any(existing =>
+                    existing.Kind.Equals(attachment.Kind, StringComparison.OrdinalIgnoreCase)
+                    && existing.Path.Equals(attachment.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            AddAttachment(Path.GetFileName(attachment.Path), attachment.Path, attachment.Kind);
+        }
     }
 
     private static string BuildCodexCapsuleSummary(string diagnosticPrompt, IReadOnlyList<ContextCapsuleAttachment> attachments)
@@ -1176,7 +1573,7 @@ public sealed partial class ContextControlViewModel
         if (requestSnippet is null)
         {
             PhaseTitle = "No CC lines";
-            PhaseDetail = "The model did not return file/FUNCTION/FIND lines. Refine the request or paste exact lines from DIR, then press CC.";
+            PhaseDetail = "The model did not return file/FUNCTION lines. Refine the request or paste exact lines from DIR, then press CC.";
             AppendTerminalOutput("File request stopped: model returned no usable CC request lines.");
             return;
         }
@@ -1188,7 +1585,7 @@ public sealed partial class ContextControlViewModel
 
         PromptText = EnsureEndsWithEnd(requestSnippet.Text);
         IsPromptOpen = true;
-        PromptModeKey = "context";
+        PreserveCodexOrUseContextPromptMode();
         PhaseTitle = IsFindOnlyRequestList(requestSnippet.Text) ? "Discovery request ready" : "CC request ready";
         PhaseDetail = IsFindOnlyRequestList(requestSnippet.Text)
             ? "Review the FIND lines, then press CC. FIND returns candidate files only, not source bodies."

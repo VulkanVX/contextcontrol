@@ -4,63 +4,253 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
-    xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
 >
-            <Border
-                Grid.Row="2"
-                Classes="editor-body skillbook-page"
-                Padding="8"
-                ClipToBounds="True"
-                MinHeight="0"
-                IsVisible="{Binding IsSkillbookMode}">
-              <Grid RowDefinitions="Auto,*" RowSpacing="8">
-                <Border Classes="scanner-metric-strip">
-                  <WrapPanel HorizontalAlignment="Center">
-                    <Border Classes="scanner-metric" Width="220">
-                      <Grid RowDefinitions="Auto,*" RowSpacing="0">
-                        <TextBlock Classes="scanner-metric-key" Text="Codex Instructions" />
-                        <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookCodexSummary}" />
-                      </Grid>
-                    </Border>
-                    <Border Classes="scanner-metric" Width="220">
-                      <Grid RowDefinitions="Auto,*" RowSpacing="0">
-                        <TextBlock Classes="scanner-metric-key" Text="Skillflow" />
-                        <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookSkillflowSummary}" />
-                      </Grid>
-                    </Border>
-                    <Border Classes="scanner-metric" Width="260">
-                      <Grid RowDefinitions="Auto,*" RowSpacing="0">
-                        <TextBlock Classes="scanner-metric-key" Text="Project + Global" />
-                        <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookUserSummary}" />
-                      </Grid>
-                    </Border>
-                    <Border Classes="scanner-metric" Width="360" ToolTip.Tip="{Binding ContextControl.SkillbookProjectPath}">
-                      <Grid RowDefinitions="Auto,*" RowSpacing="0">
-                        <TextBlock Classes="scanner-metric-key" Text="Project Skillbook" />
-                        <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookProjectPath}" />
-                      </Grid>
-                    </Border>
-                    <Border Classes="scanner-metric" Width="360" ToolTip.Tip="{Binding ContextControl.SkillbookGlobalPath}">
-                      <Grid RowDefinitions="Auto,*" RowSpacing="0">
-                        <TextBlock Classes="scanner-metric-key" Text="Global Skillbook" />
-                        <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookGlobalPath}" />
-                      </Grid>
-                    </Border>
-                  </WrapPanel>
-                </Border>
+  <Border
+      Grid.Row="2"
+      Classes="editor-body skillbook-page"
+      Padding="8"
+      ClipToBounds="True"
+      MinHeight="0"
+      IsVisible="{Binding IsSkillbookMode}">
+    <Grid RowDefinitions="Auto,*" RowSpacing="8">
+      <Border Classes="scanner-metric-strip" IsVisible="{Binding ContextControl.IsSkillbookInfoVisible}">
+        <WrapPanel HorizontalAlignment="Center">
+          <Border Classes="scanner-metric" Width="220">
+            <Grid RowDefinitions="Auto,*" RowSpacing="0">
+              <TextBlock Classes="scanner-metric-key" Text="Flows" />
+              <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookFlowCountSummary}" />
+            </Grid>
+          </Border>
+          <Border Classes="scanner-metric" Width="220">
+            <Grid RowDefinitions="Auto,*" RowSpacing="0">
+              <TextBlock Classes="scanner-metric-key" Text="CC Flow" />
+              <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookCcFlowSummary}" />
+            </Grid>
+          </Border>
+          <Border Classes="scanner-metric" Width="260">
+            <Grid RowDefinitions="Auto,*" RowSpacing="0">
+              <TextBlock Classes="scanner-metric-key" Text="Project + Global" />
+              <TextBlock Grid.Row="1" Classes="scanner-metric-value" Text="{Binding ContextControl.SkillbookUserSummary}" />
+            </Grid>
+          </Border>
+        </WrapPanel>
+      </Border>
 
-                <ScrollViewer
-                    Grid.Row="1"
-                    VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled"
-                    AllowAutoHide="False">
-                  <controls:SkillbookRenderControl
-                      Items="{Binding ContextControl.SkillbookEntries}"
-                      ThemeKey="{Binding ThemeKey}"
-                      UiFontFamily="{Binding UiFontFamily}"
-                      CodeFontFamily="{Binding CodeFontFamily}" />
-                </ScrollViewer>
+      <Grid Grid.Row="1" ColumnDefinitions="180,238,*" ColumnSpacing="8" MinHeight="0">
+        <Border Classes="skillbook-native-pane" MinHeight="0">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" MinHeight="0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBlock Text="Flows" Classes="skillbook-pane-title" />
+              <Button
+                  Grid.Column="1"
+                  Classes="skillbook-small-button"
+                  Content="+"
+                  ToolTip.Tip="Add project flow"
+                  Command="{Binding ContextControl.AddSkillbookFlowCommand}" />
+            </Grid>
+            <ListBox
+                x:Name="SkillbookFlowList"
+                Grid.Row="1"
+                Classes="skillbook-list"
+                ItemsSource="{Binding ContextControl.SkillbookFlows}"
+                SelectedItem="{Binding ContextControl.SelectedSkillbookFlow, Mode=TwoWay}"
+                SelectionMode="Single"
+                controls:HoverScrollbarBehavior.IsEnabled="True"
+                controls:HoverScrollbarBehavior.ReserveRight="12"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:SkillbookFlowViewModel}">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="1">
+                    <TextBlock Text="{Binding Title}" Classes="skillbook-row-title" />
+                    <TextBlock Grid.Row="1" Text="{Binding CountLabel}" Classes="skillbook-row-meta" />
+                    <TextBlock Grid.Row="2" Text="{Binding SourceLabel}" Classes="skillbook-row-meta" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Classes="skillbook-native-pane" MinHeight="0">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" MinHeight="0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBlock Text="Sections" Classes="skillbook-pane-title" />
+              <Button
+                  Grid.Column="1"
+                  Classes="skillbook-small-button"
+                  Content="+"
+                  ToolTip.Tip="Add section to selected editable flow"
+                  Command="{Binding ContextControl.AddSkillbookSectionCommand}" />
+            </Grid>
+            <Grid Grid.Row="1" RowDefinitions="130,Auto,*" RowSpacing="6" MinHeight="0">
+              <ListBox
+                  x:Name="SkillbookSectionList"
+                  Classes="skillbook-list"
+                  ItemsSource="{Binding ContextControl.SkillbookSections}"
+                  SelectedItem="{Binding ContextControl.SelectedSkillbookSection, Mode=TwoWay}"
+                  SelectionMode="Single"
+                  controls:HoverScrollbarBehavior.IsEnabled="True"
+                  controls:HoverScrollbarBehavior.ReserveRight="12"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:SkillbookSectionViewModel}">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="1">
+                      <TextBlock Text="{Binding Title}" Classes="skillbook-row-title" />
+                      <TextBlock Grid.Row="1" Text="{Binding CountLabel}" Classes="skillbook-row-meta" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBlock Text="Skills" Classes="skillbook-pane-title" />
+                <Button
+                    Grid.Column="1"
+                    Classes="skillbook-small-button"
+                    Content="+"
+                    ToolTip.Tip="Add markdown skill to selected section"
+                    Command="{Binding ContextControl.AddSkillbookSkillCommand}" />
               </Grid>
-            </Border>
+              <ListBox
+                  x:Name="SkillbookSkillList"
+                  Grid.Row="2"
+                  Classes="skillbook-list"
+                  ItemsSource="{Binding ContextControl.SkillbookSkills}"
+                  SelectedItem="{Binding ContextControl.SelectedSkillbookSkill, Mode=TwoWay}"
+                  SelectionMode="Single"
+                  controls:HoverScrollbarBehavior.IsEnabled="True"
+                  controls:HoverScrollbarBehavior.ReserveRight="12"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:SkillbookSkillViewModel}">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="1">
+                      <TextBlock Text="{Binding Title}" Classes="skillbook-row-title" />
+                      <TextBlock Grid.Row="1" Text="{Binding Summary}" Classes="skillbook-row-meta" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Column="2" RowDefinitions="Auto,*" RowSpacing="8" MinHeight="0">
+          <Border Classes="skillbook-native-pane" MaxHeight="178">
+            <Grid RowDefinitions="Auto,*" RowSpacing="6" MinHeight="0">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Text="CC Flow" Classes="skillbook-pane-title" />
+                <Button
+                    Grid.Column="1"
+                    Classes="skillbook-small-button"
+                    Content="Reload"
+                    Command="{Binding ContextControl.ReloadSkillbookCommand}" />
+              </Grid>
+              <ScrollViewer
+                  Grid.Row="1"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  controls:HoverScrollbarBehavior.IsEnabled="True"
+                  controls:HoverScrollbarBehavior.ReserveRight="12">
+                <ItemsControl ItemsSource="{Binding ContextControl.PromptFlowSteps}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:PromptFlowStepViewModel}">
+                      <Border
+                          Classes="skillbook-flow-step"
+                          Classes.current="{Binding IsCurrent}">
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Text="{Binding Title}" Classes="skillbook-flow-title" />
+                            <TextBlock Grid.Column="1" Text="{Binding Recipient}" Classes="skillbook-flow-pill" />
+                          </Grid>
+                          <Grid Grid.Row="1" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="0">
+                            <Border Classes="skillbook-flow-cell">
+                              <Grid ColumnDefinitions="72,*" ColumnSpacing="6">
+                                <TextBlock Text="Trigger" Classes="skillbook-flow-label" />
+                                <TextBlock Grid.Column="1" Text="{Binding Trigger}" Classes="skillbook-flow-meta" />
+                              </Grid>
+                            </Border>
+                            <Border Grid.Row="1" Classes="skillbook-flow-cell">
+                              <Grid ColumnDefinitions="72,*" ColumnSpacing="6">
+                                <TextBlock Text="Source" Classes="skillbook-flow-label" />
+                                <TextBlock Grid.Column="1" Text="{Binding PromptSource}" Classes="skillbook-flow-meta" />
+                              </Grid>
+                            </Border>
+                            <Border Grid.Row="2" Classes="skillbook-flow-cell">
+                              <Grid ColumnDefinitions="72,*" ColumnSpacing="6">
+                                <TextBlock Text="Attach" Classes="skillbook-flow-label" />
+                                <TextBlock Grid.Column="1" Text="{Binding Attachments}" Classes="skillbook-flow-meta" />
+                              </Grid>
+                            </Border>
+                            <Border Grid.Row="3" Classes="skillbook-flow-cell">
+                              <Grid ColumnDefinitions="72,*" ColumnSpacing="6">
+                                <TextBlock Text="Skillbook" Classes="skillbook-flow-label" />
+                                <TextBlock Grid.Column="1" Text="{Binding SkillbookInjection}" Classes="skillbook-flow-meta" />
+                              </Grid>
+                            </Border>
+                          </Grid>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="1" Classes="skillbook-native-pane" MinHeight="0" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*" RowSpacing="5" MinHeight="0">
+              <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="7">
+                <TextBlock Text="{Binding ContextControl.SkillbookSelectedSummary}" Classes="skillbook-pane-title" VerticalAlignment="Center" />
+                <CheckBox
+                    Grid.Column="1"
+                    Classes="skillbook-enabled-toggle"
+                    Content="Enabled"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding ContextControl.CanEditSelectedSkillbookSkill}"
+                    IsChecked="{Binding ContextControl.SkillbookEditorEnabled, Mode=TwoWay}" />
+                <Button
+                    Grid.Column="2"
+                    Classes="skillbook-small-button skillbook-toolbar-button"
+                    Content="{Binding ContextControl.SkillbookBuiltInEditButtonLabel}"
+                    IsVisible="{Binding ContextControl.ShowSkillbookBuiltInEditButton}"
+                    Command="{Binding ContextControl.ToggleSkillbookBuiltInEditCommand}" />
+                <Button
+                    Grid.Column="3"
+                    Classes="skillbook-small-button skillbook-toolbar-button"
+                    Content="Revert"
+                    Command="{Binding ContextControl.RevertSkillbookSkillCommand}" />
+                <Button
+                    Grid.Column="4"
+                    Classes="skillbook-small-button skillbook-toolbar-button primary"
+                    Content="Save"
+                    Command="{Binding ContextControl.SaveSkillbookSkillCommand}" />
+              </Grid>
+              <TextBox
+                  Grid.Row="1"
+                  Classes="skillbook-markdown-editor"
+                  MinHeight="0"
+                  FontSize="{Binding PromptWindowFontSize}"
+                  LineHeight="{Binding PromptWindowLineHeight}"
+                  AcceptsReturn="True"
+                  TextWrapping="Wrap"
+                  IsReadOnly="{Binding ContextControl.IsSkillbookEditorReadOnly}"
+                  Text="{Binding ContextControl.SkillbookEditorText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                  controls:HoverScrollbarBehavior.IsEnabled="True"
+                  controls:HoverScrollbarBehavior.ReserveRight="12"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            </Grid>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Border>
 </UserControl>

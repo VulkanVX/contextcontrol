@@ -33,7 +33,9 @@ public sealed partial class MainWindow
         if (e.PropertyName == nameof(WorkbenchViewModel.ThemeKey)
             || e.PropertyName == nameof(WorkbenchViewModel.UiFontFamily)
             || e.PropertyName == nameof(WorkbenchViewModel.UiFontColorModeKey)
+            || e.PropertyName == nameof(WorkbenchViewModel.ChatAppearanceKey)
             || e.PropertyName == nameof(WorkbenchViewModel.CustomUiFontColorHex)
+            || e.PropertyName == nameof(WorkbenchViewModel.UiFontSize)
             || e.PropertyName == nameof(WorkbenchViewModel.CodeFontFamily)
             || e.PropertyName == nameof(WorkbenchViewModel.SkinKey)
             || e.PropertyName == nameof(WorkbenchViewModel.ThemeAdaptFileCountColor)
@@ -114,7 +116,9 @@ public sealed partial class MainWindow
         var codeFont = ViewModel?.CodeFontFamily;
         var skin = ViewModel?.SkinKey;
         var uiFontColorMode = ViewModel?.UiFontColorModeKey;
+        var chatAppearance = ViewModel?.ChatAppearanceKey;
         var customUiFontColor = ViewModel?.CustomUiFontColorHex;
+        var uiFontSize = ViewModel?.UiFontSize;
         WorkbenchThemeResources.Apply(
             this,
             key,
@@ -122,13 +126,15 @@ public sealed partial class MainWindow
             codeFont,
             skinKey: skin,
             uiFontColorModeKey: uiFontColorMode,
+            chatAppearanceKey: chatAppearance,
             customUiFontColor: customUiFontColor,
             themeAdaptFileCountColor: ViewModel?.ThemeAdaptFileCountColor ?? false,
             themeAdaptLocColor: ViewModel?.ThemeAdaptLocColor ?? false,
             themeAdaptVersionColor: ViewModel?.ThemeAdaptVersionColor ?? false,
-            themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false);
+            themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false,
+            uiFontSize: uiFontSize);
         ProjectTreeView?.InvalidateVisual();
-        _themeSettingsWindow?.ApplyTheme(key, uiFont, codeFont, skin, uiFontColorMode, customUiFontColor);
+        _themeSettingsWindow?.ApplyTheme(key, uiFont, codeFont, skin, uiFontColorMode, customUiFontColor, uiFontSize, chatAppearance);
     }
 
     private void RefreshWindowTitle()

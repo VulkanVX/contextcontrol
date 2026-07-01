@@ -123,6 +123,26 @@ public sealed partial class WorkbenchViewModel
     public string UiFontColorModeKey => SelectedUiFontColorMode.Key;
     public bool UseCustomUiFontColor => string.Equals(UiFontColorModeKey, "custom", StringComparison.OrdinalIgnoreCase);
 
+    public ThemeOptionViewModel SelectedChatAppearance
+    {
+        get => _selectedChatAppearance;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            if (SetProperty(ref _selectedChatAppearance, value))
+            {
+                OnPropertyChanged(nameof(ChatAppearanceKey));
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
+    public string ChatAppearanceKey => SelectedChatAppearance.Key;
+
     public Color CustomUiFontColor
     {
         get => _customUiFontColor;
@@ -410,6 +430,76 @@ public sealed partial class WorkbenchViewModel
         }
     }
 
+    public double UiFontSize
+    {
+        get => _uiFontSize;
+        set
+        {
+            var next = NormalizeAppearanceFontSize(value, 11.0);
+            if (SetProperty(ref _uiFontSize, next))
+            {
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
+    public double CodeEditorFontSize
+    {
+        get => _codeEditorFontSize;
+        set
+        {
+            var next = NormalizeAppearanceFontSize(value, 12.0);
+            if (SetProperty(ref _codeEditorFontSize, next))
+            {
+                OnPropertyChanged(nameof(CodeEditorLineHeight));
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
+    public double CodeEditorLineHeight => Math.Max(12.0, CodeEditorFontSize + 4.0);
+
+    public double PromptWindowFontSize
+    {
+        get => _promptWindowFontSize;
+        set
+        {
+            var next = NormalizeAppearanceFontSize(value, 12.0);
+            if (SetProperty(ref _promptWindowFontSize, next))
+            {
+                OnPropertyChanged(nameof(PromptWindowLineHeight));
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
+    public double PromptWindowLineHeight => Math.Max(12.0, PromptWindowFontSize * 1.5);
+
+    public double ChatWindowFontSize
+    {
+        get => _chatWindowFontSize;
+        set
+        {
+            var next = NormalizeAppearanceFontSize(value, 10.0);
+            if (SetProperty(ref _chatWindowFontSize, next))
+            {
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
+    public bool AutoSwitchPromptModesToChat
+    {
+        get => _autoSwitchPromptModesToChat;
+        set
+        {
+            if (SetProperty(ref _autoSwitchPromptModesToChat, value))
+            {
+                SaveAppearanceSettings();
+            }
+        }
+    }
+
     public WorkbenchModeOptionViewModel SelectedWorkspaceMode
     {
         get => _selectedWorkspaceMode;
@@ -429,11 +519,9 @@ public sealed partial class WorkbenchViewModel
             OnPropertyChanged(nameof(IsLlmsMode));
             OnPropertyChanged(nameof(IsDependenciesMode));
             OnPropertyChanged(nameof(IsChatMode));
-            OnPropertyChanged(nameof(IsImageGenMode));
             OnPropertyChanged(nameof(IsConversationMode));
             OnPropertyChanged(nameof(IsSkillbookMode));
             OnPropertyChanged(nameof(IsProjectScannerMode));
-            ContextControl.IsImageGenWorkspaceActive = IsImageGenMode;
             SaveAppearanceSettings();
         }
     }
@@ -456,10 +544,7 @@ public sealed partial class WorkbenchViewModel
     public bool IsChatMode =>
         string.Equals(SelectedWorkspaceMode.Key, "chat", StringComparison.OrdinalIgnoreCase);
 
-    public bool IsImageGenMode =>
-        string.Equals(SelectedWorkspaceMode.Key, "imagegen", StringComparison.OrdinalIgnoreCase);
-
-    public bool IsConversationMode => IsChatMode || IsImageGenMode;
+    public bool IsConversationMode => IsChatMode;
 
     public bool IsSkillbookMode =>
         string.Equals(SelectedWorkspaceMode.Key, "skillbook", StringComparison.OrdinalIgnoreCase);

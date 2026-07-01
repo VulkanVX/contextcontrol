@@ -26,9 +26,9 @@
     </Grid.RowDefinitions>
     <parts:MainTitleBar x:Name="MainTitleBar" />
 
-    <Grid Grid.Row="1" RowSpacing="8" Margin="8" MinHeight="0">
+    <Grid Grid.Row="1" RowSpacing="4" Margin="6" MinHeight="0">
     <Grid.RowDefinitions>
-      <RowDefinition Height="42" />
+      <RowDefinition Height="24" />
       <RowDefinition Height="*" MinHeight="0" />
     </Grid.RowDefinitions>
     <parts:ProjectTabsBar />
@@ -53,8 +53,8 @@
         <Border Grid.Column="1" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True" Margin="0,0,1,0" MinHeight="0">
           <Grid MinHeight="0">
             <Grid.RowDefinitions>
-              <RowDefinition Height="30" />
-              <RowDefinition Height="42" />
+              <RowDefinition Height="22" />
+              <RowDefinition Height="32" />
               <RowDefinition Height="*" MinHeight="0" />
             </Grid.RowDefinitions>
             <parts:WorkspaceHeaderBar Grid.Row="0" Grid.RowSpan="2" />
@@ -87,6 +87,52 @@
                   x:Name="ContextPromptBar"
                   MinHeight="0"
                   ClipToBounds="True" />
+
+              <Border
+                  Classes="cc-usage-overlay"
+                  ClipToBounds="True"
+                  IsVisible="{Binding ContextControl.IsCodexUsagePanelVisible}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                  <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
+                    <TextBlock Classes="cc-usage-label" Text="5h % left" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Classes="cc-usage-value"
+                        Text="{Binding ContextControl.CodexFiveHourPercentLeftLabel}" />
+                    <Border
+                        Grid.Row="2"
+                        Classes="cc-usage-bar-track">
+                      <Border
+                          Classes="cc-usage-bar-fill"
+                          Classes.depleted="{Binding ContextControl.IsCodexFiveHourLimitDepleted}"
+                          Width="{Binding ContextControl.CodexFiveHourUsageBarFillWidth}" />
+                    </Border>
+                    <TextBlock
+                        Grid.Row="3"
+                        Classes="cc-usage-reset"
+                        Text="{Binding ContextControl.CodexFiveHourResetLabel}" />
+                  </Grid>
+                  <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
+                    <TextBlock Classes="cc-usage-label" Text="Weekly % left" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Classes="cc-usage-value"
+                        Text="{Binding ContextControl.CodexWeeklyPercentLeftLabel}" />
+                    <Border
+                        Grid.Row="2"
+                        Classes="cc-usage-bar-track">
+                      <Border
+                          Classes="cc-usage-bar-fill"
+                          Classes.depleted="{Binding ContextControl.IsCodexWeeklyLimitDepleted}"
+                          Width="{Binding ContextControl.CodexWeeklyUsageBarFillWidth}" />
+                    </Border>
+                    <TextBlock
+                        Grid.Row="3"
+                        Classes="cc-usage-reset"
+                        Text="{Binding ContextControl.CodexWeeklyResetLabel}" />
+                  </Grid>
+                </Grid>
+              </Border>
             </controls:PromptDockHost>
 
           </Grid>

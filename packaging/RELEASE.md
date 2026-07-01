@@ -42,7 +42,7 @@ No LLM weights, dependency runtimes, chat history, source files, tests, or build
 
 The workbench checks GitHub releases on startup and exposes a header-bar **Check updates** button. If a newer release exists, the button downloads `ContextControl-win-x64-Setup.exe` and starts it with the current install folder preselected. The updater reuses an already downloaded installer for the same release, cleans stale temp update folders when possible, hands setup off only after the running Workbench process exits, and setup skips unchanged files while extracting.
 
-Codex prompt mode is gated on Codex CLI authentication. The prompt is read-only while Codex is selected but not logged in, shows **Please login into codex to use it**, and settings expose Login, Refresh, Doctor, and Logout actions. Login launches Windows PowerShell by full path inside Windows Terminal when available, avoiding `wt.exe` child-command error 2147942402 on machines where `powershell` is not resolvable by name.
+Codex prompt mode is gated on Codex CLI setup and authentication. The prompt is read-only while Codex is selected but not installed or logged in, and settings expose Install, Guide, Login, Refresh, Doctor, and Logout actions. Install is best-effort: Windows uses the Codex `winget` package, while macOS/Linux open the official standalone installer route; Guide is the fallback when package managers, admin policy, network, or PATH refresh block automation. Login launches Windows PowerShell by full path inside Windows Terminal when available, avoiding `wt.exe` child-command error 2147942402 on machines where `powershell` is not resolvable by name.
 
 Current app-side autosetup coverage documented in the README and packaged install guide:
 
@@ -64,6 +64,6 @@ Fresh Windows Python bootstrap: managed Python dependencies ignore the Microsoft
 
 SmartScreen/reputation note: the release script can Authenticode-sign the setup EXE when `CONTEXTCONTROL_SIGNING_PFX_BASE64` and `CONTEXTCONTROL_SIGNING_PFX_PASSWORD` are configured. Unsigned public builds can still show Windows reputation warnings.
 
-Skillbook is packaged only as draft data right now; the desktop Skillbook feature is not currently usable.
+Skillbook now ships as the v1 flow library UI. The built-in Context Control flow is shown as read-only **CC Flow**, project/global legacy markdown still loads, and editable project markdown-folder flows can be created, renamed, enabled/disabled, saved, and reloaded. Full per-phase custom prompt activation remains a later customization pass.
 
 The GitHub Actions workflow `.github/workflows/contextcontrol-release.yml` builds the installer on `workflow_dispatch` and attaches the setup EXE plus checksum to releases when a `v*` tag is pushed. The zip is not required for end-user install.

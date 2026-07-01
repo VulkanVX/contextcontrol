@@ -7,7 +7,10 @@ public sealed record ContextControlCommandResult(
     int ExitCode,
     string StandardOutput,
     string StandardError,
-    string? OutputFile = null)
+    string? OutputFile = null,
+    string Runner = "PowerShell",
+    TimeSpan? Elapsed = null,
+    string? FallbackReason = null)
 {
     public bool Succeeded => ExitCode == 0;
 }

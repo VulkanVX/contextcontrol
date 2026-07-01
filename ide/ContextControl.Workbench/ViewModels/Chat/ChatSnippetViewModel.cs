@@ -2,9 +2,27 @@
 
 namespace ContextControl.Workbench.ViewModels;
 
+public sealed record PatchPlanSnippetRow(
+    string FileName,
+    string Version,
+    string Added,
+    string Removed,
+    string Loc,
+    string Target,
+    string Actions);
+
+public sealed record PatchSnippetPreviewRow(
+    string FileName,
+    string Mode,
+    string Detail,
+    string BodyLabel,
+    string Target);
+
 public sealed class ChatSnippetViewModel(string kind, string language, string text, string suggestedFileName = "") : ObservableObject
 {
     private bool _isExpanded;
+    private IReadOnlyList<PatchPlanSnippetRow>? _patchPlanRows;
+    private IReadOnlyList<PatchSnippetPreviewRow>? _patchPreviewRows;
 
     public string Kind { get; } = string.IsNullOrWhiteSpace(kind) ? "code" : kind.Trim();
     public string Language { get; } = string.IsNullOrWhiteSpace(language) ? "text" : language.Trim();
@@ -13,18 +31,23 @@ public sealed class ChatSnippetViewModel(string kind, string language, string te
 
     public bool IsPatch => string.Equals(Kind, "patch", StringComparison.OrdinalIgnoreCase);
     public bool IsRequestList => string.Equals(Kind, "request", StringComparison.OrdinalIgnoreCase);
-    public bool IsCode => !IsPatch && !IsRequestList;
+    public bool IsSourceRequestList => IsRequestList && string.Equals(Language, "cc-request-source", StringComparison.OrdinalIgnoreCase);
+    public bool IsFindRequestList => IsRequestList && string.Equals(Language, "cc-request-find", StringComparison.OrdinalIgnoreCase);
+    public bool IsExpandRequestList => IsRequestList && string.Equals(Language, "cc-request-expand", StringComparison.OrdinalIgnoreCase);
+    public bool IsPatchPlan => string.Equals(Kind, "patch-plan", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Language, "cc-patch-plan", StringComparison.OrdinalIgnoreCase);
+    public bool IsCode => !IsPatch && !IsRequestList && !IsPatchPlan;
     public bool CanSaveAsFile => IsCode && !string.IsNullOrWhiteSpace(Text);
     public bool CanCreateProjectFile => CanSaveAsFile && LooksLikeCompleteFile(Language, Text);
     public bool HasPromptAction => IsPatch || IsRequestList;
 
     public string TypeLabel => IsPatch
         ? "patch"
-        : IsRequestList ? "request" : Language.ToLowerInvariant();
+        : IsRequestList ? "request" : IsPatchPlan ? "plan" : Language.ToLowerInvariant();
 
     public string Title => IsPatch
-        ? "CC-REPLACE patch"
-        : IsRequestList ? "CC request list" : $"Code snippet: {Language}";
+        ? PatchLabel
+        : IsRequestList ? ResolveRequestMetaLabel() : IsPatchPlan ? "Patch file plan" : $"Code snippet: {Language}";
 
     public string ActionLabel => IsPatch
         ? "Send to Prompt"
@@ -34,19 +57,53 @@ public sealed class ChatSnippetViewModel(string kind, string language, string te
         ? 0
         : Text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n').Length;
 
-    public string MetaLabel => IsCode && !string.IsNullOrWhiteSpace(SuggestedFileName)
-        ? $"{Language} - {LineCount:N0} lines - {Text.Length:N0} chars - file {SuggestedFileName}"
-        : $"{Language} - {LineCount:N0} lines - {Text.Length:N0} chars";
+    public string MetaLabel => IsPatch
+        ? PatchLabel
+        : IsRequestList ? ResolveRequestMetaLabel() : IsPatchPlan ? "Patch plan" : ResolveCodeMetaLabel();
 
     public string CompactMetaLabel
     {
         get
         {
-            var meta = $"{TypeLabel} - {LineCount:N0} lines - {Text.Length:N0} chars - {FormatSize(Text.Length)}";
-            return IsCode && !string.IsNullOrWhiteSpace(SuggestedFileName)
-                ? $"{meta} - {SuggestedFileName}"
-                : meta;
+            if (IsPatchPlan)
+            {
+                return "Patch plan";
+            }
+
+            if (IsPatch)
+            {
+                return PatchLabel;
+            }
+
+            return IsRequestList ? ResolveRequestMetaLabel() : ResolveCodeMetaLabel();
         }
+    }
+
+    private string ResolveRequestMetaLabel()
+    {
+        if (IsSourceRequestList)
+        {
+            return "CC source request";
+        }
+
+        if (IsFindRequestList)
+        {
+            return "CC FIND request";
+        }
+
+        if (IsExpandRequestList)
+        {
+            return "CC EXPAND request";
+        }
+
+        return "CC request";
+    }
+
+    private string ResolveCodeMetaLabel()
+    {
+        return IsCode && !string.IsNullOrWhiteSpace(SuggestedFileName)
+            ? SuggestedFileName
+            : Language;
     }
 
     public string DocumentPath => IsPatch
@@ -54,14 +111,39 @@ public sealed class ChatSnippetViewModel(string kind, string language, string te
         : IsRequestList ? "request.md" : SuggestedFileName;
 
     public double CodePreviewHeight => Math.Clamp(42 + Math.Min(LineCount, 16) * 16, 88, 260);
-    public double CollapsedPreviewHeight => 30;
+    public double CollapsedPreviewHeight => IsPatch
+        ? Math.Clamp(8 + Math.Max(1, Math.Min(PatchPreviewRows.Count, 4)) * 16, 24, 74)
+        : 24;
     public double DisplayHeight => IsExpanded ? CodePreviewHeight : CollapsedPreviewHeight;
     public string DisplayText => IsExpanded ? Text : PreviewText;
+    public IReadOnlyList<PatchPlanSnippetRow> PatchPlanRows => IsPatchPlan ? _patchPlanRows ??= ParsePatchPlanRows(Text) : [];
+    public IReadOnlyList<PatchSnippetPreviewRow> PatchPreviewRows => IsPatch ? _patchPreviewRows ??= ParsePatchPreviewRows(Text) : [];
+    public int PatchBlockCount => IsPatch ? PatchPreviewRows.Count : 0;
+    public int PatchTargetCount => IsPatch
+        ? PatchPreviewRows
+            .Where(row => !string.IsNullOrWhiteSpace(row.Target))
+            .Select(row => row.Target)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count()
+        : 0;
+
+    private string PatchLabel => IsPatch
+        ? PatchBlockCount <= 0
+            ? "CC-Replace patch"
+            : PatchBlockCount == 1
+            ? "CC-Replace patch: 1 block"
+            : $"CC-Replace patch: {PatchBlockCount:N0} blocks"
+        : "";
 
     public string PreviewText
     {
         get
         {
+            if (IsPatch)
+            {
+                return BuildPatchPreviewText(PatchPreviewRows);
+            }
+
             var clean = (Text ?? "")
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace('\r', '\n')
@@ -121,20 +203,159 @@ public sealed class ChatSnippetViewModel(string kind, string language, string te
         IsExpanded = !IsExpanded;
     }
 
-    private static string FormatSize(int charCount)
+    private static IReadOnlyList<PatchPlanSnippetRow> ParsePatchPlanRows(string text)
     {
-        if (charCount < 1024)
+        var rows = new List<PatchPlanSnippetRow>();
+        foreach (var rawLine in (text ?? "")
+                     .Replace("\r\n", "\n", StringComparison.Ordinal)
+                     .Replace('\r', '\n')
+                     .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            return $"{charCount:N0} B";
+            var parts = rawLine.Split('\t');
+            if (parts.Length < 7)
+            {
+                continue;
+            }
+
+            rows.Add(new PatchPlanSnippetRow(
+                parts[0].Trim(),
+                parts[1].Trim(),
+                parts[2].Trim(),
+                parts[3].Trim(),
+                parts[4].Trim(),
+                parts[5].Trim(),
+                parts[6].Trim()));
         }
 
-        var kib = charCount / 1024d;
-        if (kib < 1024)
+        return rows;
+    }
+
+    private static IReadOnlyList<PatchSnippetPreviewRow> ParsePatchPreviewRows(string text)
+    {
+        var rows = new List<PatchSnippetPreviewRow>();
+        var inBlock = false;
+        var inBody = false;
+        var target = "";
+        var mode = "";
+        var name = "";
+        var header = "";
+        var bodyLines = 0;
+
+        foreach (var rawLine in NormalizeLines(text))
         {
-            return $"{kib:N1} KB";
+            var line = rawLine.Trim();
+            if (line.Equals("BEGIN CC-REPLACE", StringComparison.OrdinalIgnoreCase))
+            {
+                inBlock = true;
+                inBody = false;
+                target = "";
+                mode = "";
+                name = "";
+                header = "";
+                bodyLines = 0;
+                continue;
+            }
+
+            if (!inBlock)
+            {
+                continue;
+            }
+
+            if (line.Equals("END CC-REPLACE", StringComparison.OrdinalIgnoreCase))
+            {
+                var cleanMode = string.IsNullOrWhiteSpace(mode) ? "mode?" : mode;
+                var cleanTarget = string.IsNullOrWhiteSpace(target) ? "(unknown target)" : target;
+                var detail = !string.IsNullOrWhiteSpace(name)
+                    ? name
+                    : !string.IsNullOrWhiteSpace(header) ? header : "";
+                var bodyLabel = bodyLines > 0 ? $"{bodyLines:N0} LOC" : "bodyless";
+                rows.Add(new PatchSnippetPreviewRow(
+                    BuildFileName(cleanTarget, cleanMode.Equals("create_directory", StringComparison.OrdinalIgnoreCase)),
+                    cleanMode,
+                    detail,
+                    bodyLabel,
+                    cleanTarget));
+                inBlock = false;
+                continue;
+            }
+
+            if (line.Equals("---", StringComparison.Ordinal))
+            {
+                inBody = true;
+                continue;
+            }
+
+            if (inBody)
+            {
+                bodyLines++;
+                continue;
+            }
+
+            if (line.StartsWith("FILE:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("DIR:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("PATH:", StringComparison.OrdinalIgnoreCase))
+            {
+                var separator = line.IndexOf(':', StringComparison.Ordinal);
+                target = separator >= 0 ? line[(separator + 1)..].Trim() : "";
+            }
+            else if (line.StartsWith("MODE:", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = line["MODE:".Length..].Trim();
+            }
+            else if (line.StartsWith("NAME:", StringComparison.OrdinalIgnoreCase))
+            {
+                name = line["NAME:".Length..].Trim();
+            }
+            else if (line.StartsWith("HEADER:", StringComparison.OrdinalIgnoreCase))
+            {
+                header = line["HEADER:".Length..].Trim();
+            }
         }
 
-        return $"{kib / 1024d:N1} MB";
+        return rows;
+    }
+
+    private static string BuildPatchPreviewText(IReadOnlyList<PatchSnippetPreviewRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return "CC-Replace patch";
+        }
+
+        var lines = rows
+            .Take(4)
+            .Select(row =>
+            {
+                var detail = string.IsNullOrWhiteSpace(row.Detail) ? "" : $" :: {row.Detail}";
+                return $"{row.FileName}  {row.Mode}{detail}  {row.BodyLabel}";
+            })
+            .ToList();
+        if (rows.Count > lines.Count)
+        {
+            lines.Add($"+ {rows.Count - lines.Count:N0} more block(s)");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static IEnumerable<string> NormalizeLines(string text)
+    {
+        return (text ?? "")
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n');
+    }
+
+    private static string BuildFileName(string target, bool isDirectory)
+    {
+        var normalized = (target ?? "").Replace('\\', '/').TrimEnd('/');
+        var fileName = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = isDirectory ? "directory" : "(unknown target)";
+        }
+
+        return isDirectory ? $"{fileName}/" : fileName;
     }
 
     private static string ResolveSuggestedFileName(string? language, string? text, string? explicitFileName)

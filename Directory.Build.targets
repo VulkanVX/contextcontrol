@@ -1,0 +1,85 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ContextControl.Workbench'">
+    <BuildContextControlNative Condition="'$(BuildContextControlNative)' == ''">true</BuildContextControlNative>
+    <ContextControlNativeRequired Condition="'$(ContextControlNativeRequired)' == ''">false</ContextControlNativeRequired>
+    <ContextControlRepositoryRoot>$(MSBuildProjectDirectory)\..\..</ContextControlRepositoryRoot>
+    <ContextControlNativeSourceDir>$(ContextControlRepositoryRoot)\native\contextcontrol</ContextControlNativeSourceDir>
+    <ContextControlNativeBuildDir>$(ContextControlRepositoryRoot)\build\native-contextcontrol</ContextControlNativeBuildDir>
+    <ContextControlNativeExeName Condition="'$(OS)' == 'Windows_NT'">ccnative.exe</ContextControlNativeExeName>
+    <ContextControlNativeExeName Condition="'$(ContextControlNativeExeName)' == ''">ccnative</ContextControlNativeExeName>
+  </PropertyGroup>
+
+  <Target
+    Name="BuildContextControlNativeExporter"
+    AfterTargets="Build"
+    Condition="'$(MSBuildProjectName)' == 'ContextControl.Workbench' and '$(BuildContextControlNative)' == 'true' and Exists('$(ContextControlNativeSourceDir)\CMakeLists.txt')">
+    <Message Text="Building ContextControl native exporter..." Importance="Low" />
+
+    <Exec
+      Command="cmake -S &quot;$(ContextControlNativeSourceDir)&quot; -B &quot;$(ContextControlNativeBuildDir)&quot; -DCMAKE_BUILD_TYPE=$(Configuration)"
+      IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_ContextControlNativeConfigureExitCode" />
+    </Exec>
+
+    <Error
+      Condition="'$(ContextControlNativeRequired)' == 'true' and '$(_ContextControlNativeConfigureExitCode)' != '0'"
+      Text="ContextControl native exporter CMake configure failed." />
+    <Warning
+      Condition="'$(ContextControlNativeRequired)' != 'true' and '$(_ContextControlNativeConfigureExitCode)' != '0'"
+      Text="ContextControl native exporter CMake configure failed; Workbench will use PowerShell fallback." />
+
+    <Exec
+      Command="cmake --build &quot;$(ContextControlNativeBuildDir)&quot; --config $(Configuration)"
+      Condition="'$(_ContextControlNativeConfigureExitCode)' == '0'"
+      IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_ContextControlNativeBuildExitCode" />
+    </Exec>
+
+    <Error
+      Condition="'$(ContextControlNativeRequired)' == 'true' and '$(_ContextControlNativeConfigureExitCode)' == '0' and '$(_ContextControlNativeBuildExitCode)' != '0'"
+      Text="ContextControl native exporter build failed." />
+    <Warning
+      Condition="'$(ContextControlNativeRequired)' != 'true' and '$(_ContextControlNativeConfigureExitCode)' == '0' and '$(_ContextControlNativeBuildExitCode)' != '0'"
+      Text="ContextControl native exporter build failed; Workbench will use PowerShell fallback." />
+
+    <ItemGroup>
+      <_ContextControlNativeBinary Remove="@(_ContextControlNativeBinary)" />
+      <_ContextControlNativeBinary
+        Include="$(ContextControlNativeBuildDir)\$(Configuration)\$(ContextControlNativeExeName)"
+        Condition="Exists('$(ContextControlNativeBuildDir)\$(Configuration)\$(ContextControlNativeExeName)')" />
+      <_ContextControlNativeBinary
+        Include="$(ContextControlNativeBuildDir)\$(ContextControlNativeExeName)"
+        Condition="Exists('$(ContextControlNativeBuildDir)\$(ContextControlNativeExeName)')" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(_ContextControlNativeBinary)"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(_ContextControlNativeBinary)' != ''" />
+    <Error
+      Condition="'$(ContextControlNativeRequired)' == 'true' and '$(_ContextControlNativeConfigureExitCode)' == '0' and '$(_ContextControlNativeBuildExitCode)' == '0' and '@(_ContextControlNativeBinary)' == ''"
+      Text="ContextControl native exporter built but no executable was found." />
+  </Target>
+
+  <Target
+    Name="CopyContextControlNativeExporterToPublish"
+    AfterTargets="Publish"
+    Condition="'$(MSBuildProjectName)' == 'ContextControl.Workbench' and '$(BuildContextControlNative)' == 'true'">
+    <ItemGroup>
+      <_ContextControlNativePublishBinary Remove="@(_ContextControlNativePublishBinary)" />
+      <_ContextControlNativePublishBinary
+        Include="$(ContextControlNativeBuildDir)\$(Configuration)\$(ContextControlNativeExeName)"
+        Condition="Exists('$(ContextControlNativeBuildDir)\$(Configuration)\$(ContextControlNativeExeName)')" />
+      <_ContextControlNativePublishBinary
+        Include="$(ContextControlNativeBuildDir)\$(ContextControlNativeExeName)"
+        Condition="Exists('$(ContextControlNativeBuildDir)\$(ContextControlNativeExeName)')" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(_ContextControlNativePublishBinary)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(_ContextControlNativePublishBinary)' != '' and '$(PublishDir)' != ''" />
+  </Target>
+</Project>

@@ -30,6 +30,8 @@ internal static class SourceDependencyEnvironment
     private static readonly Dictionary<string, SourceDependencySpec> SpecsById =
         Specs.ToDictionary(spec => spec.Id, StringComparer.OrdinalIgnoreCase);
 
+    public static IReadOnlyList<SourceDependencySpec> AllSpecs => Specs;
+
     public static bool HasManagedInstaller(string dependencyId)
     {
         return SpecsById.ContainsKey(dependencyId);

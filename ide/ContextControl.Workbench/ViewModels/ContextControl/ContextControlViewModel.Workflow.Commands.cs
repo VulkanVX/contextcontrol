@@ -34,10 +34,11 @@ public sealed partial class ContextControlViewModel
             var pendingTask = PromptText.Trim();
             if (IsMeaningfulTaskPrompt(pendingTask))
             {
-                _lastUserRequest = pendingTask;
+                RememberWorkflowTask(pendingTask, save: false);
             }
 
             _semanticIndex = null;
+            _lastFindDiscoveryRequestPaths = [];
 
             RemoveAttachmentsByKind("code", "patch");
             _lastAssistantPatchBlocks = "";
@@ -46,48 +47,185 @@ public sealed partial class ContextControlViewModel
             UpdatePatchPlanActions(null);
             AddAttachment(Path.GetFileName(_processService.DirectoryExportPath), _processService.DirectoryExportPath, "dir");
             LastExportPath = _processService.DirectoryExportPath;
+            await RefreshSemanticIndexFromDirAsync();
             PromptText = StripLegacyDirPayload(PromptText);
             PhaseTitle = "DIR ready";
             PhaseDetail = IsAutopilotEnabled
-                ? "Bus stop 2: project tree attached. Press Send so the model returns exact CC file/FUNCTION/FIND lines."
-                : "Project tree attached. Press Send to ask the model for CC request lines, or paste your own lines and press CC.";
+                ? "Phase 1: project tree attached. Send the request with DIR so the model returns exact CC file/FUNCTION lines."
+                : "Project tree attached. Send a concrete request for CC lines, or paste your own lines and press CC.";
             AppendTerminalOutput($"DIR export ready: {Path.GetFileName(_processService.DirectoryExportPath)} attached.");
         });
+    }
+
+    private async Task RunDirTreeExportAsync()
+    {
+        await RunBusyAsync("TREE export", async () =>
+        {
+            var result = await _processService.RunDirectoryTreeExportAsync(ActiveProjectRoot, ActiveProjectRulesPath);
+            LogResult(result);
+
+            if (!result.Succeeded)
+            {
+                PhaseTitle = "TREE export failed";
+                PhaseDetail = FirstErrorLine(result);
+                AppendTerminalOutput($"TREE export failed: {PhaseDetail}");
+                return;
+            }
+
+            LastExportPath = _processService.DirectoryTreeExportPath;
+            PhaseTitle = "TREE ready";
+            PhaseDetail = "Legacy tree export created. File uses compact directory tree format.";
+            AppendTerminalOutput($"TREE export ready: {Path.GetFileName(_processService.DirectoryTreeExportPath)} written.");
+        });
+    }
+
+    private async Task RefreshSemanticIndexFromDirAsync()
+    {
+        try
+        {
+            var dirText = await _processService.ReadOutputFileAsync(_processService.DirectoryExportPath);
+            var semantic = await _semanticMapBuilder.BuildIndexAsync(ActiveProjectRoot, dirText);
+            _semanticIndex = semantic.Index;
+            await _processService.WriteSemanticMapAsync(semantic.SemanticMapText);
+            AppendTerminalOutput($"DIR semantic resolver ready: {_semanticIndex.Files.Count:N0} indexed file(s).");
+        }
+        catch (Exception ex)
+        {
+            _semanticIndex = null;
+            AppendTerminalOutput($"DIR semantic resolver skipped: {ex.Message}");
+            Log("warn", $"DIR semantic resolver skipped: {ex.Message}");
+        }
     }
 
     private async Task RunCcAsync()
     {
         await RunBusyAsync("CC export", async () =>
         {
-            var requestLines = _promptBuilder.BuildCodeExportRequestLines(PromptText);
+            var effectiveProjectRoot = ResolveEffectiveProjectRootPath();
+            var parse = RepairFunctionOwnerRequestLines(
+                _promptBuilder.ParsePhase1RequestLines(PromptText),
+                effectiveProjectRoot,
+                out var repairMessages);
+            foreach (var repairMessage in repairMessages)
+            {
+                AppendTerminalOutput(repairMessage);
+            }
+
+            var requestLines = parse.RequestLines;
             if (requestLines.Count == 0)
             {
                 PhaseTitle = "CC needs input";
-                PhaseDetail = "Paste clean file/function/FIND lines, or a quoted model list, into the prompt bar first.";
+                PhaseDetail = "Paste clean file/function lines, or a quoted model list, into the prompt bar first.";
                 Log("warn", "CC cancelled: no request lines.");
-                AppendTerminalOutput("CC cancelled: no usable file/function/FIND request lines found.");
+                AppendTerminalOutput("CC cancelled: no usable file/function request lines found.");
                 return;
             }
 
-            var missingPaths = FindMissingRequestPaths(requestLines);
-            if (missingPaths.Count > 0)
+            var manifest = await LoadCurrentDirManifestAsync();
+            var writeActiveRequestToPrompt = true;
+            IReadOnlyList<string> queuedFindLines = [];
+            IReadOnlyList<MixedCcInvalidSourceLine> mixedInvalidSourceLines = [];
+            ContextPhase1ValidationResult validation;
+            if (TryBuildMixedCcRequestPlan(
+                    parse,
+                    manifest,
+                    effectiveProjectRoot,
+                    _lastFindDiscoveryRequestPaths,
+                    out var mixedPlan))
             {
-                PhaseTitle = "CC path not found";
-                PhaseDetail = missingPaths.Count == 1
-                    ? $"Not in project tree: {missingPaths[0]}"
-                    : $"{missingPaths.Count} request paths are not in the active project tree.";
-                Log("warn", $"CC cancelled: missing request path {missingPaths[0]}");
-                AppendTerminalOutput("CC cancelled: these request paths are not in the active project tree:");
-                foreach (var missing in missingPaths.Take(8))
+                queuedFindLines = mixedPlan.FindLines;
+                mixedInvalidSourceLines = mixedPlan.InvalidSourceLines;
+                foreach (var invalidSourceLine in mixedInvalidSourceLines)
                 {
-                    AppendTerminalOutput($"  {missing}");
+                    AppendTerminalOutput($"Mixed CC source line invalid: {invalidSourceLine.Line} -> {invalidSourceLine.Error}");
                 }
 
-                AppendTerminalOutput("Use real paths from DIR, or use FIND: text for discovery.");
+                if (mixedPlan.ValidSourceLines.Count == 0)
+                {
+                    PhaseTitle = "CC mixed request blocked";
+                    PhaseDetail = mixedInvalidSourceLines.Count > 0
+                        ? "Source request lines are invalid. FIND was not run automatically."
+                        : "Mixed source/FIND request has no valid source lines. FIND was not run automatically.";
+                    AppendTerminalOutput("CC mixed request stopped: FIND discovery remains queued and was not run automatically.");
+                    AppendQueuedFindRequestChatMessage(queuedFindLines, mixedInvalidSourceLines);
+                    return;
+                }
+
+                validation = ContextPhase1RequestValidator.Validate(
+                    new ContextRequestLineParseResult(mixedPlan.ValidSourceLines, [], true),
+                    manifest,
+                    effectiveProjectRoot,
+                    _lastFindDiscoveryRequestPaths);
+                writeActiveRequestToPrompt = false;
+                AppendTerminalOutput("Mixed CC request staged: exporting valid source lines first; FIND remains queued separately.");
+            }
+            else
+            {
+                validation = ContextPhase1RequestValidator.Validate(
+                    parse,
+                    manifest,
+                    effectiveProjectRoot,
+                    _lastFindDiscoveryRequestPaths);
+            }
+
+            if (!validation.IsValid)
+            {
+                PhaseTitle = "CC request invalid";
+                PhaseDetail = validation.Error;
+                Log("warn", $"CC cancelled: {validation.Error}");
+                AppendTerminalOutput($"CC cancelled: {validation.Error}");
+                if (validation.Candidates.Count > 0)
+                {
+                    AppendTerminalOutput("Nearest visible manifest candidates:");
+                    foreach (var candidate in validation.Candidates.Take(6))
+                    {
+                        AppendTerminalOutput($"  {candidate}");
+                    }
+                }
+
                 return;
             }
 
-            PromptText = EnsureEndsWithEnd(string.Join(Environment.NewLine, requestLines));
+            requestLines = validation.RequestLines;
+            if (validation.Kind.Equals("expand", StringComparison.OrdinalIgnoreCase))
+            {
+                var scope = validation.ExpandScope;
+                _lastFindDiscoveryRequestPaths = [];
+                PromptText = EnsureEndsWithEnd($"EXPAND: {scope}");
+                PhaseTitle = "DIR expand";
+                PhaseDetail = $"Expanding scoped DIR manifest: {scope}";
+                AppendTerminalOutput($"DIR expand started for {scope}.");
+                var expandResult = await _processService.RunDirectoryExpandAsync(scope, ActiveProjectRoot, ActiveProjectRulesPath);
+                LogResult(expandResult);
+
+                if (!expandResult.Succeeded)
+                {
+                    PhaseTitle = "DIR expand failed";
+                    PhaseDetail = FirstErrorLine(expandResult);
+                    AppendTerminalOutput($"DIR expand failed: {PhaseDetail}");
+                    return;
+                }
+
+                RemoveAttachmentsByKind("dir", "code", "patch");
+                _lastAssistantPatchBlocks = "";
+                IsPatchPlanReady = false;
+                PatchSummary = "No patch loaded.";
+                UpdatePatchPlanActions(null);
+                AddAttachment(Path.GetFileName(_processService.DirectoryExportPath), _processService.DirectoryExportPath, "dir");
+                LastExportPath = _processService.DirectoryExportPath;
+                await RefreshSemanticIndexFromDirAsync();
+                PromptText = "";
+                PhaseTitle = "DIR expanded";
+                PhaseDetail = "Scoped manifest attached. Send the request again so the model returns exact source request lines.";
+                AppendTerminalOutput($"DIR expand complete: {Path.GetFileName(_processService.DirectoryExportPath)} replaced the previous DIR manifest.");
+                return;
+            }
+
+            if (writeActiveRequestToPrompt)
+            {
+                PromptText = EnsureEndsWithEnd(string.Join(Environment.NewLine, requestLines));
+            }
+
             PhaseTitle = "CC export";
             PhaseDetail = $"Exporting {requestLines.Count} selected source/function request line(s).";
             AppendTerminalOutput($"CC export started with {requestLines.Count} request line(s).");
@@ -113,6 +251,7 @@ public sealed partial class ContextControlViewModel
 
                 if (matchedFiles.Count == 0)
                 {
+                    _lastFindDiscoveryRequestPaths = [];
                     PromptText = "";
                     PhaseTitle = "FIND found nothing";
                     PhaseDetail = "Discovery exported no matching source files. Try a narrower exact term from the DIR tree.";
@@ -125,6 +264,7 @@ public sealed partial class ContextControlViewModel
                     return;
                 }
 
+                _lastFindDiscoveryRequestPaths = matchedFiles.ToArray();
                 PromptText = EnsureEndsWithEnd(string.Join(Environment.NewLine, matchedFiles));
                 PhaseTitle = "FIND matched files";
                 PhaseDetail = $"Discovery found {matchedFiles.Count:N0} candidate file(s). Review the prompt lines, then press CC again to export source.";
@@ -142,15 +282,322 @@ public sealed partial class ContextControlViewModel
             UpdatePatchPlanActions(null);
             AddAttachment(Path.GetFileName(_processService.CodeExportPath), _processService.CodeExportPath, "code");
             LastExportPath = _processService.CodeExportPath;
-            PromptText = string.IsNullOrWhiteSpace(_lastUserRequest)
-                ? ""
-                : _lastUserRequest;
+            _lastFindDiscoveryRequestPaths = [];
+            PromptText = "";
             PhaseTitle = "Context ready";
             PhaseDetail = IsAutopilotEnabled
-                ? "Bus stop 4: source context attached. Press Send for source audit; ask explicitly for a patch only when needed."
-                : "Source context attached. Press Send for audit/analysis, or ask explicitly for CC-REPLACE patch blocks.";
+                ? "Phase 2: source attached. The prompt is intentionally empty; send for the CC decision or add a short clarification."
+                : "Source context attached. Send an optional clarification for analysis, more context, or CC-REPLACE patch blocks.";
             AppendTerminalOutput($"CC export complete: {requestLines.Count} request line(s) exported.");
+            if (queuedFindLines.Count > 0)
+            {
+                AppendTerminalOutput("Queued FIND discovery remains available as a separate CC request.");
+                AppendQueuedFindRequestChatMessage(queuedFindLines, mixedInvalidSourceLines);
+            }
         });
+    }
+
+    private sealed record MixedCcRequestPlan(
+        IReadOnlyList<string> ValidSourceLines,
+        IReadOnlyList<MixedCcInvalidSourceLine> InvalidSourceLines,
+        IReadOnlyList<string> FindLines);
+
+    private sealed record MixedCcInvalidSourceLine(string Line, string Error);
+
+    private static bool TryBuildMixedCcRequestPlan(
+        ContextRequestLineParseResult parse,
+        ContextDirManifest manifest,
+        string projectRoot,
+        IReadOnlyCollection<string>? trustedFindRequestPaths,
+        out MixedCcRequestPlan plan)
+    {
+        plan = new MixedCcRequestPlan([], [], []);
+        if (parse.ExtraLines.Count > 0 || !parse.EndsWithEnd)
+        {
+            return false;
+        }
+
+        var findLines = parse.RequestLines
+            .Where(line => line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var sourceLines = parse.RequestLines
+            .Where(line => !line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase)
+                && !line.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (findLines.Length == 0 || sourceLines.Length == 0)
+        {
+            return false;
+        }
+
+        var validSourceLines = new List<string>();
+        var invalidSourceLines = new List<MixedCcInvalidSourceLine>();
+        foreach (var sourceLine in sourceLines)
+        {
+            var validation = ContextPhase1RequestValidator.Validate(
+                new ContextRequestLineParseResult([sourceLine], [], true),
+                manifest,
+                projectRoot,
+                trustedFindRequestPaths);
+            if (validation.IsValid)
+            {
+                validSourceLines.AddRange(validation.RequestLines);
+                continue;
+            }
+
+            invalidSourceLines.Add(new MixedCcInvalidSourceLine(sourceLine, validation.Error));
+        }
+
+        plan = new MixedCcRequestPlan(
+            validSourceLines.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            invalidSourceLines,
+            findLines);
+        return true;
+    }
+
+    private static ContextRequestLineParseResult RepairFunctionOwnerRequestLines(
+        ContextRequestLineParseResult parse,
+        string projectRoot,
+        out IReadOnlyList<string> repairMessages)
+    {
+        var messages = new List<string>();
+        if (string.IsNullOrWhiteSpace(projectRoot) || parse.RequestLines.Count == 0)
+        {
+            repairMessages = messages;
+            return parse;
+        }
+
+        var repairedLines = new List<string>(parse.RequestLines.Count);
+        foreach (var line in parse.RequestLines)
+        {
+            if (TryRepairFunctionOwnerLine(projectRoot, line, out var repairedLine)
+                && !string.Equals(line, repairedLine, StringComparison.Ordinal))
+            {
+                repairedLines.Add(repairedLine);
+                messages.Add($"CC request repaired: {line} -> {repairedLine}");
+                continue;
+            }
+
+            repairedLines.Add(line);
+        }
+
+        repairMessages = messages;
+        return messages.Count == 0
+            ? parse
+            : new ContextRequestLineParseResult(repairedLines, parse.ExtraLines, parse.EndsWithEnd);
+    }
+
+    private static bool TryRepairFunctionOwnerLine(
+        string projectRoot,
+        string line,
+        out string repairedLine)
+    {
+        repairedLine = line;
+        const string prefix = "FUNCTION ";
+        if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var payload = line[prefix.Length..].Trim();
+        var separatorIndex = payload.LastIndexOf(" :: ", StringComparison.Ordinal);
+        var separatorLength = " :: ".Length;
+        if (separatorIndex < 0)
+        {
+            separatorIndex = payload.LastIndexOf("::", StringComparison.Ordinal);
+            separatorLength = "::".Length;
+        }
+
+        if (separatorIndex <= 0)
+        {
+            return false;
+        }
+
+        var relativePath = payload[..separatorIndex].Trim();
+        var symbol = payload[(separatorIndex + separatorLength)..].Trim();
+        if (relativePath.Length == 0
+            || symbol.Length == 0
+            || relativePath.Contains('*')
+            || Path.IsPathRooted(relativePath))
+        {
+            return false;
+        }
+
+        var requestedAbsolutePath = Path.Combine(
+            projectRoot,
+            relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (File.Exists(requestedAbsolutePath))
+        {
+            var requestedContent = TryReadTextFile(requestedAbsolutePath);
+            if (ContainsSymbolDeclaration(requestedContent, symbol))
+            {
+                return false;
+            }
+        }
+
+        var ownerPath = TryFindFunctionOwnerPath(projectRoot, relativePath, symbol);
+        if (string.IsNullOrWhiteSpace(ownerPath))
+        {
+            return false;
+        }
+
+        repairedLine = $"FUNCTION {ownerPath} :: {symbol}";
+        return true;
+    }
+
+    private static string? TryFindFunctionOwnerPath(
+        string projectRoot,
+        string requestedRelativePath,
+        string symbol)
+    {
+        var requestedDirectory = Path.GetDirectoryName(requestedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        var requestedFileName = Path.GetFileNameWithoutExtension(requestedRelativePath);
+        if (string.IsNullOrWhiteSpace(requestedFileName))
+        {
+            return null;
+        }
+
+        var searchRoot = string.IsNullOrWhiteSpace(requestedDirectory)
+            ? projectRoot
+            : Path.Combine(projectRoot, requestedDirectory);
+        if (!Directory.Exists(searchRoot))
+        {
+            searchRoot = projectRoot;
+        }
+
+        try
+        {
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                MatchCasing = MatchCasing.CaseInsensitive
+            };
+            var candidates = Directory.EnumerateFiles(searchRoot, $"{requestedFileName}*.cs", options)
+                .Select(path => new
+                {
+                    AbsolutePath = path,
+                    RelativePath = Path.GetRelativePath(projectRoot, path).Replace('\\', '/')
+                })
+                .Where(candidate => !candidate.RelativePath.Contains("/bin/", StringComparison.OrdinalIgnoreCase)
+                    && !candidate.RelativePath.Contains("/obj/", StringComparison.OrdinalIgnoreCase))
+                .Select(candidate => new
+                {
+                    candidate.AbsolutePath,
+                    candidate.RelativePath,
+                    Content = TryReadTextFile(candidate.AbsolutePath)
+                })
+                .Where(candidate => !string.IsNullOrEmpty(candidate.Content)
+                    && candidate.Content.Contains(symbol, StringComparison.Ordinal))
+                .OrderByDescending(candidate => ContainsSymbolDeclaration(candidate.Content, symbol))
+                .ThenBy(candidate => candidate.RelativePath.Length)
+                .ThenBy(candidate => candidate.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return candidates.Length == 1 || candidates.Length > 0
+                ? candidates[0].RelativePath
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string TryReadTextFile(string path)
+    {
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static bool ContainsSymbolDeclaration(string content, string symbol)
+    {
+        foreach (var rawLine in content.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || !line.Contains(symbol, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var symbolIndex = line.IndexOf(symbol, StringComparison.Ordinal);
+            if (symbolIndex <= 0)
+            {
+                continue;
+            }
+
+            var prefix = line[..symbolIndex].Trim();
+            if (!LooksLikeCSharpMemberDeclarationPrefix(prefix))
+            {
+                continue;
+            }
+
+            var suffix = line[(symbolIndex + symbol.Length)..];
+            if (suffix.StartsWith("(", StringComparison.Ordinal)
+                || suffix.StartsWith(" ", StringComparison.Ordinal)
+                || suffix.StartsWith("\t", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool LooksLikeCSharpMemberDeclarationPrefix(string prefix)
+    {
+        if (prefix.Contains("=>", StringComparison.Ordinal)
+            || prefix.Contains("=", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var tokens = prefix.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        return tokens.Any(token => token is "public" or "private" or "protected" or "internal");
+    }
+
+    private void AppendQueuedFindRequestChatMessage(
+        IReadOnlyList<string> findLines,
+        IReadOnlyList<MixedCcInvalidSourceLine> invalidSourceLines)
+    {
+        if (findLines.Count == 0)
+        {
+            return;
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Source and FIND run separately.");
+        if (invalidSourceLines.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("Invalid source lines:");
+            foreach (var invalidSourceLine in invalidSourceLines)
+            {
+                builder.AppendLine($"- {invalidSourceLine.Line} ({invalidSourceLine.Error})");
+            }
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Queued FIND discovery request:");
+        foreach (var findLine in findLines)
+        {
+            builder.AppendLine(findLine);
+        }
+
+        builder.Append("END");
+        AppendChatMessage(new LocalLlmChatMessageViewModel(
+            "assistant",
+            builder.ToString(),
+            "ContextControl",
+            "CC request"));
     }
 
     private async Task RunGoPreviewAsync()
@@ -205,7 +652,7 @@ public sealed partial class ContextControlViewModel
             UpdatePatchPlanActions(planReady ? summary : null);
             PhaseTitle = planReady ? "Patch planned" : "Patch preview failed";
             PhaseDetail = planReady
-                ? "Review the plan, then apply effective edits from the dock."
+                ? "Review the patch files below, then apply effective edits or apply all."
                 : failureDetail;
             AppendTerminalOutput(planReady ? PatchSummary : $"GO preview failed: {PhaseDetail}");
             AppendChatMessage(new LocalLlmChatMessageViewModel(
@@ -225,6 +672,7 @@ public sealed partial class ContextControlViewModel
     {
         await RunBusyAsync("GO apply", async () =>
         {
+            var plannedFiles = PatchPlanFiles.ToArray();
             PhaseTitle = "Applying patch";
             PhaseDetail = string.Equals(decision, "all", StringComparison.OrdinalIgnoreCase)
                 ? "Applying all ccReplace actions."
@@ -237,9 +685,13 @@ public sealed partial class ContextControlViewModel
             AppendTerminalOutput(result.Succeeded ? $"GO apply complete: {decision} edits applied." : $"GO apply failed: {PhaseDetail}");
             AppendChatMessage(new LocalLlmChatMessageViewModel(
                 "assistant",
-                BuildPatchApplyChatText(result, decision),
+                BuildPatchApplyChatText(result, decision, plannedFiles),
                 "ccReplace",
                 "GO apply"));
+            if (result.Succeeded)
+            {
+                UpdatePatchPlanActions(null);
+            }
         });
     }
 

@@ -1,10 +1,12 @@
 # Build output
 bin/
 obj/
+build/
 TestResults/
 
 # ContextControl runtime output
 .tmp/
+.ccDirProfile.json
 .ccReplace.versions/
 .ccReplace.settings*.json
 .ccFileRules.json

@@ -48,6 +48,7 @@
 
   <Style Selector="Window">
     <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}" />
+    <Setter Property="FontSize" Value="{DynamicResource UiFontSize}" />
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
   </Style>
 
@@ -231,6 +232,11 @@
       <Setter Property="Background" Value="{DynamicResource DropdownSelectedBrush}" />
     </Style>
 
+    <Style Selector="MenuItem">
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="9,4" />
+    </Style>
+
     <Style Selector="ContextMenu.project-tree-context-menu">
       <Setter Property="Background" Value="{DynamicResource DropdownBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
@@ -239,9 +245,8 @@
     </Style>
 
     <Style Selector="MenuItem.project-tree-context-item">
-      <Setter Property="Height" Value="22" />
-      <Setter Property="MinHeight" Value="22" />
-      <Setter Property="Padding" Value="9,1" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="9,4" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
       <Setter Property="FontSize" Value="10.5" />
       <Setter Property="FontWeight" Value="Bold" />
@@ -317,6 +322,10 @@
 
     <Style Selector="Border.edit-dropdown.view-dropdown">
       <Setter Property="MinWidth" Value="176" />
+    </Style>
+
+    <Style Selector="Border.edit-dropdown.prompt-mode-dropdown">
+      <Setter Property="MinWidth" Value="96" />
     </Style>
 
     <Style Selector="Button.edit-dropdown-item">
@@ -398,14 +407,14 @@
     </Style>
 
     <Style Selector="Button.project-tile">
-      <Setter Property="Width" Value="118" />
-      <Setter Property="Height" Value="30" />
-      <Setter Property="Margin" Value="0,0,5,0" />
-      <Setter Property="Padding" Value="5,4" />
+      <Setter Property="Width" Value="112" />
+      <Setter Property="Height" Value="19" />
+      <Setter Property="Margin" Value="0,0,3,0" />
+      <Setter Property="Padding" Value="4,0" />
       <Setter Property="Background" Value="{DynamicResource ProjectTileBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="5" />
       <Setter Property="Opacity" Value="0.62" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="VerticalContentAlignment" Value="Stretch" />
@@ -423,9 +432,9 @@
     </Style>
 
     <Style Selector="Border.project-tile-icon">
-      <Setter Property="Width" Value="20" />
-      <Setter Property="Height" Value="20" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="CornerRadius" Value="3" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -433,7 +442,7 @@
 
     <Style Selector="TextBlock.project-tab-name">
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="FontSize" Value="9.5" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -442,7 +451,7 @@
     <Style Selector="TextBlock.project-info-line">
       <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontSize" Value="9" />
       <Setter Property="FontWeight" Value="Black" />
       <Setter Property="HorizontalAlignment" Value="Right" />
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -450,8 +459,8 @@
     </Style>
 
     <Style Selector="Button.project-window-toggle">
-      <Setter Property="Width" Value="10" />
-      <Setter Property="Height" Value="10" />
+      <Setter Property="Width" Value="9" />
+      <Setter Property="Height" Value="9" />
       <Setter Property="MinWidth" Value="0" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Padding" Value="0" />
@@ -475,8 +484,8 @@
     </Style>
 
     <Style Selector="Button.project-info-switch">
-      <Setter Property="Height" Value="19" />
-      <Setter Property="MinHeight" Value="19" />
+      <Setter Property="Height" Value="17" />
+      <Setter Property="MinHeight" Value="17" />
       <Setter Property="Width" Value="112" />
       <Setter Property="Padding" Value="7,0" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
@@ -487,7 +496,7 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="9.5" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
@@ -498,16 +507,16 @@
     </Style>
 
     <Style Selector="Button.header-mini">
-      <Setter Property="Height" Value="20" />
-      <Setter Property="MinHeight" Value="20" />
-      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="Height" Value="17" />
+      <Setter Property="MinHeight" Value="17" />
+      <Setter Property="Padding" Value="5,0" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="5" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -545,16 +554,16 @@
   </Style>
 
   <Style Selector="Button.tree-detail-toggle">
-      <Setter Property="Height" Value="20" />
-      <Setter Property="MinHeight" Value="20" />
-      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="Height" Value="17" />
+      <Setter Property="MinHeight" Value="17" />
+      <Setter Property="Padding" Value="4,0" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="CornerRadius" Value="4" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />

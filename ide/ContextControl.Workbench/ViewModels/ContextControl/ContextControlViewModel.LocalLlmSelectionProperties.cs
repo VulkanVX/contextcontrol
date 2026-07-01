@@ -66,6 +66,7 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(SelectedLocalModelLabel));
                 OnPropertyChanged(nameof(SelectedActiveLocalModel));
                 OnPropertyChanged(nameof(PromptContextPressureLabel));
+                OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
                 OnPropertyChanged(nameof(PromptFooterSummary));
                 OnPropertyChanged(nameof(PromptModelCapabilityHint));
                 OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
@@ -108,6 +109,7 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(SelectedLocalModelLabel));
                 OnPropertyChanged(nameof(SelectedActiveLocalModel));
                 OnPropertyChanged(nameof(PromptContextPressureLabel));
+                OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
                 OnPropertyChanged(nameof(PromptFooterSummary));
                 OnPropertyChanged(nameof(PromptModelCapabilityHint));
                 OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
@@ -117,7 +119,7 @@ public sealed partial class ContextControlViewModel
 
     public LocalLlmModelViewModel? SelectedActiveLocalModel
     {
-        get => IsImageGenWorkspaceActive ? SelectedImageGenerationModel : SelectedLocalModel;
+        get => IsImageGenPromptMode ? SelectedImageGenerationModel : SelectedLocalModel;
         set
         {
             if (value is null)
@@ -125,7 +127,7 @@ public sealed partial class ContextControlViewModel
                 return;
             }
 
-            if (IsImageGenWorkspaceActive)
+            if (IsImageGenPromptMode)
             {
                 if (value.IsImageGenerationModel)
                 {
@@ -140,7 +142,7 @@ public sealed partial class ContextControlViewModel
     }
 
     public IEnumerable<LocalLlmModelViewModel> ActiveInstalledLocalModels =>
-        IsImageGenWorkspaceActive ? InstalledImageGenerationModels : InstalledLocalModels;
+        IsImageGenPromptMode ? InstalledImageGenerationModels : InstalledLocalModels;
 
     public string SelectedLocalModelLabel => SelectedActiveLocalModel?.DisplayName ?? "No installed local model";
 
@@ -322,6 +324,77 @@ public sealed partial class ContextControlViewModel
         }
     }
 
+    public string CodexModelId
+    {
+        get => string.IsNullOrWhiteSpace(_codexModelId) ? DefaultCodexModelId : _codexModelId;
+        set
+        {
+            var clean = CleanCodexOption(value);
+            if (SetProperty(ref _codexModelId, clean))
+            {
+                _settings.CodexModel = clean;
+                OnPropertyChanged(nameof(CodexModelStatus));
+                OnPropertyChanged(nameof(PromptFooterSummary));
+                SaveSettingsQuietly();
+            }
+        }
+    }
+
+    public string CodexReasoningEffort
+    {
+        get => string.IsNullOrWhiteSpace(_codexReasoningEffort) ? DefaultCodexReasoningEffort : _codexReasoningEffort;
+        set
+        {
+            var clean = NormalizeCodexReasoningOption(value);
+            if (SetProperty(ref _codexReasoningEffort, clean))
+            {
+                _settings.CodexReasoningEffort = clean;
+                OnPropertyChanged(nameof(CodexModelStatus));
+                OnPropertyChanged(nameof(PromptFooterSummary));
+                SaveSettingsQuietly();
+            }
+        }
+    }
+
+    public string CodexModelStatus
+    {
+        get
+        {
+            var model = string.IsNullOrWhiteSpace(_codexModelId) ? DefaultCodexModelId : _codexModelId;
+            var reasoning = string.IsNullOrWhiteSpace(_codexReasoningEffort) ? DefaultCodexReasoningEffort : _codexReasoningEffort;
+            reasoning = $"{reasoning} reasoning";
+            return $"{model}; {reasoning}";
+        }
+    }
+
+    private (string Model, string ReasoningEffort) ResolveCodexExecutionSettings(ContextCapsulePhase phase)
+    {
+        var model = string.IsNullOrWhiteSpace(_codexModelId) ? DefaultCodexModelId : _codexModelId;
+        var reasoning = string.IsNullOrWhiteSpace(_codexReasoningEffort) ? DefaultCodexReasoningEffort : _codexReasoningEffort;
+        if (string.Equals(model, CustomFlowCodexModelId, StringComparison.OrdinalIgnoreCase))
+        {
+            var flowSettings = _skillbookService.ResolveCodexFlowSettings(phase);
+            var flowModel = CleanCodexOption(flowSettings.Model);
+            var flowReasoning = NormalizeCodexReasoningOption(flowSettings.ReasoningEffort);
+            return (
+                string.IsNullOrWhiteSpace(flowModel) ? DefaultCodexModelId : flowModel,
+                string.IsNullOrWhiteSpace(flowReasoning) ? reasoning : flowReasoning);
+        }
+
+        return (model, reasoning);
+    }
+
+    private string BuildCodexExecutionStatus(ContextCapsulePhase phase)
+    {
+        var settings = ResolveCodexExecutionSettings(phase);
+        if (string.Equals(CodexModelId, CustomFlowCodexModelId, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{CustomFlowCodexModelId} -> {settings.Model}; {settings.ReasoningEffort} reasoning";
+        }
+
+        return $"{settings.Model}; {settings.ReasoningEffort} reasoning";
+    }
+
     public string OllamaModelsDirectory
     {
         get => _ollamaModelsDirectory;
@@ -381,6 +454,24 @@ public sealed partial class ContextControlViewModel
         PhaseTitle = "HF token recommended";
         PhaseDetail = model.HuggingFaceTokenWarning;
         Log("warn", $"{model.DisplayName}: {model.HuggingFaceTokenWarning}");
+    }
+
+    private static string CleanCodexOption(string? value)
+    {
+        var clean = string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+        return string.Equals(clean, CodexDefaultOptionLabel, StringComparison.OrdinalIgnoreCase) ? "" : clean;
+    }
+
+    private static string NormalizeCodexReasoningOption(string? value)
+    {
+        return CleanCodexOption(value).ToLowerInvariant() switch
+        {
+            "low" => "low",
+            "medium" => "medium",
+            "high" => "high",
+            "xhigh" => "xhigh",
+            _ => ""
+        };
     }
 
 }

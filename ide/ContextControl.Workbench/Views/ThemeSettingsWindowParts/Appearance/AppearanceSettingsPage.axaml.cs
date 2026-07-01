@@ -18,6 +18,7 @@ public sealed partial class AppearanceSettingsPage : UserControl
     internal ComboBox SyntaxThemePickerControl => SyntaxThemePicker;
     internal ComboBox CodeFontPickerControl => CodeFontPicker;
     internal ComboBox UiFontPickerControl => UiFontPicker;
+    internal ComboBox ChatAppearancePickerControl => ChatAppearancePicker;
     internal Button SummaryArrowOptionsToggleButtonControl => SummaryArrowOptionsToggleButton;
     internal Border SummaryArrowOptionsPanelControl => SummaryArrowOptionsPanel;
     internal ComboBox FoldArrowPositionPickerControl => FoldArrowPositionPicker;
@@ -35,6 +36,8 @@ public sealed partial class AppearanceSettingsPage : UserControl
     private void OnCodeFontSelectionChanged(object? sender, SelectionChangedEventArgs e) => OwnerWindow?.OnCodeFontSelectionChanged(sender, e);
 
     private void OnUiFontSelectionChanged(object? sender, SelectionChangedEventArgs e) => OwnerWindow?.OnUiFontSelectionChanged(sender, e);
+
+    private void OnChatAppearanceSelectionChanged(object? sender, SelectionChangedEventArgs e) => OwnerWindow?.OnChatAppearanceSelectionChanged(sender, e);
 
     private void OnOptionPickerDropDownClosed(object? sender, EventArgs e) => OwnerWindow?.OnOptionPickerDropDownClosed(sender, e);
 

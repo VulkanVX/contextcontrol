@@ -9,27 +9,19 @@ public sealed class SkillbookEntryViewModel(SkillbookEntry entry) : ObservableOb
     public string Key { get; } = entry.Key;
     public string Title { get; } = entry.Title;
     public string Text { get; } = entry.Text;
-    public string Source { get; } = entry.Source;
+    public string Source { get; } = SkillbookService.NormalizeSource(entry.Source);
     public bool Enabled { get; } = entry.Enabled;
-    public string SourceLabel => Source.ToLowerInvariant() switch
-    {
-        "project" => "Project",
-        "codex" => "Codex",
-        "skillflow" => "Skillflow",
-        _ => "Global"
-    };
-    public int SourceRank => Source.ToLowerInvariant() switch
-    {
-        "codex" => 0,
-        "skillflow" => 1,
-        "project" => 2,
-        "global" => 3,
-        _ => 4
-    };
-    public string SectionTitle => Source.ToLowerInvariant() switch
+    public string FlowTitle { get; } = entry.FlowTitle;
+    public string SectionName { get; } = entry.SectionTitle;
+    public bool IsEditable { get; } = entry.IsEditable;
+    public bool IsBuiltIn { get; } = entry.IsBuiltIn;
+    public string SourceLabel => SkillbookService.SourceLabel(Source);
+    public int SourceRank => SkillbookService.SourceRank(Source);
+    public string SectionTitle => SkillbookService.NormalizeSource(Source).ToLowerInvariant() switch
     {
         "codex" => "Codex Instructions",
-        "skillflow" => "Skillflow",
+        "cc-main" => "CC Main",
+        "cc-flow" => "CC Flow",
         "project" => "Project Skillbook",
         "global" => "Global Skillbook",
         _ => "Skillbook"

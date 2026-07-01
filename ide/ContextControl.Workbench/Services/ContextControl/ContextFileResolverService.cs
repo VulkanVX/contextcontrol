@@ -350,39 +350,26 @@ public sealed class ContextFileResolverService
     private static IEnumerable<string> BuildFindLines(string userMessage, IReadOnlyList<string> queryWords)
     {
         var words = queryWords.Where(IsUsefulFindWord).ToArray();
-        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < words.Length - 1; index++)
         {
             var next = words[index + 1];
             if (next is "button" or "window" or "panel" or "pane" or "tab" or "view" or "style" or "theme"
                 or "progress" or "installer" or "install" or "model" or "token")
             {
-                var phrase = $"{words[index]} {next}";
-                if (emitted.Add(phrase))
-                {
-                    yield return $"FIND: {phrase}";
-                }
-            }
-        }
-
-        foreach (var word in words)
-        {
-            if (emitted.Add(word))
-            {
-                yield return $"FIND: {word}";
-            }
-
-            if (emitted.Count >= MaxRequestLines)
-            {
+                yield return $"FIND: {words[index]} {next}";
                 yield break;
             }
         }
 
-        if (emitted.Count == 0)
+        var word = words.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(word))
         {
-            var fallback = ExtractRawWords(userMessage).FirstOrDefault(word => word.Length >= 3) ?? "request";
-            yield return $"FIND: {fallback}";
+            yield return $"FIND: {word}";
+            yield break;
         }
+
+        var fallback = ExtractRawWords(userMessage).FirstOrDefault(rawWord => rawWord.Length >= 3) ?? "request";
+        yield return $"FIND: {fallback}";
     }
 
     private static RequestIntent ResolveIntent(string userMessage, IReadOnlyList<string> queryWords)

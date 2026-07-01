@@ -25,145 +25,203 @@
                     Minimum="0"
                     Maximum="100"
                     Value="0"
-                    Margin="0,0,0,7"
+                    Margin="0,0,0,2"
                     IsVisible="{Binding ContextControl.ShowBusyPromptProgress}"
                     IsIndeterminate="{Binding ContextControl.ShowBusyPromptProgress}" />
-
+  
                 <ItemsControl
                     Grid.Row="1"
-                    Margin="0,0,0,6"
+                    Margin="0,0,0,2"
                     ItemsSource="{Binding ContextControl.ChatRequestProgressItems}"
                     IsVisible="{Binding ContextControl.HasChatRequestProgress}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:ChatRequestProgressViewModel}">
-                      <Border Classes="cc-transfer-progress" Margin="0,0,0,4">
-                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
-                          <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+                      <Border Classes="cc-transfer-progress compact">
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="3">
+                          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Classes="cc-transfer-title" Text="{Binding Title}" />
-                            <TextBlock Grid.Column="1" Classes="cc-transfer-meta" Text="{Binding SizeLabel}" />
-                            <TextBlock Grid.Column="2" Classes="cc-transfer-meta" Text="{Binding SpeedLabel}" />
+                            <TextBlock
+                                Grid.Column="1"
+                                Classes="cc-transfer-status-inline"
+                                Text="{Binding Status}"
+                                TextWrapping="NoWrap"
+                                TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Classes="cc-transfer-meta" Text="{Binding SizeLabel}" />
+                            <TextBlock Grid.Column="3" Classes="cc-transfer-meta" Text="{Binding SpeedLabel}" />
                             <Button
-                                Grid.Column="3"
-                                Classes="cc-prompt-chip"
-                                Content="Stop"
+                                Grid.Column="4"
+                                Classes="cc-transfer-nav"
+                                Content="x"
+                                ToolTip.Tip="Stop this request"
                                 IsVisible="{Binding IsCancellable}"
                                 Command="{Binding DataContext.ContextControl.CancelCodexRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}" />
                           </Grid>
-                          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
                             <ProgressBar
+                                Classes="cc-transfer-loader"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="0"
+                                IsIndeterminate="True"
+                                IsVisible="{Binding IsIndeterminate}" />
+                            <ProgressBar
+                                Grid.Column="1"
                                 Classes="cc-transfer-bar"
                                 Minimum="0"
                                 Maximum="100"
                                 Value="{Binding Value}"
                                 IsIndeterminate="{Binding IsIndeterminate}" />
-                            <TextBlock Grid.Column="1" Classes="cc-transfer-percent" Text="{Binding ElapsedLabel}" />
+                            <TextBlock Grid.Column="2" Classes="cc-transfer-percent" Text="{Binding ElapsedLabel}" />
                           </Grid>
-                          <TextBlock Grid.Row="2" Classes="cc-prompt-meta" Text="{Binding Status}" TextWrapping="NoWrap" />
                         </Grid>
                       </Border>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
+  
                 <Border
                     Grid.Row="2"
-                    Classes="cc-transfer-progress"
+                    Classes="cc-transfer-progress compact"
                     IsVisible="{Binding ContextControl.IsTransferProgressActive}">
-                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                  <Grid RowDefinitions="Auto,Auto" RowSpacing="3">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                       <TextBlock Classes="cc-transfer-title" Text="{Binding ContextControl.TransferProgressTitle}" />
-                      <TextBlock Grid.Column="1" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressSizeLabel}" />
-                      <TextBlock Grid.Column="2" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressSpeedLabel}" />
+                      <TextBlock
+                          Grid.Column="1"
+                          Classes="cc-transfer-status-inline"
+                          Text="{Binding ContextControl.TransferProgressStatus}"
+                          TextWrapping="NoWrap"
+                          TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressSizeLabel}" />
+                      <TextBlock Grid.Column="3" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressSpeedLabel}" />
                       <Button
-                          Grid.Column="3"
-                          Classes="cc-prompt-chip"
+                          Grid.Column="4"
+                          Classes="cc-transfer-nav"
                           Content="‹"
                           ToolTip.Tip="Previous install status"
                           Command="{Binding ContextControl.PreviousTransferStatusCommand}" />
-                      <TextBlock Grid.Column="4" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressHistoryPositionLabel}" />
+                      <TextBlock Grid.Column="5" Classes="cc-transfer-meta" Text="{Binding ContextControl.TransferProgressHistoryPositionLabel}" />
                       <Button
-                          Grid.Column="5"
-                          Classes="cc-prompt-chip"
+                          Grid.Column="6"
+                          Classes="cc-transfer-nav"
                           Content="›"
                           ToolTip.Tip="Next install status"
                           Command="{Binding ContextControl.NextTransferStatusCommand}" />
                       <Button
-                          Grid.Column="6"
-                          Classes="cc-prompt-chip"
+                          Grid.Column="7"
+                          Classes="cc-transfer-nav"
                           Content="x"
                           ToolTip.Tip="Stop current progress or close completed status"
                           Command="{Binding ContextControl.CloseTransferProgressCommand}" />
                     </Grid>
-                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
                       <ProgressBar
+                          Classes="cc-transfer-loader"
+                          Minimum="0"
+                          Maximum="100"
+                          Value="0"
+                          IsIndeterminate="True"
+                          IsVisible="{Binding ContextControl.IsTransferProgressLoading}" />
+                      <ProgressBar
+                          Grid.Column="1"
                           Classes="cc-transfer-bar"
                           Minimum="0"
                           Maximum="100"
                           Value="{Binding ContextControl.TransferProgressValue}"
                           IsIndeterminate="{Binding ContextControl.IsTransferProgressIndeterminate}" />
-                      <TextBlock Grid.Column="1" Classes="cc-transfer-percent" Text="{Binding ContextControl.TransferProgressPercentLabel}" />
+                      <TextBlock Grid.Column="2" Classes="cc-transfer-percent" Text="{Binding ContextControl.TransferProgressPercentLabel}" />
                     </Grid>
-                    <TextBlock
-                        Grid.Row="2"
-                        Classes="cc-prompt-meta"
-                        Text="{Binding ContextControl.TransferProgressStatus}"
-                        TextWrapping="NoWrap" />
                   </Grid>
                 </Border>
-
+  
                 <Border x:Name="ContextPromptComposer" Grid.Row="3" Classes="cc-prompt-composer" ClipToBounds="True">
-                      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="5" MinHeight="0" ClipToBounds="True">
-                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
-                      <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding ContextControl.IsPromptModeSwitcherVisible}">
-                        <Button
-                            Classes="cc-prompt-mode"
-                            Classes.active="{Binding ContextControl.IsContextPromptMode}"
-                            Content="{Binding ContextControl.PromptPrimaryModeButtonLabel}"
-                            ToolTip.Tip="{Binding ContextControl.PromptPrimaryModeButtonToolTip}"
-                            Command="{Binding ContextControl.SwitchPromptToContextCommand}" />
-                        <Button
-                            Classes="cc-prompt-mode"
-                            Classes.active="{Binding ContextControl.IsCodexPromptMode}"
-                            Content="Codex"
-                            ToolTip.Tip="Codex CLI through the ContextControl flow"
-                            Command="{Binding ContextControl.SwitchPromptToCodexCommand}" />
-                        <Button
-                            Classes="cc-prompt-mode"
-                            Classes.active="{Binding ContextControl.IsTerminalPromptMode}"
-                            Content="Term"
-                            ToolTip.Tip="Install and model download terminal"
-                            Command="{Binding ContextControl.SwitchPromptToTerminalCommand}" />
-                      </StackPanel>
+                      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="3" MinHeight="0" ClipToBounds="True">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="4">
+                      <Button
+                          x:Name="PromptModeMenuButton"
+                          Classes="cc-prompt-mode active"
+                          ToolTip.Tip="{Binding ContextControl.PromptModeDropdownToolTip}"
+                          IsVisible="{Binding ContextControl.IsPromptModeSwitcherVisible}"
+                          Click="OnPromptModeMenuClick"
+                          PointerEntered="OnPromptModeMenuPointerEntered"
+                          PointerExited="OnPromptModeMenuPointerExited">
+                        <Button.Content>
+                          <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="4">
+                            <TextBlock Text="{Binding ContextControl.PromptModeDropdownLabel}" />
+                            <TextBlock Grid.Column="1" Classes="cc-dropdown-arrow" Text="▴" />
+                          </Grid>
+                        </Button.Content>
+                      </Button>
+                      <Popup
+                          x:Name="PromptModePopup"
+                          Grid.Column="0"
+                          PlacementTarget="{Binding #PromptModeMenuButton}"
+                          Placement="TopEdgeAlignedLeft"
+                          IsLightDismissEnabled="False">
+                        <Border
+                            x:Name="PromptModeFlyoutHost"
+                            Classes="edit-dropdown prompt-mode-dropdown"
+                            PointerEntered="OnPromptModeFlyoutPointerEntered"
+                            PointerExited="OnPromptModeFlyoutPointerExited">
+                          <StackPanel Spacing="1">
+                            <Button
+                                Classes="edit-dropdown-item"
+                                Content="Local"
+                                Click="OnPromptModeOptionClick"
+                                Command="{Binding #PromptBarRoot.DataContext.ContextControl.SwitchPromptToContextCommand}" />
+                            <Button
+                                Classes="edit-dropdown-item"
+                                Content="Codex CLI"
+                                Click="OnPromptModeOptionClick"
+                                Command="{Binding #PromptBarRoot.DataContext.ContextControl.SwitchPromptToCodexCommand}" />
+                            <Button
+                                Classes="edit-dropdown-item"
+                                Content="ImageGen"
+                                Click="OnPromptModeOptionClick"
+                                Command="{Binding #PromptBarRoot.DataContext.ContextControl.SwitchPromptToImageGenCommand}" />
+                          </StackPanel>
+                        </Border>
+                      </Popup>
                       <Border Grid.Column="1" Classes="cc-prompt-status-pill">
                         <TextBlock Text="{Binding ContextControl.PhaseTitle}" Classes="cc-prompt-status" />
                       </Border>
                       <TextBlock Grid.Column="2" Text="{Binding ContextControl.PhaseDetail}" Classes="cc-prompt-detail" />
                       <Button
                           Grid.Column="3"
-                          Classes="cc-prompt-chip"
-                          IsVisible="{Binding ContextControl.IsCcPromptChromeVisible}"
+                          Classes="cc-prompt-mode"
+                          Classes.active="{Binding ContextControl.IsCodexUsagePanelVisible}"
+                          IsVisible="{Binding ContextControl.IsCodexPromptMode}"
+                          Content="{Binding ContextControl.CodexUsageToggleLabel}"
+                          ToolTip.Tip="Show Codex prompt tokens and 5h/weekly limit snapshot"
+                          Command="{Binding ContextControl.ToggleCodexUsagePanelCommand}" />
+                      <Button
+                          Grid.Column="4"
+                          Classes="cc-prompt-mode"
+                          Classes.active="{Binding ContextControl.IsCcTimelineExpanded}"
+                          IsVisible="{Binding ContextControl.IsCcTimelineToggleVisible}"
                           Content="{Binding ContextControl.CcTimelineToggleLabel}"
                           ToolTip.Tip="{Binding ContextControl.CurrentCcStationLabel}"
                           Command="{Binding ContextControl.ToggleCcTimelineCommand}" />
                       <Button
-                          Grid.Column="4"
-                          Classes="cc-prompt-chip"
+                          Grid.Column="5"
+                          Classes="cc-prompt-mode"
+                          Classes.active="{Binding ContextControl.IsAutopilotEnabled}"
                           IsVisible="{Binding ContextControl.IsCcPromptChromeVisible}"
                           Content="{Binding ContextControl.AutopilotModeLabel}"
                           ToolTip.Tip="{Binding ContextControl.AutopilotModeToolTip}"
                           Command="{Binding ContextControl.ToggleAutopilotCommand}" />
                       <Button
-                          Grid.Column="5"
+                          Grid.Column="6"
                           Classes="cc-prompt-icon"
                           Content="x"
                           ToolTip.Tip="Close prompt"
                           Command="{Binding ContextControl.ClosePromptCommand}" />
                     </Grid>
-
-                    <StackPanel Grid.Row="1" Spacing="5">
+  
+                    <StackPanel Grid.Row="1" Spacing="3">
                       <Border Classes="cc-transfer-progress" IsVisible="{Binding ContextControl.IsCodexPromptAuthBlocked}">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                           <StackPanel>
                             <TextBlock Classes="cc-transfer-title" Text="{Binding ContextControl.CodexPromptAuthTitle}" />
                             <TextBlock Classes="cc-prompt-meta" Text="{Binding ContextControl.CodexPromptAuthMessage}" />
@@ -171,18 +229,30 @@
                           <Button
                               Grid.Column="1"
                               Classes="cc-prompt-chip"
+                              Content="{Binding ContextControl.CodexInstallButtonLabel}"
+                              ToolTip.Tip="Install Codex CLI for this OS"
+                              Command="{Binding ContextControl.InstallCodexCommand}" />
+                          <Button
+                              Grid.Column="2"
+                              Classes="cc-prompt-chip"
+                              Content="Guide"
+                              ToolTip.Tip="Open the official Codex CLI setup guide"
+                              Command="{Binding ContextControl.OpenCodexGuideCommand}" />
+                          <Button
+                              Grid.Column="3"
+                              Classes="cc-prompt-chip"
                               Content="Login"
                               ToolTip.Tip="Open Codex CLI login"
                               Command="{Binding ContextControl.OpenCodexLoginCommand}" />
                           <Button
-                              Grid.Column="2"
+                              Grid.Column="4"
                               Classes="cc-prompt-chip"
                               Content="Refresh"
                               ToolTip.Tip="Refresh Codex CLI login status"
                               Command="{Binding ContextControl.RefreshCodexStatusCommand}" />
                         </Grid>
                       </Border>
-
+  
                       <Border Classes="cc-timeline-panel" IsVisible="{Binding ContextControl.IsCcTimelinePanelVisible}">
                         <ItemsControl
                             HorizontalAlignment="Center"
@@ -198,13 +268,10 @@
                                   Classes="cc-timeline-stop"
                                   Classes.current="{Binding IsCurrent}"
                                   Classes.complete="{Binding IsComplete}"
-                                  ToolTip.Tip="{Binding Detail}">
+                                  ToolTip.Tip="{Binding ToolTipText}">
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4" VerticalAlignment="Center">
                                   <TextBlock Classes="cc-timeline-marker" Text="{Binding Marker}" />
-                                  <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="0">
-                                    <TextBlock Classes="cc-timeline-title" Text="{Binding Title}" />
-                                    <TextBlock Grid.Row="1" Classes="cc-timeline-state" Text="{Binding StateLabel}" />
-                                  </Grid>
+                                  <TextBlock Grid.Column="1" Classes="cc-timeline-title" Text="{Binding Title}" />
                                 </Grid>
                               </Border>
                             </DataTemplate>
@@ -212,7 +279,7 @@
                         </ItemsControl>
                       </Border>
                     </StackPanel>
-
+  
                     <TextBox
                         x:Name="ContextPromptTextBox"
                         Grid.Row="2"
@@ -223,6 +290,8 @@
                         IsReadOnly="{Binding ContextControl.IsPromptInputReadOnly}"
                         TextWrapping="{Binding ContextControl.PromptTextWrapping}"
                         Watermark="{Binding ContextControl.PromptWatermark}"
+                        FontSize="{Binding PromptWindowFontSize}"
+                        LineHeight="{Binding PromptWindowLineHeight}"
                         GotFocus="OnPromptTextBoxGotFocus"
                         LostFocus="OnPromptTextBoxLostFocus"
                         KeyDown="OnPromptTextBoxKeyDown"
@@ -233,7 +302,7 @@
                         controls:HoverScrollbarBehavior.IsEnabled="True"
                         controls:HoverScrollbarBehavior.ReserveRight="12"
                         Text="{Binding ContextControl.PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
+  
                     <TextBox
                         Grid.Row="2"
                         Classes="cc-terminal-output"
@@ -242,26 +311,30 @@
                         AcceptsReturn="True"
                         IsReadOnly="True"
                         TextWrapping="Wrap"
+                        FontSize="{Binding PromptWindowFontSize}"
+                        LineHeight="{Binding PromptWindowLineHeight}"
                         ScrollViewer.AllowAutoHide="True"
                         ScrollViewer.VerticalScrollBarVisibility="Auto"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                         controls:HoverScrollbarBehavior.IsEnabled="True"
                         controls:HoverScrollbarBehavior.ReserveRight="12"
                         Text="{Binding ContextControl.TerminalOutputText}" />
-
-                    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="7" Margin="0,1,0,2">
-                      <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding ContextControl.IsCcPromptActionRowVisible}">
+  
+                    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="5" Margin="0">
+                      <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding ContextControl.IsCcPromptActionRowVisible}">
                         <Button Classes="cc-prompt-chip" Content="DIR" ToolTip.Tip="Create directory context" Command="{Binding ContextControl.RunDirCommand}" />
+                        <Button Classes="cc-prompt-chip" Content="TREE" ToolTip.Tip="Create compact path tree export" Command="{Binding ContextControl.RunDirTreeExportCommand}" />
                         <Button Classes="cc-prompt-chip" Content="CC" ToolTip.Tip="Create selected code context" Command="{Binding ContextControl.RunCcCommand}" />
                         <Button Classes="cc-prompt-chip" Content="GO" ToolTip.Tip="Preview patch blocks" Command="{Binding ContextControl.RunGoCommand}" />
                       </StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding ContextControl.IsTerminalPromptMode}">
+                      <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding ContextControl.IsTerminalPromptMode}">
                         <Button Classes="cc-prompt-chip" Content="Clear" ToolTip.Tip="Clear terminal output" Command="{Binding ContextControl.ClearTerminalCommand}" />
                       </StackPanel>
                       <ComboBox
                           Grid.Column="1"
                           Classes="cc-local-model-picker"
-                          IsVisible="{Binding ContextControl.IsContextPromptMode}"
+                          Width="142"
+                          IsVisible="{Binding ContextControl.IsLocalOrImageGenPromptMode}"
                           ItemsSource="{Binding ContextControl.ActiveInstalledLocalModels}"
                           SelectedItem="{Binding ContextControl.SelectedActiveLocalModel, Mode=TwoWay}"
                           MaxDropDownHeight="180">
@@ -271,31 +344,122 @@
                           </DataTemplate>
                         </ComboBox.ItemTemplate>
                       </ComboBox>
-                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ContextControl.IsMessagePromptMode}">
-                        <Button
-                            Classes="cc-prompt-chip"
-                            Content="{Binding ContextControl.CodexLoginButtonLabel}"
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" IsVisible="{Binding ContextControl.IsMessagePromptMode}">
+                        <ComboBox
+                            Classes="cc-local-model-picker"
+                            Width="136"
                             IsVisible="{Binding ContextControl.IsCodexPromptMode}"
-                            ToolTip.Tip="Open Codex CLI login"
-                            Command="{Binding ContextControl.OpenCodexLoginCommand}" />
-                        <Button
-                            Classes="cc-prompt-chip"
-                            Content="Refresh"
+                            ItemsSource="{Binding ContextControl.CodexModelOptions}"
+                            SelectedItem="{Binding ContextControl.CodexModelId, Mode=TwoWay}"
+                            ToolTip.Tip="Codex model"
+                            MaxDropDownHeight="180" />
+                        <ComboBox
+                            Classes="cc-local-model-picker"
+                            Width="70"
                             IsVisible="{Binding ContextControl.IsCodexPromptMode}"
-                            ToolTip.Tip="Refresh Codex CLI login status"
-                            Command="{Binding ContextControl.RefreshCodexStatusCommand}" />
-                        <Border Classes="cc-prompt-status-pill" IsVisible="{Binding ContextControl.HasPromptModelCapabilityHint}">
-                          <TextBlock Text="{Binding ContextControl.PromptModelCapabilityHint}" Classes="cc-prompt-status" />
-                        </Border>
-                        <TextBlock Text="{Binding ContextControl.PromptFooterSummary}" Classes="cc-prompt-meta" VerticalAlignment="Center" />
+                            ItemsSource="{Binding ContextControl.CodexReasoningEffortOptions}"
+                            SelectedItem="{Binding ContextControl.CodexReasoningEffort, Mode=TwoWay}"
+                            ToolTip.Tip="Codex reasoning effort"
+                            MaxDropDownHeight="180" />
+                        <Button
+                            Classes="cc-prompt-mode"
+                            Content="{Binding ContextControl.AttachmentButtonLabel}"
+                            IsEnabled="{Binding ContextControl.HasAttachments}"
+                            ToolTip.Tip="Pending attachments">
+                          <Button.Flyout>
+                            <Flyout Placement="TopEdgeAlignedLeft">
+                              <Border Classes="cc-attachment-host prompt-dropdown">
+                                <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                                  <TextBlock Text="Pending attachments" Classes="cc-attachment-title" />
+                                  <ListBox
+                                      Grid.Row="1"
+                                      Classes="attachment-list"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      ItemsSource="{Binding #PromptBarRoot.DataContext.ContextControl.Attachments}"
+                                      MaxHeight="220"
+                                      SelectionMode="Single"
+                                      controls:HoverScrollbarBehavior.IsEnabled="True"
+                                      controls:HoverScrollbarBehavior.ReserveRight="12"
+                                      ScrollViewer.AllowAutoHide="True"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.Styles>
+                                      <Style Selector="ListBox > ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,0,4" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                      </Style>
+                                      <Style Selector="ListBox > ListBoxItem:selected">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderBrush" Value="Transparent" />
+                                      </Style>
+                                    </ListBox.Styles>
+                                    <ListBox.ItemTemplate>
+                                      <DataTemplate DataType="{x:Type vm:ContextControlAttachmentViewModel}">
+                                        <Border
+                                            Classes="cc-attachment-row"
+                                            HorizontalAlignment="Stretch"
+                                            ToolTip.Tip="{Binding Path}">
+                                          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="7">
+                                            <Border
+                                                Classes="cc-attachment-ext-tag"
+                                                Background="{Binding ExtensionTagBackground}"
+                                                BorderBrush="{Binding ExtensionTagBorder}">
+                                              <TextBlock
+                                                  Text="{Binding ExtensionTagText}"
+                                                  Foreground="{Binding ExtensionTagForeground}"
+                                                  Classes="cc-attachment-ext-tag-text" />
+                                            </Border>
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                Text="{Binding DisplayTitle}"
+                                                Classes="path-text"
+                                                VerticalAlignment="Center" />
+                                            <Button
+                                                Grid.Column="2"
+                                                Classes="cc-prompt-mode"
+                                                Content="{Binding IncludeLabel}"
+                                                Command="{Binding #PromptBarRoot.DataContext.ContextControl.ToggleAttachmentIncludeCommand}"
+                                                CommandParameter="{Binding}" />
+                                            <Button
+                                                Grid.Column="3"
+                                                Classes="cc-transfer-nav"
+                                                Content="x"
+                                                ToolTip.Tip="Remove attachment"
+                                                Command="{Binding #PromptBarRoot.DataContext.ContextControl.RemoveAttachmentCommand}"
+                                                CommandParameter="{Binding}" />
+                                          </Grid>
+                                        </Border>
+                                      </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                  </ListBox>
+                                </Grid>
+                              </Border>
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
                       </StackPanel>
                       <TextBlock Grid.Column="2" Text="{Binding ContextControl.TransferProgressStatus}" Classes="cc-prompt-meta" IsVisible="{Binding ContextControl.IsTerminalPromptMode}" />
                       <Button
+                          x:Name="PromptSendButton"
                           Grid.Column="3"
                           Classes="cc-prompt-send"
+                          Classes.warning="{Binding ContextControl.IsDirSendMissingRequestWarning}"
                           IsVisible="{Binding ContextControl.IsMessagePromptMode}"
                           Content="{Binding ContextControl.PromptSendButtonLabel}"
-                          Command="{Binding ContextControl.SendCommand}" />
+                          ToolTip.Tip="{Binding ContextControl.PromptSendButtonToolTip}"
+                          Command="{Binding ContextControl.SendCommand}">
+                        <Button.Transitions>
+                          <Transitions>
+                            <DoubleTransition Property="Opacity" Duration="0:0:0.35" />
+                          </Transitions>
+                        </Button.Transitions>
+                      </Button>
                     </Grid>
                   </Grid>
                 </Border>

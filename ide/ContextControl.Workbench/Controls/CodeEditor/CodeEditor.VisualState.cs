@@ -36,6 +36,19 @@ public sealed partial class CodeEditor
         _minimap.InvalidateVisual();
     }
 
+    private double EffectiveEditorLineHeight => Math.Max(12.0, Math.Clamp(EditorFontSize, 8.0, 22.0) + 4.0);
+
+    private void ApplyEditorFontSize()
+    {
+        var fontSize = Math.Clamp(EditorFontSize, 8.0, 22.0);
+        var lineHeight = Math.Max(12.0, fontSize + 4.0);
+        _surface.SetEditorFontSize(fontSize, lineHeight);
+        _minimap.SetEditorLineHeight(lineHeight);
+        _verticalScrollbar.SmallChange = lineHeight;
+        _verticalScrollbar.LargeChange = lineHeight * 8;
+        QueueScrollbarRefresh();
+    }
+
     private void ApplySkin()
     {
         var normalizedSkin = NormalizeSkinKey(SkinKey);
@@ -114,7 +127,7 @@ public sealed partial class CodeEditor
         _verticalScrollbar.IsHitTestVisible = isVisible;
         _verticalScrollbar.Maximum = maxOffset;
         _verticalScrollbar.ViewportSize = Math.Max(0, ViewportHeight);
-        _verticalScrollbar.LargeChange = Math.Max(EditorLineHeight, ViewportHeight * 0.85);
+        _verticalScrollbar.LargeChange = Math.Max(EffectiveEditorLineHeight, ViewportHeight * 0.85);
 
         var nextValue = Math.Clamp(_verticalOffset, 0, maxOffset);
         if (Math.Abs(_verticalScrollbar.Value - nextValue) <= 0.1)

@@ -167,6 +167,7 @@ function Find-HashableFunctionRanges {
         $cleanLine = Strip-CodeLineForHashScan $rawLine ([ref]$blockComment)
         $name = ""
         $isFunction = $false
+        $isExpressionMember = $false
 
         if ($ext -eq ".ps1") {
             if ($cleanLine -match '^\s*function\s+([A-Za-z0-9_\-]+)\b') {
@@ -179,6 +180,17 @@ function Find-HashableFunctionRanges {
                 $name = $Matches[2]
                 $isFunction = $true
             }
+        }
+        elseif ($ext -eq ".cs" -and
+            $cleanLine -match '^\s*(?:(?:public|private|protected|internal|static|virtual|override|sealed|new|required|readonly|partial|unsafe)\s+)+[A-Za-z0-9_<>,\.\?\[\]\s]+?\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=>') {
+            $name = $Matches["name"]
+            $isFunction = $true
+            $isExpressionMember = $true
+        }
+        elseif ($ext -eq ".cs" -and
+            $cleanLine -match '^\s*(?:(?:public|private|protected|internal|static|virtual|override|sealed|new|required|readonly|partial|unsafe)\s+)+[A-Za-z0-9_<>,\.\?\[\]\s]+?\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\{\s*(?:get|set|init)\b') {
+            $name = $Matches["name"]
+            $isFunction = $true
         }
         else {
             $match = [regex]::Match($cleanLine, '(?<![A-Za-z0-9_~])((?:[A-Za-z_][A-Za-z0-9_]*::)*~?[A-Za-z_][A-Za-z0-9_]*)\s*\(')
@@ -196,6 +208,42 @@ function Find-HashableFunctionRanges {
         }
 
         if (-not $isFunction -or $name -eq "") {
+            continue
+        }
+
+        if ($isExpressionMember) {
+            $end = -1
+            $expressionBlockComment = $false
+
+            for ($j = $i; $j -lt $safeLines.Count; $j++) {
+                $clean = Strip-CodeLineForHashScan ([string]$safeLines[$j]) ([ref]$expressionBlockComment)
+                if ($clean.IndexOf(";") -ge 0) {
+                    $end = $j + 1
+                    break
+                }
+            }
+
+            if ($end -lt 0) {
+                continue
+            }
+
+            $key = ("$name|$i|$end").ToLowerInvariant()
+            if ($seen.ContainsKey($key)) {
+                continue
+            }
+            $seen[$key] = $true
+
+            $results.Add([pscustomobject]@{
+                Name = $name
+                Start = $i
+                End = $end
+                Hash = (Get-RegionHashFromLines $safeLines $i $end)
+            })
+
+            if ($results.Count -ge $MaxCount) {
+                break
+            }
+
             continue
         }
 

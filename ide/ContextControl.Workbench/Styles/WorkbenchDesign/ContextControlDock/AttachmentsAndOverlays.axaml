@@ -11,6 +11,13 @@
     <Setter Property="MinHeight" Value="96" />
   </Style>
 
+  <Style Selector="Border.cc-attachment-host.prompt-dropdown">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="Width" Value="360" />
+    <Setter Property="MaxHeight" Value="260" />
+  </Style>
+
   <Style Selector="ListBox.attachment-list">
     <Setter Property="Padding" Value="0" />
     <Setter Property="Transitions">

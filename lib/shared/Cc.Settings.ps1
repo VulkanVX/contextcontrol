@@ -14,11 +14,12 @@ function New-CcSharedDefaultSettings {
         # The IDE persists the editable project copy to .ccFileRules.json.
         SupportedFileExtensions = @(
             ".axaml", ".bat", ".c", ".cc", ".cmd", ".comp", ".cpp", ".cs", ".csproj",
-            ".css", ".cxx", ".fc", ".frag", ".fs", ".fsproj", ".glsl", ".h", ".hh", ".hpp",
-            ".html", ".hxx", ".inc", ".ini", ".inl", ".ipp", ".js", ".json", ".jsx",
-            ".lua", ".m", ".md", ".metal", ".mm", ".props", ".ps1", ".psd1", ".psm1",
-            ".py", ".rs", ".sh", ".slang", ".targets", ".toml", ".ts", ".tsx", ".txt",
-            ".vert", ".wgsl", ".xaml", ".xml", ".yaml", ".yml"
+            ".css", ".cxx", ".fc", ".frag", ".fs", ".fsproj", ".geom", ".glsl", ".h", ".hh",
+            ".hpp", ".go", ".gradle", ".html", ".hlsl", ".hxx", ".inc", ".ini", ".inl", ".ipp",
+            ".java", ".js", ".json", ".jsx", ".kt", ".kts", ".lock", ".lua", ".m", ".md",
+            ".mesh", ".metal", ".mm", ".mod", ".props", ".ps1", ".psd1", ".psm1", ".py", ".rs",
+            ".shader", ".sh", ".slang", ".sum", ".targets", ".task", ".tesc", ".tese", ".toml",
+            ".ts", ".tsx", ".txt", ".vert", ".wgsl", ".xaml", ".xml", ".yaml", ".yml"
         )
         IgnoredFileExtensions = @(
             ".bak", ".bin", ".bmp", ".cache", ".collision", ".db", ".dds", ".dll", ".exe",
@@ -34,7 +35,11 @@ function New-CcSharedDefaultSettings {
             "packages", "Release", "third_party", "thirdparty", "vendor", "vcpkg_installed", "x64"
         )
         IgnoredFiles = @(
-            ".ccFileRules.json", ".ccWorkbench.settings.json", ".DS_Store", "desktop.ini", "Thumbs.db"
+            ".ccDirProfile.json", ".ccFileRules.json", ".ccReplace.settings*.json",
+            ".ccWorkbench.chat-history*.json", ".ccWorkbench.settings.json",
+            ".DS_Store", "cc_chat_export_*.md", "cc_code_export*.md",
+            "cc_project_dir.md", "cc_semantic_map.md", "desktop.ini",
+            "patch.txt", "Thumbs.db"
         )
     }
 }

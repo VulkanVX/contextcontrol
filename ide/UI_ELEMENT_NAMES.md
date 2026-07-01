@@ -67,8 +67,11 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 | Dependencies page | `DependenciesPage.axaml` | Backend dependency workspace page. |
 | Dependency search | `DependencySearchBox` | Overlay search box for dependencies. |
 | Dependency list | `DependencyListRenderControl` | Rendered dependency install/status cards. |
-| Skillbook page | `SkillbookPage.axaml` | Skillbook path and entry workspace page. |
-| Skillbook list | `SkillbookRenderControl` | Rendered skillbook entries. |
+| Skillbook page | `SkillbookPage.axaml` | Flow library workspace page for CC Flow, project/global flows, sections, skills, and markdown editing. |
+| Skillbook flow rail | `SkillbookPage.axaml` | Flow selector for Context Control and editable project/global/custom flows. |
+| Skillbook section/skill list | `SkillbookPage.axaml` | Grouped section and skill selector for large Skillbook collections. |
+| Skillbook editor | `SkillbookPage.axaml` | Native selectable markdown editor/read-only detail pane. |
+| CC Flow inspector | `SkillbookPage.axaml` | Prompt-call map showing trigger, source, recipient, attachments, and Skillbook injection state. |
 | Project graph page | `ProjectGraphPage.axaml` | Architecture graph workspace page. |
 | Project graph view | `ProjectGraphView` | Custom rendered architecture graph canvas. |
 | Project graph search | `ProjectGraphSearchPanel`, `ProjectGraphSearchBox` | Graph node search overlay. |
@@ -121,6 +124,6 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 | Local LLM catalog render control | `Controls/LocalLlmCatalog/**` | Model card rendering, badges, tooltips, pull action hit areas. |
 | Dependency list render control | `Controls/Workspace/DependencyListRenderControl.cs` | Backend dependency cards. |
 | Project scanner render control | `Controls/Workspace/ProjectScannerRenderControl.cs` | Scanner report sections. |
-| Skillbook render control | `Controls/Workspace/SkillbookRenderControl.cs` | Skillbook entries. |
+| Skillbook render control | `Controls/Workspace/SkillbookRenderControl.cs` | Legacy rendered Skillbook surface retained for compatibility. |
 | Prompt dock host | `Controls/Common/PromptDockHost.cs` | Hosts workspace content and bottom prompt dock sizing. |
 | Hover scrollbar behavior | `Controls/Common/HoverScrollbarBehavior.cs` | Shared hover/spacing behavior for scrollbars. |

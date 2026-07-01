@@ -23,11 +23,11 @@ public sealed partial class CodeEditor
         private const double BottomPadding = EditorBottomPadding;
         private const double MinGutterWidth = 0;
         private const double TextStartPadding = 8;
-        private const double LineHeight = EditorLineHeight;
-        private const double FontSize = 12;
-        private const double LineNumberFontSize = 11;
-        private const double CharWidth = 7.15;
-        private const double FoldSlotWidth = CharWidth;
+        private double LineHeight => _lineHeight;
+        private double FontSize => _fontSize;
+        private double LineNumberFontSize => Math.Max(8.0, _fontSize - 1.0);
+        private double CharWidth => Math.Max(5.2, _fontSize * 0.596);
+        private double FoldSlotWidth => CharWidth;
         private const double FoldArrowHitRadius = 6;
         private const double FoldButtonSize = 11.5;
         private const double FoldButtonCornerRadius = 3;
@@ -36,8 +36,8 @@ public sealed partial class CodeEditor
         private const double FoldArrowHalfHeight = 1.75;
         private const double FoldArrowCollapsedHalfWidth = 1.9;
         private const double FoldArrowCollapsedHalfHeight = 2.8;
-        private const double LineNumberLeftPadding = CharWidth;
-        private const double NumberAreaRightPadding = CharWidth;
+        private double LineNumberLeftPadding => CharWidth;
+        private double NumberAreaRightPadding => CharWidth;
         private const double GutterArrowColumnWidth = (FoldArrowHitRadius * 2) + 2;
         private const byte ScopeGuideAlpha = 78;
         private const byte ActiveScopeGuideAlpha = 158;
@@ -84,6 +84,8 @@ public sealed partial class CodeEditor
         private Pen? _unifiedScopeGuidePen;
         private Pen? _activeUnifiedScopeGuidePen;
         private IReadOnlyDictionary<int, string> _lineChanges = new Dictionary<int, string>();
+        private double _fontSize = DefaultEditorFontSize;
+        private double _lineHeight = DefaultEditorLineHeight;
         private string[] _lines = [""];
         private VisibleRow[] _visibleRows = [VisibleRow.ForCodeLine(0)];
         private FoldRegion[] _foldRegions = [];
@@ -111,10 +113,10 @@ public sealed partial class CodeEditor
         private long _animationPhase;
         private double _gutterWidth = MinGutterWidth;
         private double _foldColumnStart = MinGutterWidth + TextStartPadding;
-        private double _textStart = MinGutterWidth + (TextStartPadding * 2) + FoldSlotWidth;
-        private double _guideBaseX = MinGutterWidth + TextStartPadding + (FoldSlotWidth / 2);
-        private double _arrowBaseX = MinGutterWidth + TextStartPadding + (FoldSlotWidth / 2);
-        private double _lineNumberRight = LineNumberLeftPadding + CharWidth;
+        private double _textStart = MinGutterWidth + (TextStartPadding * 2) + 7.15;
+        private double _guideBaseX = MinGutterWidth + TextStartPadding + (7.15 / 2);
+        private double _arrowBaseX = MinGutterWidth + TextStartPadding + (7.15 / 2);
+        private double _lineNumberRight = 7.15 + 7.15;
         private ScrollViewer? _scrollHost;
         private Action<double>? _verticalScrollRequester;
         private Func<double>? _verticalOffsetProvider;
@@ -151,6 +153,27 @@ public sealed partial class CodeEditor
         }
 
         public double ContentHeight => TopPadding + (_visibleRows.Length * LineHeight) + BottomPadding;
+
+        public void SetEditorFontSize(double fontSize, double lineHeight)
+        {
+            var nextFontSize = Math.Clamp(fontSize, 8.0, 22.0);
+            var nextLineHeight = Math.Max(12.0, lineHeight);
+            if (Math.Abs(_fontSize - nextFontSize) <= 0.01
+                && Math.Abs(_lineHeight - nextLineHeight) <= 0.01)
+            {
+                return;
+            }
+
+            _fontSize = nextFontSize;
+            _lineHeight = nextLineHeight;
+            _textMateSpanCache.Clear();
+            _lineSegmentCache.Clear();
+            _visibleLineDigits = -1;
+            _visibleGuideDepth = -1;
+            RebuildVisibleLines();
+            InvalidateMeasure();
+            InvalidateVisual();
+        }
 
         public void SetDocument(string text, string path, IReadOnlyDictionary<int, string>? lineChanges)
         {

@@ -343,7 +343,7 @@ public sealed partial class ContextControlViewModel
             if (message.HasDiagnosticPrompt)
             {
                 builder.AppendLine();
-                builder.AppendLine("#### Exact local capsule sent to Ollama");
+                builder.AppendLine($"#### {BuildDiagnosticPromptExportHeading(message)}");
                 AppendFencedBlock(builder, message.DiagnosticPrompt, "text");
             }
 
@@ -374,6 +374,21 @@ public sealed partial class ContextControlViewModel
         }
 
         return builder.ToString().TrimEnd() + Environment.NewLine;
+    }
+
+    private static string BuildDiagnosticPromptExportHeading(LocalLlmChatMessageViewModel message)
+    {
+        if (message.IsCodexGenerated)
+        {
+            return "Exact Codex harness input";
+        }
+
+        if (message.Phase.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Exact model input";
+        }
+
+        return "Exact local capsule sent to Ollama";
     }
 
     private static void AppendFencedBlock(StringBuilder builder, string? text, string language)
@@ -464,7 +479,7 @@ public sealed partial class ContextControlViewModel
 
         PromptText = EnsureEndsWithEnd(snippet.Text);
         IsPromptOpen = true;
-        PromptModeKey = "context";
+        PreserveCodexOrUseContextPromptMode();
         PhaseTitle = snippet.IsRequestList ? "CC request loaded" : "Snippet loaded";
         PhaseDetail = snippet.IsRequestList
             ? "Review the request lines, then press CC."

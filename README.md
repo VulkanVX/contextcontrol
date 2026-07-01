@@ -87,13 +87,13 @@ Stable enough to test:
 Work in progress:
 
 - Context Control prompting flow in the desktop app
-- Skillbook UI and behavior; it currently does not work as a usable feature
+- Full Skillbook prompt customization beyond the read-only built-in CC Flow contracts
 - Non-Windows packaged releases
 - Some advanced GPU/server model backends
 
 The CLI scripts remain the conservative path for the original DIR/CC/GO patch pipeline while the desktop prompting flow matures.
 
-Codex mode requires an authenticated Codex CLI. If Codex mode is selected before login, the prompt is locked and shows **Please login into codex to use it**. Use **View -> Settings -> LLMs -> Codex CLI** to Login, Refresh, Doctor, or Logout. Codex credentials are owned by the Codex CLI; ContextControl only checks status and opens the login/logout commands.
+Codex mode requires the Codex CLI. If Codex mode is selected before setup, the prompt is locked and shows whether Codex needs to be installed or logged in. Use **View -> Settings -> LLMs -> Codex CLI** to Install, Guide, Login, Refresh, Doctor, or Logout. Install is best-effort: Windows uses the Codex `winget` package, while macOS/Linux open the official standalone installer route; the Guide button is the fallback when package managers, admin policy, network, or PATH refresh block automation. Codex credentials are owned by the Codex CLI; ContextControl only checks status and opens the setup/login/logout commands.
 
 ## Local LLM And Dependency Install
 
@@ -191,7 +191,9 @@ The desktop app is being built around the same idea, but the prompting flow is s
 
 ## Skillbook
 
-`skillbook/` contains draft local-model instruction material, but the desktop Skillbook feature is currently not working as a usable feature. Treat it as bundled draft data only until the UI behavior, defaults, activation, and long-term format are rebuilt.
+`skillbook/` is the v1 flow library. The desktop Skillbook page shows the built-in read-only Context Control flow, project/global legacy markdown entries, and editable markdown-folder flows under `skillbook/flows/<flow-id>/...`.
+
+Editable project flows support adding flows, sections, and skills, renaming them, enabling/disabling skills, and saving markdown bodies. The built-in **CC Flow** contracts stay locked in v1, and the page includes a CC Flow inspector that shows when DIR, CC, file-request, source-audit, patch-write, patch-review, GO preview, apply, and raw/image/browser routes exist and whether Skillbook instructions are injected.
 
 ## Build From Source
 

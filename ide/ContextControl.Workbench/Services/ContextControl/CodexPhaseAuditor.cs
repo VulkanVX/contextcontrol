@@ -1,6 +1,7 @@
 // CC-DESC: Validates Codex CLI output against the active ContextControl workflow phase.
 
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ContextControl.Workbench.Services;
 
@@ -37,7 +38,7 @@ public sealed record CodexPhaseAuditResult(
 
         if (RequestLines.Count > 0)
         {
-            builder.AppendLine("Usable CC request lines:");
+            builder.AppendLine(Passed ? "Usable CC request lines:" : "Rejected CC request lines:");
             foreach (var requestLine in RequestLines.Take(12))
             {
                 builder.AppendLine(requestLine);
@@ -53,9 +54,19 @@ public sealed record CodexPhaseAuditResult(
     }
 }
 
+public sealed record CodexPhaseAuditContext(
+    ContextDirManifest? DirManifest = null,
+    string ProjectRoot = "",
+    IReadOnlyCollection<string>? TrustedFindRequestPaths = null);
+
 public static class CodexPhaseAuditor
 {
-    public static CodexPhaseAuditResult Audit(ContextCapsulePhase phase, string message, ContextPromptBuilder? promptBuilder = null)
+    public static CodexPhaseAuditResult Audit(
+        ContextCapsulePhase phase,
+        string message,
+        ContextPromptBuilder? promptBuilder = null,
+        string sourceContext = "",
+        CodexPhaseAuditContext? auditContext = null)
     {
         promptBuilder ??= new ContextPromptBuilder();
         var text = message ?? "";
@@ -72,15 +83,16 @@ public static class CodexPhaseAuditor
 
         var patchText = promptBuilder.ExtractPatchBlocks(text);
         var patchBlocks = SplitPatchBlocks(patchText);
-        var requestAudit = AuditRequestLines(text);
+        var requestAuditText = patchBlocks.Count > 0 ? RemovePatchBlocks(text) : text;
+        var requestAudit = AuditRequestLines(requestAuditText);
         var directActionWarnings = FindDirectActionClaims(text);
 
         return phase switch
         {
-            ContextCapsulePhase.FileRequest => AuditFileRequest(phase, requestAudit, patchBlocks.Count, directActionWarnings),
-            ContextCapsulePhase.SourceAudit => AuditSourceAudit(phase, text, requestAudit, patchBlocks, patchText, promptBuilder, directActionWarnings),
-            ContextCapsulePhase.PatchWrite => AuditPatchWrite(phase, text, requestAudit, patchBlocks, patchText, promptBuilder, directActionWarnings),
-            ContextCapsulePhase.PatchReview => AuditPatchReview(phase, text, patchBlocks, patchText, promptBuilder, directActionWarnings),
+            ContextCapsulePhase.FileRequest => AuditFileRequest(phase, requestAudit, patchBlocks.Count, directActionWarnings, auditContext),
+            ContextCapsulePhase.SourceAudit => AuditSourceAudit(phase, text, requestAudit, patchBlocks, patchText, promptBuilder, directActionWarnings, sourceContext),
+            ContextCapsulePhase.PatchWrite => AuditPatchWrite(phase, text, requestAudit, patchBlocks, patchText, promptBuilder, directActionWarnings, sourceContext),
+            ContextCapsulePhase.PatchReview => AuditPatchReview(phase, text, patchBlocks, patchText, promptBuilder, directActionWarnings, sourceContext),
             _ => AuditChat(phase, directActionWarnings)
         };
     }
@@ -89,7 +101,8 @@ public static class CodexPhaseAuditor
         ContextCapsulePhase phase,
         RequestLineAudit requestAudit,
         int patchBlockCount,
-        IReadOnlyList<string> directActionWarnings)
+        IReadOnlyList<string> directActionWarnings,
+        CodexPhaseAuditContext? auditContext)
     {
         var details = new List<string>();
         details.AddRange(directActionWarnings);
@@ -101,7 +114,7 @@ public static class CodexPhaseAuditor
 
         if (requestAudit.RequestLines.Count == 0)
         {
-            details.Add("No exact file, FUNCTION, SYMBOL, FUNC, or FIND lines were found.");
+            details.Add("No exact file, FUNCTION, FUNC, FIND, or EXPAND lines were found.");
             return Create(
                 phase,
                 CodexPhaseAuditLevel.Error,
@@ -109,6 +122,19 @@ public static class CodexPhaseAuditor
                 details,
                 requestAudit.RequestLines,
                 patchBlockCount);
+        }
+
+        var findCount = requestAudit.RequestLines.Count(line => line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase));
+        var expandCount = requestAudit.RequestLines.Count(line => line.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase));
+        var sourceCount = requestAudit.RequestLines.Count - findCount - expandCount;
+        if (findCount > 0 && (findCount != 1 || expandCount > 0 || sourceCount > 0))
+        {
+            details.Add("FIND must be exactly one line followed by END; do not mix FIND with source or EXPAND lines.");
+        }
+
+        if (expandCount > 0 && (expandCount != 1 || findCount > 0 || sourceCount > 0))
+        {
+            details.Add("EXPAND must be exactly one line followed by END; do not mix EXPAND with source or FIND lines.");
         }
 
         if (!requestAudit.EndsWithEnd)
@@ -119,6 +145,33 @@ public static class CodexPhaseAuditor
         foreach (var extra in requestAudit.ExtraLines.Take(4))
         {
             details.Add($"Extra non-request line in file-request output: {extra}");
+        }
+
+        if (auditContext?.DirManifest is { } manifest)
+        {
+            var validation = ContextPhase1RequestValidator.Validate(
+                new ContextRequestLineParseResult(requestAudit.RequestLines, requestAudit.ExtraLines, requestAudit.EndsWithEnd),
+                manifest,
+                auditContext.ProjectRoot,
+                auditContext.TrustedFindRequestPaths);
+            if (!validation.IsValid)
+            {
+                details.Add(validation.Error);
+                if (validation.Candidates.Count > 0)
+                {
+                    details.Add("Nearest valid DIR entries: " + string.Join(", ", validation.Candidates.Take(6)));
+                }
+
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: file-request output is not valid for the current DIR manifest.",
+                    details,
+                    requestAudit.RequestLines,
+                    patchBlockCount);
+            }
+
+            requestAudit = requestAudit with { RequestLines = validation.RequestLines };
         }
 
         var level = details.Count == 0 ? CodexPhaseAuditLevel.Pass : CodexPhaseAuditLevel.Warning;
@@ -135,7 +188,8 @@ public static class CodexPhaseAuditor
         IReadOnlyList<string> patchBlocks,
         string patchText,
         ContextPromptBuilder promptBuilder,
-        IReadOnlyList<string> directActionWarnings)
+        IReadOnlyList<string> directActionWarnings,
+        string sourceContext)
     {
         var details = new List<string>();
         details.AddRange(directActionWarnings);
@@ -150,6 +204,23 @@ public static class CodexPhaseAuditor
                     phase,
                     CodexPhaseAuditLevel.Error,
                     "Codex phase audit failed: source-audit returned malformed CC-REPLACE blocks.",
+                    details,
+                    requestAudit.RequestLines,
+                    patchBlocks.Count);
+            }
+
+            var blockingPatchHeaderError = false;
+            foreach (var warning in FindPatchHeaderWarnings(patchBlocks, sourceContext, out blockingPatchHeaderError).Take(4))
+            {
+                details.Add(warning);
+            }
+
+            if (blockingPatchHeaderError)
+            {
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: source-audit returned CC-REPLACE blocks that GO cannot target.",
                     details,
                     requestAudit.RequestLines,
                     patchBlocks.Count);
@@ -179,7 +250,8 @@ public static class CodexPhaseAuditor
         IReadOnlyList<string> patchBlocks,
         string patchText,
         ContextPromptBuilder promptBuilder,
-        IReadOnlyList<string> directActionWarnings)
+        IReadOnlyList<string> directActionWarnings,
+        string sourceContext)
     {
         var details = new List<string>();
         details.AddRange(directActionWarnings);
@@ -199,9 +271,21 @@ public static class CodexPhaseAuditor
                     patchBlocks.Count);
             }
 
-            foreach (var warning in FindPatchHeaderWarnings(patchBlocks).Take(4))
+            var blockingPatchHeaderError = false;
+            foreach (var warning in FindPatchHeaderWarnings(patchBlocks, sourceContext, out blockingPatchHeaderError).Take(4))
             {
                 details.Add(warning);
+            }
+
+            if (blockingPatchHeaderError)
+            {
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: patch-write returned CC-REPLACE blocks that GO cannot target.",
+                    details,
+                    requestAudit.RequestLines,
+                    patchBlocks.Count);
             }
 
             var level = details.Count == 0 ? CodexPhaseAuditLevel.Pass : CodexPhaseAuditLevel.Warning;
@@ -237,9 +321,27 @@ public static class CodexPhaseAuditor
                     0);
             }
 
+            var requestShapeError = ValidateRequestListShape(requestAudit);
+            if (!string.IsNullOrWhiteSpace(requestShapeError))
+            {
+                details.Add(requestShapeError);
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: NEED_MORE_CONTEXT returned an invalid context request.",
+                    details,
+                    requestAudit.RequestLines,
+                    0);
+            }
+
             if (!requestAudit.EndsWithEnd)
             {
                 details.Add("NEED_MORE_CONTEXT request lines did not end with END.");
+            }
+
+            foreach (var extra in requestAudit.ExtraLines.Take(4))
+            {
+                details.Add($"Extra non-request line in NEED_MORE_CONTEXT output: {extra}");
             }
 
             var level = details.Count == 0 ? CodexPhaseAuditLevel.Pass : CodexPhaseAuditLevel.Warning;
@@ -251,17 +353,37 @@ public static class CodexPhaseAuditor
 
         if (requestAudit.RequestLines.Count > 0)
         {
-            details.Add("Patch-write returned request lines without the required NEED_MORE_CONTEXT marker.");
-            return Create(
-                phase,
-                CodexPhaseAuditLevel.Error,
-                "Codex phase audit failed: patch-write answered like file-request phase.",
-                details,
-                requestAudit.RequestLines,
-                0);
+            var requestShapeError = ValidateRequestListShape(requestAudit);
+            if (!string.IsNullOrWhiteSpace(requestShapeError))
+            {
+                details.Add(requestShapeError);
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: patch-write returned an invalid context request.",
+                    details,
+                    requestAudit.RequestLines,
+                    0);
+            }
+
+            if (!requestAudit.EndsWithEnd)
+            {
+                details.Add("Patch-write context request lines did not end with END.");
+            }
+
+            foreach (var extra in requestAudit.ExtraLines.Take(4))
+            {
+                details.Add($"Extra non-request line in patch-write context request output: {extra}");
+            }
+
+            var level = details.Count == 0 ? CodexPhaseAuditLevel.Pass : CodexPhaseAuditLevel.Warning;
+            var summary = level == CodexPhaseAuditLevel.Pass
+                ? $"Codex phase audit passed: patch-write asked for {requestAudit.RequestLines.Count:N0} more context line(s)."
+                : "Codex phase audit warning: patch-write context request output needs review.";
+            return Create(phase, level, summary, details, requestAudit.RequestLines, 0);
         }
 
-        details.Add("Patch-write must return raw CC-REPLACE blocks, or NEED_MORE_CONTEXT plus valid CC request lines ending with END.");
+        details.Add("Patch-write must return raw CC-REPLACE blocks or valid CC request lines ending with END.");
         return Create(
             phase,
             CodexPhaseAuditLevel.Error,
@@ -277,7 +399,8 @@ public static class CodexPhaseAuditor
         IReadOnlyList<string> patchBlocks,
         string patchText,
         ContextPromptBuilder promptBuilder,
-        IReadOnlyList<string> directActionWarnings)
+        IReadOnlyList<string> directActionWarnings,
+        string sourceContext)
     {
         var details = new List<string>();
         details.AddRange(directActionWarnings);
@@ -292,6 +415,23 @@ public static class CodexPhaseAuditor
                     phase,
                     CodexPhaseAuditLevel.Error,
                     "Codex phase audit failed: patch-review returned malformed CC-REPLACE blocks.",
+                    details,
+                    [],
+                    patchBlocks.Count);
+            }
+
+            var blockingPatchHeaderError = false;
+            foreach (var warning in FindPatchHeaderWarnings(patchBlocks, sourceContext, out blockingPatchHeaderError).Take(4))
+            {
+                details.Add(warning);
+            }
+
+            if (blockingPatchHeaderError)
+            {
+                return Create(
+                    phase,
+                    CodexPhaseAuditLevel.Error,
+                    "Codex phase audit failed: patch-review returned CC-REPLACE blocks that GO cannot target.",
                     details,
                     [],
                     patchBlocks.Count);
@@ -400,20 +540,61 @@ public static class CodexPhaseAuditor
         return blocks;
     }
 
-    private static IReadOnlyList<string> FindPatchHeaderWarnings(IReadOnlyList<string> patchBlocks)
+    private static string RemovePatchBlocks(string text)
+    {
+        return Regex.Replace(
+            text ?? "",
+            "(?is)BEGIN\\s+CC-REPLACE\\b.*?END\\s+CC-REPLACE\\b",
+            Environment.NewLine,
+            RegexOptions.CultureInvariant);
+    }
+
+    private static IReadOnlyList<string> FindPatchHeaderWarnings(
+        IReadOnlyList<string> patchBlocks,
+        string sourceContext,
+        out bool hasBlockingError)
     {
         var warnings = new List<string>();
+        hasBlockingError = false;
         for (var index = 0; index < patchBlocks.Count; index++)
         {
             var block = patchBlocks[index];
             var headers = ReadPatchHeaders(block);
-            if (!headers.ContainsKey("FILE"))
+            var mode = headers.TryGetValue("MODE", out var modeValue)
+                ? modeValue.Trim()
+                : "";
+            var isCreateDirectory = mode.Equals("create_directory", StringComparison.OrdinalIgnoreCase);
+            if (isCreateDirectory && !headers.ContainsKey("DIR"))
+            {
+                warnings.Add($"CC-REPLACE block {index + 1:N0} uses MODE:create_directory and should use DIR:, not FILE:.");
+            }
+            else if (!isCreateDirectory && !headers.ContainsKey("FILE"))
             {
                 warnings.Add($"CC-REPLACE block {index + 1:N0} should use FILE: for Codex output even though GO may accept legacy aliases.");
+            }
+
+            if (mode.Equals("replace_region", StringComparison.OrdinalIgnoreCase)
+                && headers.TryGetValue("NAME", out var name)
+                && !string.IsNullOrWhiteSpace(name)
+                && !ContainsReplaceRegionMarker(sourceContext, name))
+            {
+                hasBlockingError = true;
+                warnings.Add($"CC-REPLACE block {index + 1:N0} uses MODE:replace_region NAME:{name}, but the visible CC source does not contain CC-REPLACE-BEGIN: {name}. Use replace_region only for marked regions; for unmarked XAML/AXAML style edits use MODE:whole_file with the complete file contents, or ask NEED_MORE_CONTEXT.");
             }
         }
 
         return warnings;
+    }
+
+    private static bool ContainsReplaceRegionMarker(string sourceContext, string markerName)
+    {
+        if (string.IsNullOrWhiteSpace(sourceContext) || string.IsNullOrWhiteSpace(markerName))
+        {
+            return false;
+        }
+
+        var pattern = @"CC-REPLACE-BEGIN\s*:\s*" + Regex.Escape(markerName.Trim()) + @"\b";
+        return Regex.IsMatch(sourceContext, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     private static Dictionary<string, string> ReadPatchHeaders(string block)
@@ -480,6 +661,25 @@ public static class CodexPhaseAuditor
     private static bool HasNeedMoreContext(string text)
     {
         return NormalizeLines(text).Any(line => line.Trim().Equals("NEED_MORE_CONTEXT", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ValidateRequestListShape(RequestLineAudit requestAudit)
+    {
+        var findCount = requestAudit.RequestLines.Count(line => line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase));
+        var expandCount = requestAudit.RequestLines.Count(line => line.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase));
+        var sourceCount = requestAudit.RequestLines.Count - findCount - expandCount;
+
+        if (findCount > 0 && (findCount != 1 || expandCount > 0 || sourceCount > 0))
+        {
+            return "FIND must be exactly one line followed by END; do not mix FIND with source or EXPAND lines.";
+        }
+
+        if (expandCount > 0 && (expandCount != 1 || findCount > 0 || sourceCount > 0))
+        {
+            return "EXPAND must be exactly one line followed by END; do not mix EXPAND with source or FIND lines.";
+        }
+
+        return "";
     }
 
     private static IEnumerable<string> NormalizeLines(string text)

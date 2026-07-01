@@ -26,6 +26,7 @@ public sealed record ContextCapsuleBuildRequest(
     string ModelId,
     string ModelContextLabel,
     int TargetContextTokens,
+    string WorkflowInstructions,
     string SkillbookInstructions,
     IReadOnlyList<ContextCapsuleAttachment> Attachments);
 
@@ -68,6 +69,13 @@ public sealed class ContextCapsuleBuilder
         builder.AppendLine();
         builder.AppendLine(BuildPhaseContract(request.Phase));
         builder.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(request.WorkflowInstructions))
+        {
+            builder.AppendLine("ContextControl workflow instructions:");
+            builder.AppendLine(request.WorkflowInstructions.Trim());
+            builder.AppendLine();
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SkillbookInstructions))
         {
@@ -195,71 +203,84 @@ public sealed class ContextCapsuleBuilder
         {
             ContextCapsulePhase.FileRequest => """
                 Phase contract:
-                Bus stop: DIR -> CC request selection.
-                DIR project-tree context is attached. Do not solve the user task yet.
+                Phase 1: DIR + Request.
+                DIR project-tree context and the user request are attached. Do not solve the task yet.
                 Output only the smallest safe CC request list.
+                Do not wrap the list in markdown code fences or backticks.
                 Format:
-                Research scope: one short line
                 ide/ContextControl.Workbench/Views/MainWindow.axaml
                 FUNCTION ide/ContextControl.Workbench/ViewModels/ContextControlViewModel.cs :: SymbolName
+                EXPAND: ide/ContextControl.Workbench/Views/
                 END
-                Valid lines: exact file, FUNCTION path :: symbol, FIND: exactText.
-                Do not output PATH:, FILE:, DIR:, labels, absolute paths, attachment paths, or placeholder lines.
-                Every exact file path must be copied from the attached DIR tree exactly.
-                If the user's named path is absent from the DIR tree, treat it as a hint and return real nearby tree paths or FIND: terms.
+                Valid lines: exact relative file path, FUNCTION path :: symbol, FUNCTION wildcard-path :: symbol, FUNC: symbol, FIND: text, EXPAND: directory, END.
+                Return final source request lines, exactly one FIND, or exactly one EXPAND. Do not mix FIND/EXPAND with file/FUNCTION/FUNC lines.
+                FIND must be exactly one request line followed by END.
+                EXPAND returns a richer DIR manifest for the selected scope, not source code.
+                Do not output SYMBOL, PATH:, FILE:, DIR:, labels, absolute paths, attachment paths, placeholder lines, patch blocks, or prose.
+                Prefer exact relative file paths copied from DIR when the target file is visible.
+                Every exact file path must be copied from the attached DIR manifest exactly.
+                If the user's named path is absent from the DIR manifest, treat it as a hint and return real nearby manifest paths, FIND, or EXPAND.
                 Never invent src/, .xaml.cs, .csproj, or framework-style paths that are not present in the tree.
                 Ignore diagnostic questions about whether attachments were received; the inventory above is authoritative, and your output must still be a useful CC request list.
-                FIND terms must come from the user's real task, not from capsule headings such as local LLM capsule, attachment, project tree, or context.
-                FIND is discovery only: it lists candidate files and occurrence previews, but it never exports source bodies. After FIND results, ask for exact file paths or FUNCTION lines before writing a patch.
-                Never return END by itself. If unsure, output 2-5 FIND: terms from the user request, then END.
+                Never return END by itself. If unsure, output the narrowest visible owner files/functions, then END.
                 """,
             ContextCapsulePhase.SourceAudit => """
                 Phase contract:
-                Bus stop: CC source audit / evidence review.
-                CC source/function context is attached. Do not patch unless the user explicitly asks for code changes.
-                Analyze only the visible source context and the user's task.
-                Treat complex work as gated stages. Do not advance a later stage until the current stage has a mini-report.
-                For each candidate or finding, use this structure:
-                Candidate ID:
-                Title:
-                Affected files/functions:
-                External or user-controlled input:
-                Trust boundary:
-                Normal operation path:
-                Invariant or requirement violated:
-                Exact code evidence:
-                Impact:
-                Extra files/functions needed:
-                Confidence:
-                Disprove conditions:
-                If context is insufficient, request only exact files, FUNCTION path :: symbol, or FIND: exactText lines, ending with END.
-                Keep claims conservative. Separate proven primitive from reachability whenever the impact depends on a later path.
+                Phase 2: CC export.
+                CC source/function context is attached. Use only visible source and the optional user clarification.
+                If context is insufficient, output only the next narrow CC request list ending with END.
+                If context is sufficient, output one GO patch containing raw BEGIN/END CC-REPLACE blocks only. GO writes that raw output to patch.txt.
+                One GO patch may contain many CC-REPLACE blocks across many files.
+                Keep analysis internal; do not add prose unless the user explicitly asked for explanation instead of a patch.
                 """,
             ContextCapsulePhase.PatchWrite => """
                 Phase contract:
-                Bus stop: CC patch authoring.
+                Phase 2: CC export.
                 CC source/function context is attached.
-                You are NOT in DIR/file-request phase. File selection is already complete.
-                Do not reply with DIR, FIND, END, or a file request list.
-                Answer from the provided source, or emit raw CC-REPLACE blocks only.
-                Every CC-REPLACE block must include FILE, MODE, and usually the --- separator.
+                You are not in DIR + Request. Do not output broad discovery; use exactly one FIND only when exact paths are unknown.
+                If source is insufficient, output only the next narrow CC request list ending with END.
+                If source is sufficient, emit one GO patch containing raw CC-REPLACE blocks only. GO writes that raw output to patch.txt.
+                One GO patch may contain many CC-REPLACE blocks across many files. Do not split patches into separate chat answers by file.
+                Do not emit prose mixed with the patch, git diff, shell commands, apply_patch syntax, direct file edits, markdown fences, or commentary inside the patch.
                 Never put a bare path directly after BEGIN CC-REPLACE.
                 Use paths relative to the project root, copied from the CC source export header.
-                Required patch shape:
+                Use replace_region only when the visible source contains literal CC-REPLACE-BEGIN/END markers for NAME.
+                A XAML selector, CSS selector, function name, or style name is not a replace_region marker.
+                For unmarked XAML/AXAML style/resource edits, use MODE: whole_file with the complete file contents from the export, or request more CC context if the full file is not visible.
+                Supported MODE values: replace_region, insert_include, whole_file, insert_after_function, insert_before_function, delete_function, function, append_to_file, create_directory.
+                General rules:
+                Use FILE for file-targeting modes.
+                Use DIR only for create_directory.
+                Body modes require --- followed by replacement text.
+                Bodyless modes are insert_include, delete_function, and create_directory.
+                function, insert_before_function, insert_after_function, delete_function, and replace_region require NAME.
+                insert_include requires HEADER.
+                whole_file body must be the complete final file content.
+                New files use MODE: whole_file.
+                If adding, removing, or renaming C++ source files, include the required CMakeLists.txt/build-file CC-REPLACE block in the same GO patch.
+                Ground every edit in visible source and choose the least invasive valid ccReplace mode.
+                If a required target, declaration, dependency, or build owner is not visible, request the next narrow CC export instead of guessing.
+                Do not ask for more context when the visible export already contains the target file and enough surrounding source to write the edit.
+                Mode choice order:
+                1. replace_region: use for visible CC-REPLACE-BEGIN/END markers.
+                2. insert_include: use for one missing C/C++ include.
+                3. whole_file: use for new files, small files, unmarked files, or risky structure edits.
+                4. insert_after_function / insert_before_function / delete_function: use around one unique visible function.
+                5. function: use only when replacing one unique unambiguous function.
+                6. append_to_file: use only for additive tail content.
+                7. create_directory: use before creating files inside a new folder.
+                Patch block skeleton:
                 BEGIN CC-REPLACE
-                FILE: path/relative/to/project
-                MODE: function|replace_region|whole_file|append_to_file
-                NAME: required_for_function_or_replace_region
+                FILE: path/relative/to/project_root.cpp
+                MODE: whole_file
                 ---
                 replacement text
                 END CC-REPLACE
-                For MODE: insert_include, use HEADER: <...> or HEADER: "..." and omit the body/separator.
-                Do not invent APIs not shown in context.
-                If the visible CC source context is insufficient, reply with NEED_MORE_CONTEXT followed by valid CC request lines and END.
+                Header variants: create_directory uses DIR instead of FILE; insert_include adds HEADER and has no body; function/insert_before_function/insert_after_function/delete_function/replace_region require NAME; bodyless modes omit ---.
                 """,
             ContextCapsulePhase.PatchReview => """
                 Phase contract:
-                Bus stop: patch review / repair.
+                Phase 2: CC patch review.
                 Patch context is attached.
                 Review or repair it using only visible context.
                 If repaired, emit complete CC-REPLACE blocks.
@@ -275,10 +296,10 @@ public sealed class ContextCapsuleBuilder
     {
         return phase switch
         {
-            ContextCapsulePhase.FileRequest => "file-request",
-            ContextCapsulePhase.SourceAudit => "source-audit",
-            ContextCapsulePhase.PatchWrite => "patch-write",
-            ContextCapsulePhase.PatchReview => "patch-review",
+            ContextCapsulePhase.FileRequest => "DIR + Request",
+            ContextCapsulePhase.SourceAudit => "CC",
+            ContextCapsulePhase.PatchWrite => "CC",
+            ContextCapsulePhase.PatchReview => "CC",
             _ => "chat"
         };
     }

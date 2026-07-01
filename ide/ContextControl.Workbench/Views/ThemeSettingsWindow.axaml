@@ -71,6 +71,11 @@
                 Content="Project Rules"
                 Click="OnFileRulesNavClick" />
             <Button
+                x:Name="PromptWindowNavButton"
+                Classes="settings-nav"
+                Content="Prompt Window"
+                Click="OnPromptWindowNavClick" />
+            <Button
                 x:Name="LlmsNavButton"
                 Classes="settings-nav"
                 Content="LLMs"
@@ -82,6 +87,8 @@
           <parts:AppearanceSettingsPage x:Name="AppearancePage" />
 
           <parts:LlmsSettingsPage x:Name="LlmsPage" IsVisible="False" />
+
+          <parts:PromptWindowSettingsPage x:Name="PromptWindowPage" IsVisible="False" />
 
           <parts:FileRulesSettingsPage x:Name="FileRulesPage" IsVisible="False" />
         </Grid>

@@ -16,9 +16,12 @@ public sealed partial class ContextControlViewModel : ObservableObject
 {
     private const string ChatConversationKind = "chat";
     private const string ImageGenConversationKind = "imagegen";
-    private const double CompactPromptBarHeight = 222;
-    private const double MaximumPromptBarHeight = 376;
-    private const double BusyPromptProgressHeight = 10;
+    private const string DefaultCodexModelId = "gpt-5.3-codex-spark";
+    private const string CustomFlowCodexModelId = "gpt customflow";
+    private const string DefaultCodexReasoningEffort = "low";
+    private const double CompactPromptBarHeight = 206;
+    private const double MaximumPromptBarHeight = 360;
+    private const double BusyPromptProgressHeight = 8;
     private const double PromptLineHeight = 18;
     private const int CompactPromptLines = 4;
     private const int EstimatedPromptWrapColumn = 82;
@@ -63,13 +66,14 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private const string LlmBaseAll = "All bases";
     private const string LlmContextAny = "Any";
     private const string LlmRequirementAny = "Any requirement";
+    private const string CodexDefaultOptionLabel = "Codex config default";
     private const int CcStageRequest = 0;
-    private const int CcStageDir = 1;
-    private const int CcStageResolve = 2;
-    private const int CcStageExport = 3;
-    private const int CcStagePatch = 4;
-    private const int CcStagePreview = 5;
-    private const int CcStageApply = 6;
+    private const int CcStageDir = 0;
+    private const int CcStageResolve = 0;
+    private const int CcStageExport = 1;
+    private const int CcStagePatch = 1;
+    private const int CcStagePreview = 2;
+    private const int CcStageApply = 2;
 
     private readonly WorkbenchSettings _settings;
     private readonly ContextControlProcessService _processService;
@@ -86,6 +90,8 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private readonly object _settingsSaveLock = new();
     private Func<string, Task>? _clipboardWriter;
     private Func<ChatSnippetViewModel, Task<string?>>? _snippetFileSaver;
+    private Action<string>? _projectFileOpener;
+    private Action? _promptModeWorkspaceRequester;
     private bool _isBusy;
     private bool _isPromptOpen;
     private bool _isPromptTypingActive;
@@ -101,9 +107,13 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private bool _isCcTimelineExpanded = true;
     private bool _isAutopilotEnabled;
     private bool _isCodexRequestRunning;
+    private bool _isCodexCliInstalled;
+    private bool _isInstallingCodex;
     private bool _isCodexAuthenticated;
     private bool _isCodexLoginRequired;
     private bool _isRefreshingCodexStatus;
+    private bool _isRefreshingCodexUsage;
+    private bool _isCodexUsagePanelExpanded;
     private CancellationTokenSource? _codexAuthWatchCancellation;
     private int _currentCcTimelineStageIndex = CcStageRequest;
     private double _transferProgressValue;
@@ -135,12 +145,28 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private string _hardwareSummary = "Detecting GPU...";
     private string _localLlmStatus = "Local model scan pending.";
     private string _codexStatus = "Codex CLI read-only CC capsule";
+    private string _codexUsageSummary = "Codex usage appears after a Codex prompt completes.";
+    private string _codexRateLimitSummary = "5h and weekly limits appear when Codex reports an account snapshot.";
+    private string _codexFiveHourPercentLeftLabel = "--";
+    private string _codexWeeklyPercentLeftLabel = "--";
+    private string _codexUsageResetLabel = "minor reset --";
+    private string _codexFiveHourResetLabel = "5h reset --";
+    private string _codexWeeklyResetLabel = "weekly reset --";
+    private double _codexFiveHourPercentLeftValue;
+    private double _codexWeeklyPercentLeftValue;
+    private double _codexFiveHourUsageBarFillWidth;
+    private double _codexWeeklyUsageBarFillWidth;
+    private bool _isCodexFiveHourLimitDepleted;
+    private bool _isCodexWeeklyLimitDepleted;
     private string _lastAssistantPatchBlocks = "";
     private string _lastUserRequest = "";
+    private IReadOnlyList<string> _lastFindDiscoveryRequestPaths = [];
     private string _fileRequestModelId;
     private string _patchWriteModelId;
     private string _patchReviewModelId;
     private string _chatModelId;
+    private string _codexModelId;
+    private string _codexReasoningEffort;
     private string _ollamaModelsDirectory;
     private string _ollamaModelsDirectoryStatus;
     private string _huggingFaceToken;
@@ -166,7 +192,6 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private bool _isSyncingChatDraft;
     private bool _isSwitchingChatSession;
     private bool _isSwitchingConversationKind;
-    private bool _isImageGenWorkspaceActive;
     private bool _isLlmInfoExpanded;
     private bool _isLlmFiltersExpanded = true;
     private bool _isLocalLlmSearchOpen;
@@ -198,6 +223,10 @@ public sealed partial class ContextControlViewModel : ObservableObject
         _patchWriteModelId = settings.PatchWriteModel;
         _patchReviewModelId = settings.PatchReviewModel;
         _chatModelId = settings.ChatModel;
+        var cleanCodexModel = CleanCodexOption(settings.CodexModel);
+        var cleanCodexReasoning = NormalizeCodexReasoningOption(settings.CodexReasoningEffort);
+        _codexModelId = string.IsNullOrWhiteSpace(cleanCodexModel) ? DefaultCodexModelId : cleanCodexModel;
+        _codexReasoningEffort = string.IsNullOrWhiteSpace(cleanCodexReasoning) ? DefaultCodexReasoningEffort : cleanCodexReasoning;
         _ollamaModelsDirectory = LocalLlmService.ResolveOllamaModelsDirectory(settings.OllamaModelsDirectory);
         _ollamaModelsDirectoryStatus = $"Ollama model storage: {_ollamaModelsDirectory}";
         _huggingFaceToken = settings.HuggingFaceToken;
@@ -225,6 +254,9 @@ public sealed partial class ContextControlViewModel : ObservableObject
             ? settings.SelectedAiRoute
             : RouteOptions[0];
         _promptModeKey = NormalizePromptModeKey(settings.PromptModeKey);
+        _activeConversationKind = string.Equals(_promptModeKey, "imagegen", StringComparison.OrdinalIgnoreCase)
+            ? ImageGenConversationKind
+            : ChatConversationKind;
 
         IsPromptOpen = settings.PromptBarOpenByDefault;
         LocalLlmModels = new ObservableCollection<LocalLlmModelViewModel>(
@@ -279,35 +311,67 @@ public sealed partial class ContextControlViewModel : ObservableObject
         RefreshLocalLlmBaseFilters();
         ApplyLocalLlmFilters();
         LocalModelIdOptions = new ObservableCollection<string>(LocalLlmService.Catalog.Select(model => model.Id));
+        CodexModelOptions = new ObservableCollection<string>(
+            new[]
+            {
+                CustomFlowCodexModelId,
+                "gpt-5.5",
+                "gpt-5.4",
+                "gpt-5.4-mini",
+                "gpt-5.3-codex",
+                "gpt-5.3-codex-spark",
+                "gpt-5.2",
+                "codex-auto-review"
+            });
+        if (!string.IsNullOrWhiteSpace(_codexModelId) && !CodexModelOptions.Contains(_codexModelId))
+        {
+            CodexModelOptions.Add(_codexModelId);
+        }
+
+        CodexReasoningEffortOptions = new ObservableCollection<string>(
+            new[]
+            {
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+            });
+        if (!string.IsNullOrWhiteSpace(_codexReasoningEffort) && !CodexReasoningEffortOptions.Contains(_codexReasoningEffort))
+        {
+            CodexReasoningEffortOptions.Add(_codexReasoningEffort);
+        }
+
         LlmBackendDependencies = new ObservableCollection<LlmBackendDependencyViewModel>(CreateLlmBackendDependencies());
         VisibleLlmBackendDependencies = [];
         ApplyDependencyFilters();
         UpdateOllamaBackendDependency();
         CcTimelineStages =
         [
-            new CcTimelineStageViewModel("request", "Request", "Write the user task"),
-            new CcTimelineStageViewModel("dir", "DIR", "Attach project tree"),
-            new CcTimelineStageViewModel("resolve", "Files", "Model picks CC lines"),
-            new CcTimelineStageViewModel("export", "CC", "Export code context"),
-            new CcTimelineStageViewModel("patch", "Patch", "Author/review edits"),
-            new CcTimelineStageViewModel("preview", "GO", "Preview patch plan"),
-            new CcTimelineStageViewModel("apply", "Apply", "Write effective edits")
+            new CcTimelineStageViewModel("dir-request", "DIR + Request", "Map project and ask for source context", "The user request and DIR map are sent together. The model returns a minimal file/function list ending with END."),
+            new CcTimelineStageViewModel("cc", "CC", "Export source and decide next step", "CC attaches selected source. The model either asks for more CC context or emits GO-ready CC-REPLACE blocks."),
+            new CcTimelineStageViewModel("go", "GO", "Preview and apply patch", "GO and Apply are local ccReplace actions. They do not send a model prompt.")
         ];
         UpdateCcTimelineState();
-        SkillbookEntries = new ObservableCollection<SkillbookEntryViewModel>(
-            _skillbookService.LoadEntries().Select(entry => new SkillbookEntryViewModel(entry)));
+        SkillbookEntries = [];
+        InitializeSkillbookCommands();
+        LoadSkillbookDocument();
         ChatSessions = [];
         ChatRequestProgressItems.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasChatRequestProgress));
+            OnPropertyChanged(nameof(ShowBusyPromptProgress));
             OnPromptBarLayoutChanged();
         };
 
         RunDirCommand = new RelayCommand<object>(_ => _ = RunDirAsync(), _ => !IsBusy);
         RunCcCommand = new RelayCommand<object>(_ => _ = RunCcAsync(), _ => !IsBusy);
         RunGoCommand = new RelayCommand<object>(_ => _ = RunGoPreviewAsync(), _ => !IsBusy);
+        RunDirTreeExportCommand = new RelayCommand<object>(_ => _ = RunDirTreeExportAsync(), _ => !IsBusy);
         ApplyPatchCommand = new RelayCommand<object>(_ => _ = ApplyPatchAsync(), _ => !IsBusy && IsPatchPlanReady);
         ApplyAllPatchCommand = new RelayCommand<object>(_ => _ = ApplyPatchAsync("all"), _ => !IsBusy && IsPatchPlanReady);
+        OpenPatchPlanFileCommand = new RelayCommand<PatchPlanFileViewModel>(
+            OpenPatchPlanFile,
+            file => file?.CanOpen == true);
         SendCommand = new RelayCommand<object>(_ => _ = SendAsync(), _ => !IsBusy && !IsCodexPromptAuthBlocked);
         ToggleLogPanelCommand = new RelayCommand<object>(_ => SelectDockPanel("log"));
         SelectLogPanelCommand = new RelayCommand<object>(_ => SelectDockPanel("log"));
@@ -336,17 +400,28 @@ public sealed partial class ContextControlViewModel : ObservableObject
                 && !IsBusy
                 && !IsRefreshingLocalModels
                 && !IsInstallingOllama);
-        SwitchPromptToContextCommand = new RelayCommand<object>(_ => PromptModeKey = "context");
-        SwitchPromptToChatCommand = new RelayCommand<object>(_ => PromptModeKey = "context");
-        SwitchPromptToCodexCommand = new RelayCommand<object>(_ => ActivateCodexPromptMode());
+        SwitchPromptToContextCommand = new RelayCommand<object>(_ => SwitchPromptModeFromButton("context"));
+        SwitchPromptToChatCommand = new RelayCommand<object>(_ => SwitchPromptModeFromButton("context"));
+        SwitchPromptToCodexCommand = new RelayCommand<object>(_ =>
+        {
+            ActivateCodexPromptMode();
+            _promptModeWorkspaceRequester?.Invoke();
+        });
+        SwitchPromptToImageGenCommand = new RelayCommand<object>(_ => SwitchPromptModeFromButton("imagegen"));
         SwitchPromptToTerminalCommand = new RelayCommand<object>(_ => PromptModeKey = "terminal");
         ClearTerminalCommand = new RelayCommand<object>(_ => ClearTerminalOutput());
         PreviousTransferStatusCommand = new RelayCommand<object>(_ => MoveTransferProgressHistory(-1), _ => CanMoveTransferProgressHistory(-1));
         NextTransferStatusCommand = new RelayCommand<object>(_ => MoveTransferProgressHistory(1), _ => CanMoveTransferProgressHistory(1));
         CloseTransferProgressCommand = new RelayCommand<object>(_ => CloseTransferProgress(), _ => CanCloseTransferProgress);
+        InstallCodexCommand = new RelayCommand<object>(
+            _ => InstallCodex(),
+            _ => !IsBusy && !IsCodexRequestRunning && !IsInstallingCodex);
+        OpenCodexGuideCommand = new RelayCommand<object>(
+            _ => OpenCodexGuide(),
+            _ => !IsBusy && !IsCodexRequestRunning);
         OpenCodexLoginCommand = new RelayCommand<object>(
             _ => OpenCodexLogin(),
-            _ => !IsBusy && !IsCodexRequestRunning);
+            _ => !IsBusy && !IsCodexRequestRunning && IsCodexCliInstalled);
         LogoutCodexCommand = new RelayCommand<object>(
             _ => _ = LogoutCodexAsync(),
             _ => IsCodexAuthenticated && !IsBusy && !IsCodexRequestRunning && !IsRefreshingCodexStatus);
@@ -355,10 +430,19 @@ public sealed partial class ContextControlViewModel : ObservableObject
             _ => !IsCodexRequestRunning && !IsRefreshingCodexStatus);
         RunCodexDoctorCommand = new RelayCommand<object>(
             _ => _ = RunCodexDoctorAsync(),
-            _ => !IsBusy && !IsCodexRequestRunning && !IsRefreshingCodexStatus);
+            _ => !IsBusy && !IsCodexRequestRunning && !IsRefreshingCodexStatus && IsCodexCliInstalled);
         CancelCodexRequestCommand = new RelayCommand<ChatRequestProgressViewModel>(
             CancelCodexRequest,
             item => CanCancelCodexRequest(item));
+        ToggleCodexUsagePanelCommand = new RelayCommand<object>(_ =>
+        {
+            IsPromptOpen = true;
+            IsCodexUsagePanelExpanded = !IsCodexUsagePanelExpanded;
+            if (IsCodexUsagePanelExpanded)
+            {
+                _ = RefreshCodexUsageFromLogsAsync(showChecking: false);
+            }
+        });
         CopyRoutingLogCommand = new RelayCommand<object>(_ => _ = CopyRoutingLogAsync());
         CopySnippetCommand = new RelayCommand<ChatSnippetViewModel>(snippet => _ = CopySnippetAsync(snippet));
         SaveSnippetAsCommand = new RelayCommand<ChatSnippetViewModel>(
@@ -372,6 +456,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
         UseSnippetForCcCommand = new RelayCommand<ChatSnippetViewModel>(UseSnippetForCc);
         PreviewSnippetCommand = new RelayCommand<ChatSnippetViewModel>(snippet => _ = PreviewSnippetAsync(snippet), snippet => snippet?.IsPatch == true);
         ToggleAttachmentIncludeCommand = new RelayCommand<ContextControlAttachmentViewModel>(ToggleAttachmentInclude);
+        RemoveAttachmentCommand = new RelayCommand<ContextControlAttachmentViewModel>(RemoveAttachment);
         ToggleThinkingCommand = new RelayCommand<LocalLlmChatMessageViewModel>(message => message?.ToggleThinking());
         ToggleDiagnosticCommand = new RelayCommand<LocalLlmChatMessageViewModel>(message => message?.ToggleDiagnostic());
         ToggleSnippetCommand = new RelayCommand<ChatSnippetViewModel>(snippet => snippet?.ToggleExpanded());
@@ -396,7 +481,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
         Log("info", $"Context root: {_processService.ContextRoot}");
         LoadChatHistory();
         _ = RefreshCodexStatusAsync();
-        _ = RefreshLocalModelsAsync();
+        _ = RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
     }
 
     public ObservableCollection<string> RouteOptions { get; }
@@ -415,6 +500,8 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public ObservableCollection<string> LocalLlmContextFilters { get; }
     public ObservableCollection<string> LocalLlmRequirementFilters { get; }
     public ObservableCollection<string> LocalModelIdOptions { get; }
+    public ObservableCollection<string> CodexModelOptions { get; }
+    public ObservableCollection<string> CodexReasoningEffortOptions { get; }
     public ObservableCollection<LlmBackendDependencyViewModel> LlmBackendDependencies { get; }
     public AvaloniaList<LlmBackendDependencyViewModel> VisibleLlmBackendDependencies { get; }
     public ObservableCollection<SkillbookEntryViewModel> SkillbookEntries { get; }
@@ -422,6 +509,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public ChatMessageCollectionViewModel ChatMessages { get; } = new();
     public ObservableCollection<ChatRequestProgressViewModel> ChatRequestProgressItems { get; } = [];
     public ObservableCollection<PatchPlanActionViewModel> PatchPlanActions { get; } = [];
+    public ObservableCollection<PatchPlanFileViewModel> PatchPlanFiles { get; } = [];
     public bool HasAttachments => Attachments.Count > 0;
     public bool HasInstalledLocalModels => InstalledLocalModels.Count > 0;
     public bool HasInstalledImageGenerationModels => InstalledImageGenerationModels.Count > 0;
@@ -429,7 +517,8 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public bool HasChatSessions => ChatSessions.Count > 0;
     public bool HasChatRequestProgress => ChatRequestProgressItems.Count > 0;
     public bool HasPatchPlanActions => PatchPlanActions.Count > 0;
-    public string ChatHistoryPanelTitle => IsImageGenConversationKind(_activeConversationKind) ? "Image Chats" : "Chats";
+    public bool HasPatchPlanFiles => PatchPlanFiles.Count > 0;
+    public string ChatHistoryPanelTitle => IsImageGenConversationKind(_activeConversationKind) ? "ImageGen Chats" : "Chats";
     public string ChatHistorySummary => IsImageGenConversationKind(_activeConversationKind)
         ? $"{ChatSessions.Count:N0} image chat(s)"
         : $"{ChatSessions.Count:N0} chat(s)";
@@ -494,14 +583,22 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public ChatSessionViewModel? SelectedChatSession
     {
         get => _selectedChatSession;
-        private set => SetProperty(ref _selectedChatSession, value);
+        private set
+        {
+            if (SetProperty(ref _selectedChatSession, value))
+            {
+                OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
+            }
+        }
     }
 
     public ICommand RunDirCommand { get; }
     public ICommand RunCcCommand { get; }
     public ICommand RunGoCommand { get; }
+    public ICommand RunDirTreeExportCommand { get; }
     public ICommand ApplyPatchCommand { get; }
     public ICommand ApplyAllPatchCommand { get; }
+    public ICommand OpenPatchPlanFileCommand { get; }
     public ICommand SendCommand { get; }
     public ICommand ToggleLogPanelCommand { get; }
     public ICommand SelectLogPanelCommand { get; }
@@ -519,16 +616,20 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public ICommand SwitchPromptToContextCommand { get; }
     public ICommand SwitchPromptToChatCommand { get; }
     public ICommand SwitchPromptToCodexCommand { get; }
+    public ICommand SwitchPromptToImageGenCommand { get; }
     public ICommand SwitchPromptToTerminalCommand { get; }
     public ICommand ClearTerminalCommand { get; }
     public ICommand PreviousTransferStatusCommand { get; }
     public ICommand NextTransferStatusCommand { get; }
     public ICommand CloseTransferProgressCommand { get; }
+    public ICommand InstallCodexCommand { get; }
+    public ICommand OpenCodexGuideCommand { get; }
     public ICommand OpenCodexLoginCommand { get; }
     public ICommand LogoutCodexCommand { get; }
     public ICommand RefreshCodexStatusCommand { get; }
     public ICommand RunCodexDoctorCommand { get; }
     public ICommand CancelCodexRequestCommand { get; }
+    public ICommand ToggleCodexUsagePanelCommand { get; }
     public ICommand CopyRoutingLogCommand { get; }
     public ICommand CopySnippetCommand { get; }
     public ICommand SaveSnippetAsCommand { get; }
@@ -538,6 +639,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
     public ICommand UseSnippetForCcCommand { get; }
     public ICommand PreviewSnippetCommand { get; }
     public ICommand ToggleAttachmentIncludeCommand { get; }
+    public ICommand RemoveAttachmentCommand { get; }
     public ICommand ToggleThinkingCommand { get; }
     public ICommand ToggleDiagnosticCommand { get; }
     public ICommand ToggleSnippetCommand { get; }

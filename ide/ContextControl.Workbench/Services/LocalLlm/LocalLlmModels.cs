@@ -85,7 +85,9 @@ public sealed record LocalLlmUsageStats(
     long? TotalDurationNanoseconds,
     long? LoadDurationNanoseconds,
     long? PromptEvalDurationNanoseconds,
-    long? EvalDurationNanoseconds)
+    long? EvalDurationNanoseconds,
+    long? CachedPromptTokens = null,
+    long? ReasoningOutputTokens = null)
 {
     public double TokensPerSecond
     {
@@ -102,11 +104,33 @@ public sealed record LocalLlmUsageStats(
     {
         get
         {
-            var prompt = PromptTokens is { } promptTokens ? $"{promptTokens} in" : "? in";
-            var output = OutputTokens is { } outputTokens ? $"{outputTokens} out" : "? out";
-            var speed = TokensPerSecond > 0 ? $"{TokensPerSecond:0.#} tok/s" : "speed ?";
+            var parts = new List<string>
+            {
+                PromptTokens is { } promptTokens ? $"{promptTokens:N0} in" : "? in",
+                OutputTokens is { } outputTokens ? $"{outputTokens:N0} out" : "? out"
+            };
+            if (CachedPromptTokens is > 0)
+            {
+                parts.Add($"{CachedPromptTokens.Value:N0} cached");
+            }
+
+            if (ReasoningOutputTokens is > 0)
+            {
+                parts.Add($"{ReasoningOutputTokens.Value:N0} reasoning");
+            }
+
+            if (TokensPerSecond > 0)
+            {
+                parts.Add($"{TokensPerSecond:0.#} tok/s");
+            }
+
             var total = FormatStatsDuration(TotalDurationNanoseconds);
-            return $"{prompt}, {output}, {speed}, {total}";
+            if (!string.Equals(total, "?", StringComparison.Ordinal))
+            {
+                parts.Add(total);
+            }
+
+            return string.Join(", ", parts);
         }
     }
 
@@ -155,4 +179,6 @@ public sealed record LocalLlmGenerationProgress(
     long? LoadDurationNanoseconds,
     long? PromptEvalDurationNanoseconds,
     long? EvalDurationNanoseconds,
-    bool Done);
+    bool Done,
+    string? ThinkingDelta = null,
+    CodexUsageSnapshot? CodexUsage = null);

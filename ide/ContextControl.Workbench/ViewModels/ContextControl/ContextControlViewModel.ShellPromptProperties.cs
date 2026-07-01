@@ -16,8 +16,9 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class ContextControlViewModel
 {
-    private const string CodexPromptLoginMessage = "Please login into codex to use it";
-    private const string CodexPromptAuthorizeMessage = "Authorize to codex to use codex mode";
+    private const string CodexPromptLoginMessage = "Please log in to Codex to use it";
+    private const string CodexPromptInstallMessage = "Install Codex CLI or open the official Codex CLI guide";
+    private const string CodexPromptAuthorizeMessage = "Authorize Codex to use Codex mode";
 
     public bool IsBusy
     {
@@ -56,10 +57,6 @@ public sealed partial class ContextControlViewModel
 
     public double PromptBarHeight => IsPromptOpen
         ? CalculatePromptBarBaseHeight()
-            + (ShowBusyPromptProgress ? BusyPromptProgressHeight : 0)
-            + (IsCcTimelinePanelVisible ? 70 : 0)
-            + (IsTransferProgressActive ? 72 : 0)
-            + (ChatRequestProgressItems.Count * 68)
         : 0;
 
     public double PromptBarOpacity => IsPromptOpen ? 1 : 0;
@@ -108,6 +105,11 @@ public sealed partial class ContextControlViewModel
             {
                 OnPropertyChanged(nameof(AutopilotModeLabel));
                 OnPropertyChanged(nameof(AutopilotModeToolTip));
+                OnPropertyChanged(nameof(IsCcTimelinePanelVisible));
+                OnPropertyChanged(nameof(IsCcTimelineToggleVisible));
+                OnPropertyChanged(nameof(IsDirSendMissingRequestWarning));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
+                OnPromptBarLayoutChanged();
                 _settings.IsAutopilotEnabled = value;
                 SaveSettingsQuietly();
             }
@@ -194,7 +196,7 @@ public sealed partial class ContextControlViewModel
 
     public string OllamaInstallCommandLabel => LocalLlmService.OllamaDownloadPageUrl;
 
-    public bool ShowBusyPromptProgress => IsBusy && !IsTransferProgressActive;
+    public bool ShowBusyPromptProgress => IsBusy && !IsTransferProgressActive && !HasChatRequestProgress;
 
     public bool IsTransferProgressActive
     {
@@ -204,6 +206,7 @@ public sealed partial class ContextControlViewModel
             if (SetProperty(ref _isTransferProgressActive, value))
             {
                 OnPropertyChanged(nameof(ShowBusyPromptProgress));
+                OnPropertyChanged(nameof(IsTransferProgressLoading));
                 OnPromptBarLayoutChanged();
             }
         }
@@ -262,6 +265,8 @@ public sealed partial class ContextControlViewModel
             ? ""
             : $"{_transferProgressHistoryIndex + 1:N0}/{_transferProgressHistory.Count:N0}";
 
+    public bool IsTransferProgressLoading => IsTransferProgressActive && !_isTransferProgressDismissible;
+
     public bool CanCloseTransferProgress =>
         IsTransferProgressActive
         && (_isTransferProgressDismissible
@@ -275,6 +280,7 @@ public sealed partial class ContextControlViewModel
             if (SetProperty(ref _isPatchPlanReady, value))
             {
                 RaiseCommandStates();
+                RefreshPromptFlowSteps();
             }
         }
     }
@@ -287,6 +293,7 @@ public sealed partial class ContextControlViewModel
             if (SetProperty(ref _phaseTitle, value))
             {
                 UpdateCcTimelineFromStatus();
+                RefreshPromptFlowSteps();
             }
         }
     }
@@ -300,6 +307,7 @@ public sealed partial class ContextControlViewModel
             {
                 MirrorPhaseStatusToTerminal();
                 UpdateCcTimelineFromStatus();
+                RefreshPromptFlowSteps();
             }
         }
     }
@@ -318,7 +326,11 @@ public sealed partial class ContextControlViewModel
                 SavePromptDraftToSelectedChat();
                 OnPropertyChanged(nameof(PromptTokenomicsLabel));
                 OnPropertyChanged(nameof(PromptContextPressureLabel));
+                OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
                 OnPropertyChanged(nameof(PromptFooterSummary));
+                OnPropertyChanged(nameof(IsDirSendMissingRequestWarning));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
+                RefreshPromptFlowSteps();
                 if (wasLargePrompt != isLargePrompt)
                 {
                     OnPropertyChanged(nameof(IsLargePrompt));
@@ -355,16 +367,37 @@ public sealed partial class ContextControlViewModel
         private set
         {
             var clean = NormalizePromptModeKey(value);
+            var previous = _promptModeKey;
+            var conversationKindChanged = !string.Equals(
+                ResolveConversationKindForPromptMode(previous),
+                ResolveConversationKindForPromptMode(clean),
+                StringComparison.OrdinalIgnoreCase);
+            if (conversationKindChanged)
+            {
+                SaveChatHistory();
+            }
 
             if (SetProperty(ref _promptModeKey, clean))
             {
                 OnPropertyChanged(nameof(IsContextPromptMode));
                 OnPropertyChanged(nameof(IsChatPromptMode));
+                OnPropertyChanged(nameof(IsLocalPromptMode));
+                OnPropertyChanged(nameof(IsImageGenPromptMode));
+                OnPropertyChanged(nameof(IsLocalOrImageGenPromptMode));
                 OnPropertyChanged(nameof(IsCodexPromptMode));
                 OnPropertyChanged(nameof(IsTerminalPromptMode));
                 OnPropertyChanged(nameof(IsMessagePromptMode));
+                OnPropertyChanged(nameof(PromptModeDropdownLabel));
+                OnPropertyChanged(nameof(PromptModeDropdownToolTip));
                 OnPropertyChanged(nameof(PromptWatermark));
                 OnPropertyChanged(nameof(PromptSendButtonLabel));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
+                OnPropertyChanged(nameof(IsDirSendMissingRequestWarning));
+                OnPropertyChanged(nameof(AttachmentSummary));
+                OnPropertyChanged(nameof(AttachmentButtonLabel));
+                OnPropertyChanged(nameof(ActiveInstalledLocalModels));
+                OnPropertyChanged(nameof(SelectedActiveLocalModel));
+                OnPropertyChanged(nameof(SelectedLocalModelLabel));
                 OnPropertyChanged(nameof(IsCodexPromptAuthBlocked));
                 OnPropertyChanged(nameof(IsPromptInputReadOnly));
                 OnPropertyChanged(nameof(CodexPromptAuthTitle));
@@ -372,18 +405,33 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(PromptModelCapabilityHint));
                 OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
                 OnPropertyChanged(nameof(CodexStatus));
+                OnPropertyChanged(nameof(IsCodexUsagePanelVisible));
+                OnPropertyChanged(nameof(CodexUsageToggleLabel));
+                OnPropertyChanged(nameof(IsCcPromptChromeVisible));
+                OnPropertyChanged(nameof(IsPromptModeSwitcherVisible));
+                OnPropertyChanged(nameof(IsCcTimelinePanelVisible));
+                OnPropertyChanged(nameof(IsCcTimelineToggleVisible));
                 OnPropertyChanged(nameof(IsCcPromptActionRowVisible));
+                OnPropertyChanged(nameof(IsLocalModelPickerVisible));
+                OnPropertyChanged(nameof(IsImageGenerationModelPickerVisible));
                 OnPropertyChanged(nameof(ChatWorkspaceTitle));
+                OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
+                OnPropertyChanged(nameof(IsChatHeaderLocalModelVisible));
+                OnPropertyChanged(nameof(IsChatHeaderCodexStatusVisible));
+                OnPropertyChanged(nameof(IsChatHeaderImageModelVisible));
                 OnPropertyChanged(nameof(PromptContextPressureLabel));
                 OnPropertyChanged(nameof(PromptTokenomicsLabel));
                 OnPropertyChanged(nameof(PromptFooterSummary));
                 _settings.PromptModeKey = clean;
+                SwitchConversationKindForPromptMode(saveCurrent: !conversationKindChanged);
 
                 if (IsCodexPromptAuthBlocked)
                 {
                     ShowCodexPromptAuthRequired();
                 }
 
+                OnPromptBarLayoutChanged();
+                RefreshPromptFlowSteps();
                 RaiseCommandStates();
                 SaveSettingsQuietly();
                 SaveChatHistory();
@@ -391,9 +439,15 @@ public sealed partial class ContextControlViewModel
         }
     }
 
-    public bool IsContextPromptMode => string.Equals(PromptModeKey, "context", StringComparison.OrdinalIgnoreCase);
+    public bool IsLocalPromptMode => string.Equals(PromptModeKey, "context", StringComparison.OrdinalIgnoreCase);
 
-    public bool IsChatPromptMode => IsContextPromptMode;
+    public bool IsImageGenPromptMode => string.Equals(PromptModeKey, "imagegen", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsLocalOrImageGenPromptMode => IsLocalPromptMode || IsImageGenPromptMode;
+
+    public bool IsContextPromptMode => IsLocalPromptMode;
+
+    public bool IsChatPromptMode => IsLocalPromptMode;
 
     public bool IsCodexPromptMode => string.Equals(PromptModeKey, "codex", StringComparison.OrdinalIgnoreCase);
 
@@ -405,54 +459,40 @@ public sealed partial class ContextControlViewModel
 
     public bool IsPromptInputReadOnly => IsCodexPromptAuthBlocked;
 
-    public string CodexPromptAuthTitle => CodexPromptAuthorizeMessage;
+    public string CodexPromptAuthTitle => IsCodexCliInstalled ? CodexPromptAuthorizeMessage : "Install Codex CLI";
 
-    public string CodexPromptAuthMessage => CodexPromptLoginMessage;
-
-    public bool IsImageGenWorkspaceActive
-    {
-        get => _isImageGenWorkspaceActive;
-        set
-        {
-            if (SetProperty(ref _isImageGenWorkspaceActive, value))
-            {
-                OnPropertyChanged(nameof(PromptWatermark));
-                OnPropertyChanged(nameof(AttachmentSummary));
-                OnPropertyChanged(nameof(PromptFooterSummary));
-                OnPropertyChanged(nameof(PromptTokenomicsLabel));
-                OnPropertyChanged(nameof(PromptContextPressureLabel));
-                OnPropertyChanged(nameof(PromptSendButtonLabel));
-                OnPropertyChanged(nameof(ActiveInstalledLocalModels));
-                OnPropertyChanged(nameof(SelectedActiveLocalModel));
-                OnPropertyChanged(nameof(SelectedLocalModelLabel));
-                OnPropertyChanged(nameof(PromptModelCapabilityHint));
-                OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
-                OnPropertyChanged(nameof(IsCcPromptChromeVisible));
-                OnPropertyChanged(nameof(IsPromptModeSwitcherVisible));
-                OnPropertyChanged(nameof(PromptPrimaryModeButtonLabel));
-                OnPropertyChanged(nameof(PromptPrimaryModeButtonToolTip));
-                OnPropertyChanged(nameof(IsCcTimelinePanelVisible));
-                OnPropertyChanged(nameof(IsCcPromptActionRowVisible));
-                OnPromptBarLayoutChanged();
-                SwitchConversationKindForWorkspace();
-            }
-        }
-    }
+    public string CodexPromptAuthMessage => IsCodexCliInstalled ? CodexPromptLoginMessage : CodexPromptInstallMessage;
 
     public string PromptWatermark => IsCodexPromptAuthBlocked
-        ? CodexPromptLoginMessage
+        ? CodexPromptAuthMessage
+        : IsImageGenPromptMode
+        ? "Describe the image you want to generate..."
         : IsChatPromptMode
-        ? IsImageGenWorkspaceActive
-            ? "Describe the image you want to generate..."
-            : "Ask the selected local model, or paste CC request/patch text..."
+        ? "Ask the selected local model, or paste CC request/patch text..."
         : IsCodexPromptMode ? "Ask Codex through the ContextControl DIR -> CC -> GO flow..."
         : IsTerminalPromptMode ? "Terminal output"
         : "Message Context Control...";
 
-    public string PromptSendButtonLabel => IsImageGenWorkspaceActive
+    public string PromptSendButtonLabel => IsImageGenPromptMode
         ? "Generate"
-        : IsCodexPromptAuthBlocked ? "Login required"
+        : IsCodexPromptAuthBlocked ? IsCodexCliInstalled ? "Login required" : "Install required"
         : IsCodexPromptMode ? "Send to Codex" : "Send";
+
+    public bool IsDirSendMissingRequestWarning =>
+        IsAutopilotEnabled
+        && IsMessagePromptMode
+        && HasIncludedAttachmentKind("dir")
+        && !HasIncludedAttachmentKind("code")
+        && !HasIncludedAttachmentKind("patch")
+        && !IsMeaningfulTaskPrompt(PromptText);
+
+    public string PromptSendButtonToolTip => IsDirSendMissingRequestWarning
+        ? "This message doesn't have a request. You'll waste tokens on nothing"
+        : IsImageGenPromptMode
+            ? "Generate image"
+            : IsCodexPromptMode
+                ? "Send to Codex"
+                : "Send";
 
     public string PromptModelCapabilityHint
     {
@@ -463,7 +503,7 @@ public sealed partial class ContextControlViewModel
                 return CodexStatus;
             }
 
-            if (IsImageGenWorkspaceActive)
+            if (IsImageGenPromptMode)
             {
                 return SelectedImageGenerationModel is null
                     ? "Select an image generation model"
@@ -478,21 +518,162 @@ public sealed partial class ContextControlViewModel
 
     public bool HasPromptModelCapabilityHint => !string.IsNullOrWhiteSpace(PromptModelCapabilityHint);
 
-    public bool IsCcPromptChromeVisible => !IsImageGenWorkspaceActive;
+    public bool IsCcPromptChromeVisible => IsLocalPromptMode || IsCodexPromptMode;
 
-    public bool IsPromptModeSwitcherVisible => IsCcPromptChromeVisible || IsImageGenWorkspaceActive;
+    public bool IsPromptModeSwitcherVisible => true;
 
-    public string PromptPrimaryModeButtonLabel => IsImageGenWorkspaceActive ? "Prompt" : "CC";
+    public string PromptModeDropdownLabel => IsImageGenPromptMode
+        ? "ImageGen"
+        : IsCodexPromptMode
+            ? "Codex CLI"
+            : "Local";
 
-    public string PromptPrimaryModeButtonToolTip => IsImageGenWorkspaceActive
-        ? "Image generation prompt"
-        : "Context Control prompt";
+    public string PromptModeDropdownToolTip => IsImageGenPromptMode
+        ? "ImageGen prompt mode"
+        : IsCodexPromptMode
+            ? "Codex CLI prompt mode"
+            : "Local prompt mode";
 
-    public bool IsCcTimelinePanelVisible => IsCcPromptChromeVisible && IsCcTimelineExpanded;
+    public string PromptPrimaryModeButtonLabel => "Local";
 
-    public bool IsCcPromptActionRowVisible => IsCcPromptChromeVisible && (IsContextPromptMode || IsCodexPromptMode);
+    public string PromptPrimaryModeButtonToolTip => "Local chat and ContextControl CC flow";
 
-    public string ChatWorkspaceTitle => IsCodexPromptMode ? "Codex Chat" : "CC Chat";
+    public bool IsCcTimelinePanelVisible => IsCcPromptChromeVisible && IsCcTimelineExpanded && IsAutopilotEnabled;
+
+    public bool IsCcTimelineToggleVisible => IsCcPromptChromeVisible && IsAutopilotEnabled;
+
+    public bool IsCodexUsagePanelExpanded
+    {
+        get => _isCodexUsagePanelExpanded;
+        private set
+        {
+            if (SetProperty(ref _isCodexUsagePanelExpanded, value))
+            {
+                OnPropertyChanged(nameof(IsCodexUsagePanelVisible));
+                OnPropertyChanged(nameof(CodexUsageToggleLabel));
+                OnPromptBarLayoutChanged();
+            }
+        }
+    }
+
+    public bool IsCodexUsagePanelVisible => IsCodexPromptMode && IsCodexUsagePanelExpanded;
+
+    public string CodexUsageToggleLabel => IsCodexUsagePanelVisible ? "Hide usage" : "Usage";
+
+    public string CodexUsageSummary
+    {
+        get => _codexUsageSummary;
+        private set => SetProperty(ref _codexUsageSummary, string.IsNullOrWhiteSpace(value)
+            ? "Codex usage appears after a Codex prompt completes."
+            : value);
+    }
+
+    public string CodexRateLimitSummary
+    {
+        get => _codexRateLimitSummary;
+        private set => SetProperty(ref _codexRateLimitSummary, string.IsNullOrWhiteSpace(value)
+            ? "5h and weekly limits appear when Codex reports an account snapshot."
+            : value);
+    }
+
+    public string CodexFiveHourPercentLeftLabel
+    {
+        get => _codexFiveHourPercentLeftLabel;
+        private set => SetProperty(ref _codexFiveHourPercentLeftLabel, string.IsNullOrWhiteSpace(value) ? "--" : value);
+    }
+
+    public string CodexWeeklyPercentLeftLabel
+    {
+        get => _codexWeeklyPercentLeftLabel;
+        private set => SetProperty(ref _codexWeeklyPercentLeftLabel, string.IsNullOrWhiteSpace(value) ? "--" : value);
+    }
+
+    public string CodexUsageResetLabel
+    {
+        get => _codexUsageResetLabel;
+        private set => SetProperty(ref _codexUsageResetLabel, string.IsNullOrWhiteSpace(value) ? "minor reset --" : value);
+    }
+
+    public string CodexFiveHourResetLabel
+    {
+        get => _codexFiveHourResetLabel;
+        private set => SetProperty(ref _codexFiveHourResetLabel, string.IsNullOrWhiteSpace(value) ? "5h reset --" : value);
+    }
+
+    public string CodexWeeklyResetLabel
+    {
+        get => _codexWeeklyResetLabel;
+        private set => SetProperty(ref _codexWeeklyResetLabel, string.IsNullOrWhiteSpace(value) ? "weekly reset --" : value);
+    }
+
+    public double CodexFiveHourPercentLeftValue
+    {
+        get => _codexFiveHourPercentLeftValue;
+        private set => SetProperty(ref _codexFiveHourPercentLeftValue, Math.Clamp(value, 0, 100));
+    }
+
+    public double CodexWeeklyPercentLeftValue
+    {
+        get => _codexWeeklyPercentLeftValue;
+        private set => SetProperty(ref _codexWeeklyPercentLeftValue, Math.Clamp(value, 0, 100));
+    }
+
+    public double CodexFiveHourUsageBarFillWidth
+    {
+        get => _codexFiveHourUsageBarFillWidth;
+        private set => SetProperty(ref _codexFiveHourUsageBarFillWidth, Math.Clamp(value, 0, 98));
+    }
+
+    public double CodexWeeklyUsageBarFillWidth
+    {
+        get => _codexWeeklyUsageBarFillWidth;
+        private set => SetProperty(ref _codexWeeklyUsageBarFillWidth, Math.Clamp(value, 0, 98));
+    }
+
+    public bool IsCodexFiveHourLimitDepleted
+    {
+        get => _isCodexFiveHourLimitDepleted;
+        private set => SetProperty(ref _isCodexFiveHourLimitDepleted, value);
+    }
+
+    public bool IsCodexWeeklyLimitDepleted
+    {
+        get => _isCodexWeeklyLimitDepleted;
+        private set => SetProperty(ref _isCodexWeeklyLimitDepleted, value);
+    }
+
+    public bool IsCcPromptActionRowVisible => IsLocalPromptMode || IsCodexPromptMode;
+
+    public bool IsLocalModelPickerVisible => IsLocalPromptMode;
+
+    public bool IsImageGenerationModelPickerVisible => IsImageGenPromptMode;
+
+    public bool IsChatHeaderLocalModelVisible => IsLocalPromptMode;
+
+    public bool IsChatHeaderCodexStatusVisible => IsCodexPromptMode;
+
+    public bool IsChatHeaderImageModelVisible => IsImageGenPromptMode;
+
+    public string ChatWorkspaceTitle => IsImageGenPromptMode
+        ? "ImageGen:"
+        : IsCodexPromptMode
+            ? "Codex CLI:"
+            : "Local:";
+
+    public string ChatWorkspaceSubtitle
+    {
+        get
+        {
+            var tokenLabel = SelectedChatSession?.TotalConsumedTokenEstimateBreakdownLabel
+                ?? "0 tok est - 0 in - 0 out";
+            if (IsCodexPromptMode)
+            {
+                return $"{tokenLabel} | read-only harness | no repo browsing";
+            }
+
+            return tokenLabel;
+        }
+    }
 
     public bool IsCodexRequestRunning
     {
@@ -506,11 +687,52 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(IsPromptInputReadOnly));
                 OnPropertyChanged(nameof(PromptModelCapabilityHint));
                 OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
+                (InstallCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+                (OpenCodexGuideCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
                 (OpenCodexLoginCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
                 (LogoutCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
                 (RefreshCodexStatusCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
                 (RunCodexDoctorCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
                 (CancelCodexRequestCommand as RelayCommand<ChatRequestProgressViewModel>)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsCodexCliInstalled
+    {
+        get => _isCodexCliInstalled;
+        private set
+        {
+            if (SetProperty(ref _isCodexCliInstalled, value))
+            {
+                OnPropertyChanged(nameof(CodexLoginButtonLabel));
+                OnPropertyChanged(nameof(CodexInstallButtonLabel));
+                OnPropertyChanged(nameof(CodexSetupSummary));
+                OnPropertyChanged(nameof(CodexSetupStatusKind));
+                OnPropertyChanged(nameof(CodexPromptAuthTitle));
+                OnPropertyChanged(nameof(CodexPromptAuthMessage));
+                OnPropertyChanged(nameof(PromptWatermark));
+                OnPropertyChanged(nameof(PromptSendButtonLabel));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
+                (OpenCodexLoginCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+                (InstallCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+                (RunCodexDoctorCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsInstallingCodex
+    {
+        get => _isInstallingCodex;
+        private set
+        {
+            if (SetProperty(ref _isInstallingCodex, value))
+            {
+                OnPropertyChanged(nameof(CodexInstallButtonLabel));
+                OnPropertyChanged(nameof(CodexSetupSummary));
+                (InstallCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+                (OpenCodexLoginCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+                (RunCodexDoctorCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -529,6 +751,7 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(IsPromptInputReadOnly));
                 OnPropertyChanged(nameof(PromptWatermark));
                 OnPropertyChanged(nameof(PromptSendButtonLabel));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
                 OnPropertyChanged(nameof(PromptModelCapabilityHint));
                 OnPropertyChanged(nameof(HasPromptModelCapabilityHint));
                 if (IsCodexPromptAuthBlocked)
@@ -555,6 +778,7 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(IsPromptInputReadOnly));
                 OnPropertyChanged(nameof(PromptWatermark));
                 OnPropertyChanged(nameof(PromptSendButtonLabel));
+                OnPropertyChanged(nameof(PromptSendButtonToolTip));
                 RaiseCommandStates();
             }
         }
@@ -578,15 +802,21 @@ public sealed partial class ContextControlViewModel
 
     public string CodexLoginButtonLabel => IsCodexAuthenticated ? "Relogin" : "Login";
 
+    public string CodexInstallButtonLabel => IsInstallingCodex ? "Installing" : IsCodexCliInstalled ? "Reinstall" : "Install";
+
     public string CodexSetupSummary => IsRefreshingCodexStatus
         ? "Checking Codex CLI login..."
+        : IsInstallingCodex
+            ? "Installing Codex CLI..."
         : IsCodexAuthenticated
             ? "Codex login ready"
+            : !IsCodexCliInstalled
+                ? "Codex CLI install required"
             : IsCodexLoginRequired
                 ? "Codex login required"
                 : "Codex setup pending";
 
-    public string CodexSetupStatusKind => IsCodexAuthenticated ? "ready" : IsCodexLoginRequired ? "login" : "pending";
+    public string CodexSetupStatusKind => IsCodexAuthenticated ? "ready" : !IsCodexCliInstalled ? "install" : IsCodexLoginRequired ? "login" : "pending";
 
     public string CodexStatus
     {
@@ -612,6 +842,7 @@ public sealed partial class ContextControlViewModel
         return value?.Trim().ToLowerInvariant() switch
         {
             "codex" => "codex",
+            "imagegen" or "image-gen" or "image" => "imagegen",
             "terminal" => "terminal",
             _ => "context"
         };

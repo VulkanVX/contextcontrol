@@ -141,7 +141,8 @@ function Get-CachedSymbolSearchRegex {
         else {
             $escaped = [System.Text.RegularExpressions.Regex]::Escape($symbolText)
             $pattern = "(?<![A-Za-z0-9_])$escaped(?![A-Za-z0-9_])"
-            $script:SearchRegexCache[$cacheKey] = New-Object System.Text.RegularExpressions.Regex($pattern, [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+            $options = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+            $script:SearchRegexCache[$cacheKey] = New-Object System.Text.RegularExpressions.Regex($pattern, $options)
         }
     }
 
@@ -160,12 +161,456 @@ function Test-TextContainsSymbol {
     }
 
     if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($symbolText)) {
-        if ($Text.IndexOf($symbolText, [System.StringComparison]::Ordinal) -lt 0) {
+        if ($Text.IndexOf($symbolText, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
             return $false
         }
     }
 
     return (Get-CachedSymbolSearchRegex $symbolText).IsMatch($Text)
+}
+
+function Get-FindSearchTokens {
+    param([string]$Pattern)
+
+    $patternText = if ($null -eq $Pattern) { "" } else { [string]$Pattern }
+    if ($null -eq $script:FindTokenCache) {
+        $script:FindTokenCache = @{}
+    }
+
+    $cacheKey = $patternText.ToLowerInvariant()
+    if ($script:FindTokenCache.ContainsKey($cacheKey)) {
+        return [string[]]$script:FindTokenCache[$cacheKey]
+    }
+
+    $patternText = [regex]::Replace($patternText, '([a-z0-9])([A-Z])', '$1 $2')
+    $tokens = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+    $stopWords = @{
+        a = $true
+        an = $true
+        and = $true
+        for = $true
+        in = $true
+        of = $true
+        on = $true
+        or = $true
+        the = $true
+        to = $true
+        with = $true
+    }
+
+    foreach ($match in [regex]::Matches($patternText, '[A-Za-z0-9]+')) {
+        $token = $match.Value.ToLowerInvariant()
+        if ($token.Length -lt 2) {
+            continue
+        }
+
+        if ($stopWords.ContainsKey($token)) {
+            continue
+        }
+
+        if ($seen.ContainsKey($token)) {
+            continue
+        }
+
+        $seen[$token] = $true
+        [void]$tokens.Add($token)
+    }
+
+    $result = [string[]]$tokens.ToArray()
+    $script:FindTokenCache[$cacheKey] = $result
+    return $result
+}
+
+function ConvertTo-FindComparableText {
+    param([string]$Text)
+
+    $value = if ($null -eq $Text) { "" } else { [string]$Text }
+    $value = [regex]::Replace($value, '([a-z0-9])([A-Z])', '$1 $2')
+    $value = [regex]::Replace($value, '[^A-Za-z0-9]+', ' ')
+    $value = [regex]::Replace($value, '\s+', ' ')
+    return " $($value.Trim().ToLowerInvariant()) "
+}
+
+function Test-FindComparableContainsAllTokens {
+    param(
+        [string]$Comparable,
+        [string[]]$Tokens,
+        [int]$MaxSpan = 220
+    )
+
+    if ($Tokens.Count -eq 0) {
+        return $false
+    }
+
+    $minPosition = [int]::MaxValue
+    $maxPosition = -1
+    foreach ($token in @($Tokens)) {
+        $position = $Comparable.IndexOf(" $token ", [System.StringComparison]::Ordinal)
+        if ($position -lt 0) {
+            return $false
+        }
+
+        if ($position -lt $minPosition) {
+            $minPosition = $position
+        }
+
+        if ($position -gt $maxPosition) {
+            $maxPosition = $position
+        }
+    }
+
+    return (($maxPosition - $minPosition) -le $MaxSpan)
+}
+
+function Test-TextContainsFindTokenWindow {
+    param(
+        [string]$Text,
+        [string[]]$Tokens
+    )
+
+    if ($Tokens.Count -lt 2) {
+        return $false
+    }
+
+    $lines = @(ConvertTo-LineArray $Text)
+    if ($lines.Count -eq 0) {
+        return $false
+    }
+
+    $candidateIndices = New-Object System.Collections.Generic.List[int]
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = [string]$lines[$i]
+        $containsAnyToken = $false
+        foreach ($token in @($Tokens)) {
+            if ($line.IndexOf($token, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $containsAnyToken = $true
+                break
+            }
+        }
+
+        if (-not $containsAnyToken) {
+            continue
+        }
+
+        [void]$candidateIndices.Add($i)
+        if (Test-FindComparableContainsAllTokens -Comparable (ConvertTo-FindComparableText $line) -Tokens $Tokens) {
+            return $true
+        }
+    }
+
+    $seenWindows = @{}
+    foreach ($index in @($candidateIndices.ToArray())) {
+        $start = [Math]::Max(0, $index - 3)
+        $end = [Math]::Min($lines.Count - 1, $index + 3)
+        $windowKey = "$start|$end"
+        if ($seenWindows.ContainsKey($windowKey)) {
+            continue
+        }
+        $seenWindows[$windowKey] = $true
+
+        $windowLines = New-Object System.Collections.Generic.List[string]
+        for ($j = $start; $j -le $end; $j++) {
+            [void]$windowLines.Add([string]$lines[$j])
+        }
+
+        $windowText = ($windowLines.ToArray() -join "`n")
+        if (Test-FindComparableContainsAllTokens -Comparable (ConvertTo-FindComparableText $windowText) -Tokens $Tokens -MaxSpan 260) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-TextContainsFindPattern {
+    param(
+        [string]$Text,
+        [string]$Pattern
+    )
+
+    $patternText = if ($null -eq $Pattern) { "" } else { $Pattern.Trim() }
+    if ($patternText -eq "") {
+        return $false
+    }
+
+    if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($patternText)) {
+        $regexText = [regex]::Escape($patternText)
+        $regexText = $regexText -replace '\\\*', '.*'
+        $regexText = $regexText -replace '\\\?', '.'
+        $options = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+        if ([regex]::IsMatch($Text, $regexText, $options)) {
+            return $true
+        }
+    }
+    elseif ($Text.IndexOf($patternText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        return $true
+    }
+
+    $tokens = @(Get-FindSearchTokens $patternText)
+    if ($tokens.Count -lt 2) {
+        return $false
+    }
+
+    if ([regex]::IsMatch($patternText, '\s')) {
+        return $false
+    }
+
+    foreach ($token in @($tokens)) {
+        if ($Text.IndexOf($token, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            return $false
+        }
+    }
+
+    return Test-TextContainsFindTokenWindow -Text $Text -Tokens $tokens
+}
+
+function Test-LineContainsFindPreview {
+    param(
+        [string]$Line,
+        [string]$Pattern,
+        [string[]]$Tokens
+    )
+
+    $patternText = if ($null -eq $Pattern) { "" } else { $Pattern.Trim() }
+    if ($patternText -eq "") {
+        return $false
+    }
+
+    if ($Line.IndexOf($patternText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        return $true
+    }
+
+    if ($Tokens.Count -eq 0) {
+        return $false
+    }
+
+    return Test-FindComparableContainsAllTokens -Comparable (ConvertTo-FindComparableText $Line) -Tokens $Tokens
+}
+
+function Get-FindRelatedClassNames {
+    param(
+        [string]$Text,
+        [string]$Pattern,
+        [string[]]$Identifiers = @()
+    )
+
+    $patternTokens = @(Get-FindSearchTokens $Pattern)
+    $relatedText = Get-FindRelatedTextWindow -Text $Text -Pattern $Pattern -Tokens $patternTokens -RelatedTerms $Identifiers
+    $classes = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+
+    foreach ($match in [regex]::Matches($relatedText, '(?i)(?:Classes|class)\s*=\s*"(?<value>[^"]+)"')) {
+        foreach ($className in ($match.Groups["value"].Value -split '\s+')) {
+            Add-FindRelatedClassName $classes $seen $className $patternTokens
+        }
+    }
+
+    foreach ($match in [regex]::Matches($relatedText, '(?i)Selector\s*=\s*"(?<value>[^"]+)"')) {
+        foreach ($classMatch in [regex]::Matches($match.Groups["value"].Value, '\.([A-Za-z0-9_-]+)')) {
+            Add-FindRelatedClassName $classes $seen $classMatch.Groups[1].Value $patternTokens
+        }
+    }
+
+    return @($classes.ToArray())
+}
+
+function Add-FindRelatedClassName {
+    param(
+        [System.Collections.Generic.List[string]]$Classes,
+        [hashtable]$Seen,
+        [string]$ClassName,
+        [string[]]$PatternTokens
+    )
+
+    $clean = if ($null -eq $ClassName) { "" } else { $ClassName.Trim() }
+    if ($clean.Length -lt 3) {
+        return
+    }
+
+    $classComparable = ConvertTo-FindComparableText $clean
+    $matchesPattern = $false
+    foreach ($token in @($PatternTokens)) {
+        if ($classComparable.IndexOf(" $token ", [System.StringComparison]::Ordinal) -ge 0) {
+            $matchesPattern = $true
+            break
+        }
+    }
+
+    if (-not $matchesPattern -and
+        $clean.IndexOf("send", [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+        $clean.IndexOf("prompt", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+        return
+    }
+
+    $key = $clean.ToLowerInvariant()
+    if ($Seen.ContainsKey($key)) {
+        return
+    }
+
+    $Seen[$key] = $true
+    [void]$Classes.Add($clean)
+}
+
+function Test-TextContainsAnyFindRelatedClass {
+    param(
+        [string]$Text,
+        [string[]]$Classes
+    )
+
+    foreach ($className in @($Classes)) {
+        if ($Text.IndexOf($className, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Get-FindRelatedIdentifiers {
+    param(
+        [string]$Text,
+        [string]$Pattern
+    )
+
+    $patternTokens = @(Get-FindSearchTokens $Pattern)
+    $relatedText = Get-FindRelatedTextWindow -Text $Text -Pattern $Pattern -Tokens $patternTokens
+    $identifiers = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+
+    foreach ($match in [regex]::Matches($relatedText, '\b[A-Za-z_][A-Za-z0-9_]*(?:Command|Label|ToolTip|Text|Button|Prompt|Send|Codex)\b')) {
+        $identifier = $match.Value.Trim()
+        if ($identifier.Length -lt 4) {
+            continue
+        }
+
+        $identifierComparable = ConvertTo-FindComparableText $identifier
+        $matchesPattern = $false
+        foreach ($token in @($patternTokens)) {
+            if ($identifierComparable.IndexOf(" $token ", [System.StringComparison]::Ordinal) -ge 0) {
+                $matchesPattern = $true
+                break
+            }
+        }
+
+        if (-not $matchesPattern) {
+            continue
+        }
+
+        if (($patternTokens -contains "send") -and
+            $identifier.IndexOf("send", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            continue
+        }
+
+        if (($patternTokens -contains "button") -and
+            $identifier.IndexOf("button", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            continue
+        }
+
+        if (($patternTokens -contains "send") -and
+            $identifierComparable.IndexOf(" codex ", [System.StringComparison]::Ordinal) -lt 0 -and
+            $identifier.IndexOf("button", [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+            $identifier.IndexOf("label", [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+            $identifier.IndexOf("tooltip", [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+            $identifier.IndexOf("text", [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+            $identifier.IndexOf("prompt", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            continue
+        }
+
+        $key = $identifier.ToLowerInvariant()
+        if ($seen.ContainsKey($key)) {
+            continue
+        }
+
+        $seen[$key] = $true
+        [void]$identifiers.Add($identifier)
+    }
+
+    return @($identifiers.ToArray())
+}
+
+function Get-FindRelatedTextWindow {
+    param(
+        [string]$Text,
+        [string]$Pattern,
+        [string[]]$Tokens,
+        [string[]]$RelatedTerms = @()
+    )
+
+    $lines = @(ConvertTo-LineArray $Text)
+    if ($lines.Count -eq 0) {
+        return ""
+    }
+
+    $patternText = if ($null -eq $Pattern) { "" } else { $Pattern.Trim() }
+    $indices = New-Object System.Collections.Generic.List[int]
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = [string]$lines[$i]
+        if ($patternText -ne "" -and $line.IndexOf($patternText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            [void]$indices.Add($i)
+        }
+    }
+
+    if ($indices.Count -eq 0) {
+        foreach ($term in @($RelatedTerms)) {
+            $termText = if ($null -eq $term) { "" } else { $term.Trim() }
+            if ($termText -eq "") {
+                continue
+            }
+
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                $line = [string]$lines[$i]
+                if ($line.IndexOf($termText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    [void]$indices.Add($i)
+                }
+            }
+        }
+    }
+
+    if ($indices.Count -eq 0) {
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if (Test-LineContainsFindPreview -Line ([string]$lines[$i]) -Pattern $patternText -Tokens $Tokens) {
+                [void]$indices.Add($i)
+            }
+        }
+    }
+
+    if ($indices.Count -eq 0) {
+        return ""
+    }
+
+    $selected = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+    foreach ($index in @($indices.ToArray())) {
+        $start = [Math]::Max(0, $index - 4)
+        $end = [Math]::Min($lines.Count - 1, $index + 4)
+        for ($i = $start; $i -le $end; $i++) {
+            if ($seen.ContainsKey($i)) {
+                continue
+            }
+
+            $seen[$i] = $true
+            [void]$selected.Add([string]$lines[$i])
+        }
+    }
+
+    return ($selected.ToArray() -join "`n")
+}
+
+function Test-TextContainsAnyFindRelatedIdentifier {
+    param(
+        [string]$Text,
+        [string[]]$Identifiers
+    )
+
+    foreach ($identifier in @($Identifiers)) {
+        if ($Text.IndexOf($identifier, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Test-FileContainsSymbol {
@@ -400,7 +845,8 @@ function Add-RawSymbolOccurrencePreview {
     param(
         [string]$Path,
         [string]$Symbol,
-        [int]$MaxHits = 12
+        [int]$MaxHits = 12,
+        [switch]$FindMode
     )
 
     $symbolText = if ($null -eq $Symbol) { "" } else { $Symbol.Trim() }
@@ -423,13 +869,22 @@ function Add-RawSymbolOccurrencePreview {
 
     $previewOptions = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
     $regex = New-Object System.Text.RegularExpressions.Regex($escaped, $previewOptions)
+    $findTokens = if ($FindMode) { @(Get-FindSearchTokens $symbolText) } else { @() }
 
     $hitCount = 0
 
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($regex.IsMatch([string]$lines[$i])) {
+        $lineText = [string]$lines[$i]
+        $lineMatches = if ($FindMode) {
+            Test-LineContainsFindPreview -Line $lineText -Pattern $symbolText -Tokens $findTokens
+        }
+        else {
+            $regex.IsMatch($lineText)
+        }
+
+        if ($lineMatches) {
             $lineNo = $i + 1
-            $text = ([string]$lines[$i]).Trim()
+            $text = $lineText.Trim()
             if ($text.Length -gt 220) {
                 $text = $text.Substring(0, 220) + " ..."
             }
@@ -724,7 +1179,124 @@ function Add-FindSearchExports {
         }
 
         foreach ($request in $requests) {
-            if (Test-TextContainsSymbol $text $request.Pattern) {
+            if (Test-TextContainsFindPattern $text $request.Pattern) {
+                $request.Matches.Add($file.FullName)
+            }
+        }
+    }
+
+    foreach ($request in $requests) {
+        if ($request.Matches.Count -eq 0) {
+            continue
+        }
+
+        $relatedIdentifiers = New-Object System.Collections.Generic.List[string]
+        $seenIdentifiers = @{}
+        foreach ($path in @($request.Matches.ToArray())) {
+            try {
+                $text = Get-CachedSearchFileText $path
+            }
+            catch {
+                continue
+            }
+
+            foreach ($identifier in @(Get-FindRelatedIdentifiers -Text $text -Pattern $request.Pattern)) {
+                $identifierKey = $identifier.ToLowerInvariant()
+                if ($seenIdentifiers.ContainsKey($identifierKey)) {
+                    continue
+                }
+
+                $seenIdentifiers[$identifierKey] = $true
+                [void]$relatedIdentifiers.Add($identifier)
+            }
+        }
+
+        if ($relatedIdentifiers.Count -eq 0) {
+            continue
+        }
+
+        $request | Add-Member -NotePropertyName RelatedIdentifiers -NotePropertyValue ([string[]]$relatedIdentifiers.ToArray()) -Force
+
+        $matchedKeys = @{}
+        foreach ($path in @($request.Matches)) {
+            $matchedKeys[(Get-PathKey $path)] = $true
+        }
+
+        foreach ($file in $candidates) {
+            $fileKey = Get-PathKey $file.FullName
+            if ($matchedKeys.ContainsKey($fileKey)) {
+                continue
+            }
+
+            try {
+                $text = Get-CachedSearchFileText $file.FullName
+            }
+            catch {
+                continue
+            }
+
+            if (Test-TextContainsAnyFindRelatedIdentifier -Text $text -Identifiers ([string[]]$relatedIdentifiers.ToArray())) {
+                $matchedKeys[$fileKey] = $true
+                $request.Matches.Add($file.FullName)
+            }
+        }
+    }
+
+    foreach ($request in $requests) {
+        if ($request.Matches.Count -eq 0) {
+            continue
+        }
+
+        $relatedClasses = New-Object System.Collections.Generic.List[string]
+        $seenClasses = @{}
+        foreach ($path in @($request.Matches.ToArray())) {
+            try {
+                $text = Get-CachedSearchFileText $path
+            }
+            catch {
+                continue
+            }
+
+            $identifierTerms = @()
+            if ($request.PSObject.Properties.Name -contains "RelatedIdentifiers") {
+                $identifierTerms = [string[]]$request.RelatedIdentifiers
+            }
+
+            foreach ($className in @(Get-FindRelatedClassNames -Text $text -Pattern $request.Pattern -Identifiers $identifierTerms)) {
+                $classKey = $className.ToLowerInvariant()
+                if ($seenClasses.ContainsKey($classKey)) {
+                    continue
+                }
+
+                $seenClasses[$classKey] = $true
+                [void]$relatedClasses.Add($className)
+            }
+        }
+
+        if ($relatedClasses.Count -eq 0) {
+            continue
+        }
+
+        $matchedKeys = @{}
+        foreach ($path in @($request.Matches)) {
+            $matchedKeys[(Get-PathKey $path)] = $true
+        }
+
+        foreach ($file in $candidates) {
+            $fileKey = Get-PathKey $file.FullName
+            if ($matchedKeys.ContainsKey($fileKey)) {
+                continue
+            }
+
+            try {
+                $text = Get-CachedSearchFileText $file.FullName
+            }
+            catch {
+                continue
+            }
+
+            if (Test-TextContainsAnyFindRelatedClass -Text $text -Classes ([string[]]$relatedClasses.ToArray())) {
+                $matchedKeys[$fileKey] = $true
                 $request.Matches.Add($file.FullName)
             }
         }
@@ -753,7 +1325,7 @@ function Add-FindSearchExports {
         Add-Line ""
         Add-Line "Occurrence preview:"
         foreach ($path in $request.Matches) {
-            Add-RawSymbolOccurrencePreview -Path $path -Symbol $request.Pattern -MaxHits 4
+            Add-RawSymbolOccurrencePreview -Path $path -Symbol $request.Pattern -MaxHits 4 -FindMode
         }
         Add-Line ""
 

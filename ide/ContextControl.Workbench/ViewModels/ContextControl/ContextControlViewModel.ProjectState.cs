@@ -51,6 +51,7 @@ public sealed partial class ContextControlViewModel
             }
 
             _semanticIndex = null;
+            _lastFindDiscoveryRequestPaths = [];
             if (scopeChanged)
             {
                 _chatHistoryScopeKey = nextScope;
@@ -73,6 +74,26 @@ public sealed partial class ContextControlViewModel
     public void SetSnippetFileSaver(Func<ChatSnippetViewModel, Task<string?>>? snippetFileSaver)
     {
         _snippetFileSaver = snippetFileSaver;
+    }
+
+    public void SetProjectFileOpener(Action<string>? projectFileOpener)
+    {
+        _projectFileOpener = projectFileOpener;
+    }
+
+    public void SetPromptModeWorkspaceRequester(Action? promptModeWorkspaceRequester)
+    {
+        _promptModeWorkspaceRequester = promptModeWorkspaceRequester;
+    }
+
+    private void OpenPatchPlanFile(PatchPlanFileViewModel? file)
+    {
+        if (file?.CanOpen != true)
+        {
+            return;
+        }
+
+        _projectFileOpener?.Invoke(file.Target);
     }
 
     public void OpenPrompt()

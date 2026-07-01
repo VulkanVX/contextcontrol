@@ -178,7 +178,7 @@ function Parse-CcReplaceBlocks {
                 throw "Malformed CC-REPLACE block starting at line ${blockStartLine}: missing --- separator or END CC-REPLACE."
             }
 
-            if (@("insert_include", "create_directory") -notcontains $mode) {
+            if (@("insert_include", "delete_function", "create_directory") -notcontains $mode) {
                 throw "Malformed CC-REPLACE block starting at line ${blockStartLine}: MODE:$mode requires a --- separator and body."
             }
         }

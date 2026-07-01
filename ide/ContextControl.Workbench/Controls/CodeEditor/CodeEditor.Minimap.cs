@@ -38,6 +38,7 @@ public sealed partial class CodeEditor
         private double _viewportOffset;
         private double _viewportHeight;
         private double _extentHeight;
+        private double _editorLineHeight = DefaultEditorLineHeight;
         private string _skinKey = "default";
         private long _animationPhase;
 
@@ -65,8 +66,20 @@ public sealed partial class CodeEditor
         public void SetViewport(double offset, double viewportHeight, double extentHeight)
         {
             _viewportOffset = Math.Max(0, offset);
-            _viewportHeight = Math.Max(EditorLineHeight, viewportHeight);
+            _viewportHeight = Math.Max(_editorLineHeight, viewportHeight);
             _extentHeight = Math.Max(0, extentHeight);
+            InvalidateVisual();
+        }
+
+        public void SetEditorLineHeight(double lineHeight)
+        {
+            var next = Math.Max(12.0, lineHeight);
+            if (Math.Abs(_editorLineHeight - next) <= 0.01)
+            {
+                return;
+            }
+
+            _editorLineHeight = next;
             InvalidateVisual();
         }
 
@@ -218,10 +231,10 @@ public sealed partial class CodeEditor
                 return;
             }
 
-            var lineOffset = Math.Max(0, (_viewportOffset - TopPadding) / EditorLineHeight);
+            var lineOffset = Math.Max(0, (_viewportOffset - TopPadding) / _editorLineHeight);
             var top = TopPadding + (lineOffset * MiniLineHeight) - miniScrollOffset;
             var height = ClampViewportHeight(
-                (_viewportHeight / EditorLineHeight) * MiniLineHeight,
+                (_viewportHeight / _editorLineHeight) * MiniLineHeight,
                 7,
                 Math.Min(content.Height, GetMiniContentHeight()));
             if (top + height > content.Bottom)
@@ -244,7 +257,7 @@ public sealed partial class CodeEditor
             var lineIndex = (miniScrollOffset + point.Y - TopPadding) / MiniLineHeight;
 
             var targetLine = Math.Clamp((int)Math.Floor(lineIndex), 0, Math.Max(0, _lines.Length - 1));
-            return TopPadding + (targetLine * EditorLineHeight);
+            return TopPadding + (targetLine * _editorLineHeight);
         }
 
         public double GetEditorOffsetForTrackPoint(Point point)

@@ -1,0 +1,24 @@
+<UserControl
+    x:Class="ContextControl.Workbench.Views.ThemeSettingsWindowParts.PromptWindowSettingsPage"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid RowDefinitions="Auto,*" RowSpacing="8" ClipToBounds="True">
+    <Border Classes="rule-card" Padding="10,8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <StackPanel Spacing="2" VerticalAlignment="Center">
+          <TextBlock Classes="field-label" Text="Autoswitch to Chat when mode changes" />
+          <TextBlock
+              Classes="muted"
+              Text="Local, Codex CLI, and ImageGen prompt buttons can bring the shared chat transcript forward automatically."
+              TextWrapping="Wrap" />
+        </StackPanel>
+        <CheckBox
+            Grid.Column="1"
+            Classes="appearance-toggle"
+            Content="On/Off"
+            IsChecked="{Binding AutoSwitchPromptModesToChat, Mode=TwoWay}"
+            VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

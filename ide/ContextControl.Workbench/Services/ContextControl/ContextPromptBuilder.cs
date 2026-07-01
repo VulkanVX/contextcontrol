@@ -10,18 +10,30 @@ public sealed record PatchPlanSummary(
     int EffectiveCount,
     int DuplicateCount,
     int FileCount,
+    int DirectoryCount,
+    int CreatedCount,
+    int ChangedCount,
+    int RemovedCount,
     int Added,
     int Removed,
     IReadOnlyList<PatchPlanActionSummary> Actions,
     string Error = "")
 {
+    private bool HasProvidedBucketCounts => CreatedCount > 0 || ChangedCount > 0 || RemovedCount > 0;
+
+    public int DisplayCreatedCount => HasProvidedBucketCounts ? CreatedCount : Actions.Count(action => action.BucketLabel.Equals("created", StringComparison.OrdinalIgnoreCase));
+    public int DisplayChangedCount => HasProvidedBucketCounts ? ChangedCount : Actions.Count(action => action.BucketLabel.Equals("changed", StringComparison.OrdinalIgnoreCase));
+    public int DisplayRemovedCount => HasProvidedBucketCounts ? RemovedCount : Actions.Count(action => action.BucketLabel.Equals("removed", StringComparison.OrdinalIgnoreCase));
+    public int DisplayDirectoryCount => DirectoryCount > 0 ? DirectoryCount : Actions.Count(action => action.IsDirectory);
+
     public string CompactLabel
     {
         get
         {
             var delta = Added > 0 || Removed > 0 ? $", +{Added:N0} / -{Removed:N0}" : "";
+            var directories = DisplayDirectoryCount > 0 ? $", {DisplayDirectoryCount:N0} dirs" : "";
             var error = string.IsNullOrWhiteSpace(Error) ? "" : $" {Error}";
-            return $"Patch plan: {EffectiveCount:N0} effective, {DuplicateCount:N0} duplicate, {FileCount:N0} files{delta}.{error}".Trim();
+            return $"Patch plan: {EffectiveCount:N0} effective, {DuplicateCount:N0} duplicate, {FileCount:N0} files{directories}{delta}.{error}".Trim();
         }
     }
 }
@@ -29,19 +41,83 @@ public sealed record PatchPlanSummary(
 public sealed record PatchPlanActionSummary(
     string Mode,
     string Target,
+    string Name,
     string Part,
+    string Action,
+    string Kind,
+    string Bucket,
     int Added,
     int Removed,
+    int TotalLocAfter,
     bool IsDirectory,
     bool IsDuplicate,
     bool IsEffective,
-    string DuplicateAction)
+    bool CreatesFile,
+    bool CreatesDirectory,
+    string DuplicateAction,
+    string DuplicateTarget,
+    int VersionBefore,
+    int VersionAfter)
 {
     public string FileLabel => string.IsNullOrWhiteSpace(Target) ? "(unknown target)" : Target;
     public string PartLabel => string.IsNullOrWhiteSpace(Part) ? Mode : Part;
+    public string ActionLabel => string.IsNullOrWhiteSpace(Action) ? Mode : Action;
+    public string KindLabel => string.IsNullOrWhiteSpace(Kind) ? InferKind() : Kind;
+    public string BucketLabel => string.IsNullOrWhiteSpace(Bucket) ? InferBucket(KindLabel) : Bucket;
     public string StatusLabel => IsDuplicate ? "duplicate" : IsEffective ? "effective" : "planned";
     public string AddedLabel => $"+{Added:N0}";
     public string RemovedLabel => $"-{Removed:N0}";
+    public string DeltaLabel => $"{AddedLabel} {RemovedLabel}";
+    public string LocLabel => TotalLocAfter > 0 ? $"{TotalLocAfter:N0} LOC" : "0 LOC";
+    public string VersionLabel => IsDirectory ? "" : $"v{VersionBefore:N0} > v{VersionAfter:N0}";
+
+    private string InferKind()
+    {
+        if (IsDuplicate)
+        {
+            return "DUP";
+        }
+
+        if (IsDirectory)
+        {
+            return CreatesDirectory ? "CREATE DIR" : "CHANGE DIR";
+        }
+
+        if (CreatesFile)
+        {
+            return "CREATE FILE";
+        }
+
+        return Mode switch
+        {
+            "delete_function" => "REMOVE",
+            "insert_after_function" => "CREATE",
+            "insert_before_function" => "CREATE",
+            "append_to_file" => "CREATE",
+            "insert_include" => "CREATE",
+            _ => "CHANGE"
+        };
+    }
+
+    private static string InferBucket(string kind)
+    {
+        if (kind.StartsWith("DUP", StringComparison.OrdinalIgnoreCase))
+        {
+            return "duplicate";
+        }
+
+        if (kind.StartsWith("CREATE", StringComparison.OrdinalIgnoreCase))
+        {
+            return "created";
+        }
+
+        if (kind.StartsWith("REMOVE", StringComparison.OrdinalIgnoreCase))
+        {
+            return "removed";
+        }
+
+        return "changed";
+    }
 }
 
 public sealed partial class ContextPromptBuilder
@@ -52,7 +128,7 @@ public sealed partial class ContextPromptBuilder
         builder.AppendLine("Context Control fresh-chat request");
         builder.AppendLine();
         builder.AppendLine($"Route: {routeLabel}");
-        builder.AppendLine("Flow: read the DIR export, ask only for the smallest safe file/function/FIND list, then wait for the CC export before producing patch work.");
+        builder.AppendLine("Flow: read the DIR manifest, ask only for final source request lines, exactly one FIND, or one EXPAND ending with END, then wait for source export before producing patch work.");
         builder.AppendLine();
         builder.AppendLine("User request:");
         builder.AppendLine(string.IsNullOrWhiteSpace(userPrompt) ? "(no request text yet)" : userPrompt.Trim());
@@ -69,16 +145,54 @@ public sealed partial class ContextPromptBuilder
 
     public IReadOnlyList<string> BuildCodeExportRequestLines(string promptText)
     {
+        return ParsePhase1RequestLines(promptText).RequestLines;
+    }
+
+    public ContextRequestLineParseResult ParsePhase1RequestLines(string promptText)
+    {
         return (promptText ?? "")
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n')
             .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(NormalizeCodeExportRequestLine)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Where(line => !string.Equals(line, "END", StringComparison.OrdinalIgnoreCase))
-            .Where(IsCodeExportRequestLine)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Aggregate(
+                new
+                {
+                    RequestLines = new List<string>(),
+                    ExtraLines = new List<string>(),
+                    MeaningfulLines = new List<string>()
+                },
+                (state, rawLine) =>
+                {
+                    var normalized = NormalizeCodeExportRequestLine(rawLine);
+                    if (string.IsNullOrWhiteSpace(normalized))
+                    {
+                        return state;
+                    }
+
+                    state.MeaningfulLines.Add(normalized);
+                    if (normalized.Equals("END", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return state;
+                    }
+
+                    if (IsCodeExportRequestLine(normalized))
+                    {
+                        if (!state.RequestLines.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                        {
+                            state.RequestLines.Add(normalized);
+                        }
+                    }
+                    else
+                    {
+                        state.ExtraLines.Add(rawLine.Trim());
+                    }
+
+                    return state;
+                },
+                state => new ContextRequestLineParseResult(
+                    state.RequestLines.ToArray(),
+                    state.ExtraLines.ToArray(),
+                    state.MeaningfulLines.LastOrDefault()?.Equals("END", StringComparison.OrdinalIgnoreCase) == true));
     }
 
     public static string NormalizeCodeExportRequestLine(string? line)
@@ -103,6 +217,9 @@ public sealed partial class ContextPromptBuilder
         clean = clean.TrimEnd(',', ';').Trim();
         clean = StripInlineCodeWrapper(clean);
         clean = CleanFindLine(clean);
+        clean = CleanPrefixLine(clean, "EXPAND:");
+        clean = CleanPrefixLine(clean, "FUNCTION:");
+        clean = CleanPrefixLine(clean, "FUNC:");
 
         return clean;
     }
@@ -147,7 +264,11 @@ public sealed partial class ContextPromptBuilder
 
     private static string CleanFindLine(string text)
     {
-        const string prefix = "FIND:";
+        return CleanPrefixLine(text, "FIND:");
+    }
+
+    private static string CleanPrefixLine(string text, string prefix)
+    {
         if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
             return text;
@@ -179,9 +300,10 @@ public sealed partial class ContextPromptBuilder
         }
 
         return clean.StartsWith("FUNCTION ", StringComparison.OrdinalIgnoreCase)
+            || clean.StartsWith("FUNCTION:", StringComparison.OrdinalIgnoreCase)
             || clean.StartsWith("FUNC:", StringComparison.OrdinalIgnoreCase)
-            || clean.StartsWith("SYMBOL:", StringComparison.OrdinalIgnoreCase)
             || clean.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase)
+            || clean.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase)
             || clean.Equals("CMakeLists.txt", StringComparison.OrdinalIgnoreCase)
             || clean.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
             || clean.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase)
@@ -206,6 +328,7 @@ public sealed partial class ContextPromptBuilder
         if (clean.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase)
             || clean.StartsWith("FUNC:", StringComparison.OrdinalIgnoreCase)
             || clean.StartsWith("FUNCTION:", StringComparison.OrdinalIgnoreCase)
+            || clean.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase)
             || clean.StartsWith("SYMBOL:", StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -323,7 +446,7 @@ public sealed partial class ContextPromptBuilder
             }
 
             mode = mode.Trim().ToLowerInvariant();
-            var bodylessMode = mode is "insert_include" or "create_directory";
+            var bodylessMode = mode is "insert_include" or "delete_function" or "create_directory";
             if (!bodylessMode && !hasSeparator)
             {
                 return $"CC-REPLACE block {blockNumber} uses MODE:{mode} but has no --- separator and replacement body.";
@@ -354,7 +477,7 @@ public sealed partial class ContextPromptBuilder
     {
         if (string.IsNullOrWhiteSpace(jsonPlanOutput))
         {
-            return new PatchPlanSummary(0, 0, 0, 0, 0, [], "No patch plan returned.");
+            return new PatchPlanSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, [], "No patch plan returned.");
         }
 
         try
@@ -370,13 +493,23 @@ public sealed partial class ContextPromptBuilder
                     actions.Add(new PatchPlanActionSummary(
                         ReadString(action, "Mode"),
                         ReadString(action, "Target"),
+                        ReadString(action, "Name"),
                         ReadString(action, "Part"),
+                        ReadString(action, "Action"),
+                        ReadString(action, "Kind"),
+                        ReadString(action, "Bucket"),
                         ReadInt(action, "Added"),
                         ReadInt(action, "Removed"),
+                        ReadInt(action, "TotalLocAfter"),
                         ReadBool(action, "IsDirectory"),
                         ReadBool(action, "IsDuplicate"),
                         ReadBool(action, "IsEffective"),
-                        ReadString(action, "DuplicateAction")));
+                        ReadBool(action, "CreatesFile"),
+                        ReadBool(action, "CreatesDirectory"),
+                        ReadString(action, "DuplicateAction"),
+                        ReadString(action, "DuplicateTarget"),
+                        ReadInt(action, "VersionBefore"),
+                        ReadInt(action, "VersionAfter")));
                 }
             }
 
@@ -384,6 +517,10 @@ public sealed partial class ContextPromptBuilder
                 ReadInt(root, "EffectiveCount"),
                 ReadInt(root, "DuplicateCount"),
                 ReadInt(root, "FileCount"),
+                ReadInt(root, "DirectoryCount"),
+                ReadInt(root, "CreatedCount"),
+                ReadInt(root, "ChangedCount"),
+                ReadInt(root, "RemovedCount"),
                 ReadInt(root, "Added"),
                 ReadInt(root, "Removed"),
                 actions,
@@ -405,7 +542,7 @@ public sealed partial class ContextPromptBuilder
                 ? fileValue
                 : 0;
 
-            return new PatchPlanSummary(effective, duplicates, files, 0, 0, [], "Plan JSON could not be parsed cleanly.");
+            return new PatchPlanSummary(effective, duplicates, files, 0, 0, 0, 0, 0, 0, [], "Plan JSON could not be parsed cleanly.");
         }
     }
 

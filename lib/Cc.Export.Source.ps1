@@ -29,6 +29,10 @@ function Invoke-CcSourceExport {
     $script:SearchLineCache = @{}
     $script:SearchFunctionRangeCache = @{}
     $script:SearchRegexCache = @{}
+    $script:PathKeyCache = @{}
+    $script:NormalizedPathKeyCache = @{}
+    $script:RelativeDisplayPathCache = @{}
+    $script:FindTokenCache = @{}
 
     $script:CcSharedSettings = Read-CcSharedSettings
     $script:CcProjectRoot = Resolve-CcSharedProjectRoot $script:CcSharedSettings

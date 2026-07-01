@@ -2,10 +2,12 @@
     x:Class="ContextControl.Workbench.App"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
     RequestedThemeVariant="Light">
   <Application.Resources>
     <FontFamily x:Key="UiFontFamily">fonts:Inter, Segoe UI</FontFamily>
     <FontFamily x:Key="CodeFontFamily">avares://ContextControl.Workbench/Assets/Fonts#Cascadia Code, Consolas</FontFamily>
+    <sys:Double x:Key="UiFontSize">11</sys:Double>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

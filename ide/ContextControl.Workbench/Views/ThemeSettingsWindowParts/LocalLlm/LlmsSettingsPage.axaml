@@ -23,7 +23,7 @@
                 controls:HoverScrollbarBehavior.ReserveRight="12">
               <StackPanel Spacing="8">
                 <Border Classes="rule-card">
-                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                  <Grid RowDefinitions="Auto,Auto" RowSpacing="7">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                       <StackPanel>
                         <TextBlock Classes="settings-title" Text="Ollama model storage" />
@@ -78,8 +78,8 @@
                 </Border>
 
                 <Border Classes="rule-card">
-                  <Grid RowDefinitions="Auto,Auto" RowSpacing="7">
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                       <StackPanel>
                         <TextBlock Classes="settings-title" Text="Codex CLI" />
                         <TextBlock Classes="muted" Text="{Binding ContextControl.CodexSetupSummary}" />
@@ -89,22 +89,35 @@
                           Classes="rule-mini primary"
                           MinHeight="24"
                           MinWidth="64"
+                          Content="{Binding ContextControl.CodexInstallButtonLabel}"
+                          Command="{Binding ContextControl.InstallCodexCommand}" />
+                      <Button
+                          Grid.Column="2"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          Content="Guide"
+                          Command="{Binding ContextControl.OpenCodexGuideCommand}" />
+                      <Button
+                          Grid.Column="3"
+                          Classes="rule-mini primary"
+                          MinHeight="24"
+                          MinWidth="64"
                           Content="{Binding ContextControl.CodexLoginButtonLabel}"
                           Command="{Binding ContextControl.OpenCodexLoginCommand}" />
                       <Button
-                          Grid.Column="2"
+                          Grid.Column="4"
                           Classes="rule-mini"
                           MinHeight="24"
                           Content="Logout"
                           Command="{Binding ContextControl.LogoutCodexCommand}" />
                       <Button
-                          Grid.Column="3"
+                          Grid.Column="5"
                           Classes="rule-mini"
                           MinHeight="24"
                           Content="Refresh"
                           Command="{Binding ContextControl.RefreshCodexStatusCommand}" />
                       <Button
-                          Grid.Column="4"
+                          Grid.Column="6"
                           Classes="rule-mini"
                           MinHeight="24"
                           Content="Doctor"

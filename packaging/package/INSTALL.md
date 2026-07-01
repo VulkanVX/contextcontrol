@@ -38,7 +38,7 @@ After this version is installed, ContextControl checks GitHub releases on startu
 
 ContextControl does not bundle LLM weights or backend runtimes. Install the app first, then use the **Dependencies** and **Local LLMs** pages.
 
-Codex mode requires an authenticated Codex CLI. Open **View -> Settings -> LLMs -> Codex CLI** to Login, Refresh, Doctor, or Logout. If Codex mode is selected before login, the prompt is locked and shows **Please login into codex to use it** until the CLI reports an authenticated session.
+Codex mode requires the Codex CLI and an authenticated session. Open **View -> Settings -> LLMs -> Codex CLI** to Install, open the official Guide, Login, Refresh, Doctor, or Logout. Install is best-effort: Windows uses the Codex `winget` package, while macOS/Linux open the official standalone installer route; Guide is the fallback when package managers, admin policy, network, or PATH refresh block automation. If Codex mode is selected before setup, the prompt is locked until the CLI is installed and reports an authenticated session.
 
 Current autosetup coverage:
 

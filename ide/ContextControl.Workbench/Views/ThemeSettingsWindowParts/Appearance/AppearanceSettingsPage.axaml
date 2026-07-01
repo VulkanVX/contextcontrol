@@ -6,7 +6,7 @@
     xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
 >
-          <Grid x:Name="AppearancePageRoot" RowDefinitions="Auto,Auto,*" RowSpacing="6" ClipToBounds="True">
+          <Grid x:Name="AppearancePageRoot" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="6" ClipToBounds="True">
             <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="8">
               <StackPanel Spacing="3">
                 <TextBlock Classes="field-label" Text="Skin" />
@@ -244,7 +244,161 @@
               </StackPanel>
             </Grid>
 
-            <Border Grid.Row="1" Classes="rule-card" Padding="4">
+            <Border Grid.Row="1" Classes="rule-card" Padding="6,4">
+              <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                  <TextBlock Classes="field-label" Text="UI size" />
+                  <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
+                    <Slider
+                        Minimum="8"
+                        Maximum="22"
+                        TickFrequency="0.5"
+                        IsSnapToTickEnabled="True"
+                        Value="{Binding UiFontSize, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding UiFontSize, StringFormat='{}{0:0.#}'}" />
+                  </Grid>
+                </Grid>
+                <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                  <TextBlock Classes="field-label" Text="Code Editor size" />
+                  <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
+                    <Slider
+                        Minimum="8"
+                        Maximum="22"
+                        TickFrequency="0.5"
+                        IsSnapToTickEnabled="True"
+                        Value="{Binding CodeEditorFontSize, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding CodeEditorFontSize, StringFormat='{}{0:0.#}'}" />
+                  </Grid>
+                </Grid>
+                <Grid Grid.Column="2" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                  <TextBlock Classes="field-label" Text="Prompt Window size" />
+                  <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
+                    <Slider
+                        Minimum="8"
+                        Maximum="22"
+                        TickFrequency="0.5"
+                        IsSnapToTickEnabled="True"
+                        Value="{Binding PromptWindowFontSize, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding PromptWindowFontSize, StringFormat='{}{0:0.#}'}" />
+                  </Grid>
+                </Grid>
+                <Grid Grid.Column="3" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                  <TextBlock Classes="field-label" Text="Chat/ImageGen size" />
+                  <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
+                    <Slider
+                        Minimum="8"
+                        Maximum="22"
+                        TickFrequency="0.5"
+                        IsSnapToTickEnabled="True"
+                        Value="{Binding ChatWindowFontSize, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding ChatWindowFontSize, StringFormat='{}{0:0.#}'}" />
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Classes="rule-card" Padding="6,5">
+              <Grid ColumnDefinitions="220,*" ColumnSpacing="10">
+                <StackPanel Spacing="3">
+                  <TextBlock Classes="field-label" Text="Chat Appearance" />
+                  <ComboBox
+                      x:Name="ChatAppearancePicker"
+                      Classes="theme-picker"
+                      ItemsSource="{Binding ChatAppearances}"
+                      SelectedItem="{Binding SelectedChatAppearance, Mode=TwoWay}"
+                      DropDownClosed="OnOptionPickerDropDownClosed"
+                      SelectionChanged="OnChatAppearanceSelectionChanged">
+                    <ComboBox.SelectionBoxItemTemplate>
+                      <DataTemplate DataType="{x:Type vm:ThemeOptionViewModel}">
+                        <TextBlock Text="{Binding Name}" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      </DataTemplate>
+                    </ComboBox.SelectionBoxItemTemplate>
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate DataType="{x:Type vm:ThemeOptionViewModel}">
+                        <StackPanel Spacing="0">
+                          <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+
+                <Grid Grid.Column="1" ColumnDefinitions="*,*,*" ColumnSpacing="6" MinHeight="70">
+                  <Border
+                      Grid.Column="0"
+                      Padding="0"
+                      CornerRadius="6"
+                      Background="{DynamicResource ChatAssistantBubbleBrush}"
+                      BorderBrush="{DynamicResource ChatAssistantBorderBrush}"
+                      BorderThickness="1"
+                      ClipToBounds="True">
+                    <Grid RowDefinitions="17,*">
+                      <Border Background="{DynamicResource ChatAssistantHeaderBrush}" BorderBrush="{DynamicResource ChatHeaderSeparatorBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,0" VerticalAlignment="Center">
+                          <TextBlock Text="Codex" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource ChatAssistantOwnerBrush}" />
+                          <TextBlock Grid.Column="1" Text="CC" FontSize="7.5" Foreground="{DynamicResource ChatMetaBrush}" Margin="5,0,0,0" />
+                          <TextBlock Grid.Column="2" Text="15:21" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource ChatMetaBrush}" />
+                        </Grid>
+                      </Border>
+                      <StackPanel Grid.Row="1" Margin="6,4" Spacing="3">
+                        <TextBlock Text="request owner files" FontSize="8.5" Foreground="{DynamicResource ChatBodyTextBrush}" />
+                        <Border Padding="5,2" CornerRadius="4" Background="{DynamicResource ChatSnippetShellBrush}" BorderBrush="{DynamicResource ChatSnippetBorderBrush}" BorderThickness="1">
+                          <TextBlock Text="request" FontSize="7.5" Foreground="{DynamicResource ChatRequestBadgeTextBrush}" />
+                        </Border>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+
+                  <Border
+                      Grid.Column="1"
+                      Padding="0"
+                      CornerRadius="6"
+                      Background="{DynamicResource ChatToolBubbleBrush}"
+                      BorderBrush="{DynamicResource ChatToolBorderBrush}"
+                      BorderThickness="1"
+                      ClipToBounds="True">
+                    <Grid RowDefinitions="17,*">
+                      <Border Background="{DynamicResource ChatToolHeaderBrush}" BorderBrush="{DynamicResource ChatHeaderSeparatorBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,0" VerticalAlignment="Center">
+                          <TextBlock Text="ccReplace" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource ChatToolOwnerBrush}" />
+                          <TextBlock Grid.Column="1" Text="GO preview" FontSize="7.5" Foreground="{DynamicResource ChatMetaBrush}" Margin="5,0,0,0" />
+                          <TextBlock Grid.Column="2" Text="15:22" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource ChatMetaBrush}" />
+                        </Grid>
+                      </Border>
+                      <StackPanel Grid.Row="1" Margin="6,4" Spacing="3">
+                        <TextBlock Text="Patch plan: 1 file" FontSize="8.5" Foreground="{DynamicResource ChatBodyTextBrush}" />
+                        <Border Padding="5,2" CornerRadius="4" Background="{DynamicResource ChatSnippetShellBrush}" BorderBrush="{DynamicResource ChatSnippetBorderBrush}" BorderThickness="1">
+                          <TextBlock Text="PromptComposer.axaml   +12  -4" FontSize="7.5" Foreground="{DynamicResource ChatMetaBrush}" />
+                        </Border>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+
+                  <Border
+                      Grid.Column="2"
+                      Padding="0"
+                      CornerRadius="6"
+                      Background="{DynamicResource ChatUserBubbleBrush}"
+                      BorderBrush="{DynamicResource ChatUserBorderBrush}"
+                      BorderThickness="1"
+                      ClipToBounds="True">
+                    <Grid RowDefinitions="17,*">
+                      <Border Background="{DynamicResource ChatUserHeaderBrush}" BorderBrush="{DynamicResource ChatHeaderSeparatorBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,0" VerticalAlignment="Center">
+                          <TextBlock Text="You" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource ChatUserOwnerBrush}" />
+                          <TextBlock Grid.Column="1" Text="task" FontSize="7.5" Foreground="{DynamicResource ChatMetaBrush}" Margin="5,0,0,0" />
+                          <TextBlock Grid.Column="2" Text="15:20" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource ChatMetaBrush}" />
+                        </Grid>
+                      </Border>
+                      <TextBlock Grid.Row="1" Margin="6,4" Text="make it cleaner" FontSize="8.5" Foreground="{DynamicResource ChatBodyTextBrush}" />
+                    </Grid>
+                  </Border>
+                </Grid>
+              </Grid>
+            </Border>
+
+            <Border Grid.Row="3" Classes="rule-card" Padding="4">
               <StackPanel Spacing="0">
                 <TextBlock Classes="field-label" Text="Editor style" />
                 <Grid ColumnDefinitions="*,*" Classes="editor-style-table">
@@ -439,7 +593,7 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="2" Classes="syntax-preview-card" Margin="0,2,0,0" ClipToBounds="True">
+            <Border Grid.Row="4" Classes="syntax-preview-card" Margin="0,2,0,0" ClipToBounds="True">
               <Grid RowDefinitions="Auto,*" RowSpacing="6" ClipToBounds="True">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <TextBlock Classes="field-label" Text="Preview" />
@@ -453,6 +607,7 @@
                     x:Name="AppearanceCodePreview"
                     Grid.Row="1"
                     CodeFontFamily="{Binding CodeFontFamily}"
+                    EditorFontSize="{Binding CodeEditorFontSize}"
                     SkinKey="{Binding SkinKey}"
                     ShowMinimap="{Binding ShowAppearanceCodePreview}"
                     MinHeight="0"

@@ -249,7 +249,7 @@ public sealed partial class ContextControlViewModel
             Log(result.Succeeded ? "ok" : "warn", result.Status);
             if (result.Succeeded)
             {
-                await RefreshLocalModelsAsync();
+                await RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
             }
         }
         catch (OperationCanceledException)

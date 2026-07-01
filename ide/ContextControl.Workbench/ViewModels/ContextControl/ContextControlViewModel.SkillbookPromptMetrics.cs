@@ -21,16 +21,19 @@ public sealed partial class ContextControlViewModel
         get
         {
             var codex = SkillbookEntries.Count(entry => entry.Source.Equals("codex", StringComparison.OrdinalIgnoreCase));
-            var skillflow = SkillbookEntries.Count(entry => entry.Source.Equals("skillflow", StringComparison.OrdinalIgnoreCase));
-            return $"{SkillbookEntries.Count} instruction(s); {codex} Codex, {skillflow} Skillflow; project overrides global entries";
+            var ccMain = SkillbookEntries.Count(entry => SkillbookService.IsCcMainSource(entry.Source));
+            var ccFlow = SkillbookEntries.Count(entry => SkillbookService.IsCcFlowSource(entry.Source));
+            return $"{SkillbookEntries.Count} instruction(s); {codex} Codex, {ccMain} CC Main, {ccFlow} CC Flow; project overrides global entries";
         }
     }
 
     public string SkillbookCodexSummary =>
         $"{SkillbookEntries.Count(entry => entry.Source.Equals("codex", StringComparison.OrdinalIgnoreCase)):N0} harness instruction(s)";
 
-    public string SkillbookSkillflowSummary =>
-        $"{SkillbookEntries.Count(entry => entry.Source.Equals("skillflow", StringComparison.OrdinalIgnoreCase)):N0} development phase(s)";
+    public string SkillbookCcFlowSummary =>
+        $"{SkillbookEntries.Count(entry => SkillbookService.IsCcMainSource(entry.Source)):N0} main; {SkillbookEntries.Count(entry => SkillbookService.IsCcFlowSource(entry.Source)):N0} phase(s)";
+
+    public string SkillbookSkillflowSummary => SkillbookCcFlowSummary;
 
     public string SkillbookUserSummary
     {
@@ -50,34 +53,39 @@ public sealed partial class ContextControlViewModel
     {
         get
         {
-            if (IsImageGenWorkspaceActive)
+            if (IsImageGenPromptMode)
             {
                 var promptTokensOnly = ContextCapsuleBuilder.EstimateTokens(PromptText);
-                return $"{promptTokensOnly:N0} prompt tok; no CC context";
+                return $"Current prompt tok: {promptTokensOnly:N0} | {promptTokensOnly:N0} prompt tok | 0 attachment tok";
             }
 
             if (IsCodexPromptMode)
             {
                 var codexPromptTokens = ContextCapsuleBuilder.EstimateTokens(PromptText);
                 var codexAttachments = EstimateAttachmentBudget();
-                return codexAttachments.IsClipped
-                    ? $"{codexPromptTokens:N0} prompt tok; {codexAttachments.SentTokens:N0} sent attachment tok ({codexAttachments.FullTokens:N0} full); Codex"
-                    : $"{codexPromptTokens:N0} prompt tok; {codexAttachments.SentTokens:N0} attachment tok; Codex";
+                return BuildCurrentPromptTokenomicsLabel(codexPromptTokens, codexAttachments);
             }
 
             var promptTokens = ContextCapsuleBuilder.EstimateTokens(PromptText);
             var attachments = EstimateAttachmentBudget();
-            return attachments.IsClipped
-                ? $"{promptTokens:N0} prompt tok; {attachments.SentTokens:N0} sent attachment tok ({attachments.FullTokens:N0} full)"
-                : $"{promptTokens:N0} prompt tok; {attachments.SentTokens:N0} attachment tok";
+            return BuildCurrentPromptTokenomicsLabel(promptTokens, attachments);
         }
+    }
+
+    private static string BuildCurrentPromptTokenomicsLabel(int promptTokens, AttachmentTokenBudget attachments)
+    {
+        var total = Math.Max(0, promptTokens) + Math.Max(0, attachments.SentTokens);
+        var attachmentLabel = attachments.IsClipped
+            ? $"{attachments.SentTokens:N0} attachment tok ({attachments.FullTokens:N0} full)"
+            : $"{attachments.SentTokens:N0} attachment tok";
+        return $"Current prompt tok: {total:N0} | {promptTokens:N0} prompt tok | {attachmentLabel}";
     }
 
     public string PromptContextPressureLabel
     {
         get
         {
-            if (IsImageGenWorkspaceActive)
+            if (IsImageGenPromptMode)
             {
                 var imageGenerationModelLabel = SelectedImageGenerationModel?.DisplayName ?? "No image gen model";
                 return $"{imageGenerationModelLabel}: prompt-only image generation";
@@ -167,12 +175,16 @@ public sealed partial class ContextControlViewModel
         }
     }
 
+    public string AttachmentButtonLabel => Attachments.Count == 0
+        ? "Attachments"
+        : $"Attachments {Attachments.Count:N0}";
+
     public string PromptFooterSummary => IsLargePrompt
         ? $"{AttachmentSummary} - large prompt mode - {PromptTokenomicsLabel}"
-        : IsImageGenWorkspaceActive
+        : IsImageGenPromptMode
         ? $"{AttachmentSummary} - {SelectedLocalModelLabel}"
         : IsCodexPromptMode
-        ? $"{AttachmentSummary} - Codex CC flow - {PromptTokenomicsLabel}"
+        ? $"{AttachmentSummary} - Codex CC flow - {CodexModelStatus} - {PromptTokenomicsLabel}"
         : $"{AttachmentSummary} - {PromptTokenomicsLabel}";
 
     public string ContextRootPath => _processService.ContextRoot;

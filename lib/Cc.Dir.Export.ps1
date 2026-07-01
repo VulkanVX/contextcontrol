@@ -8,12 +8,17 @@ param(
     [string]$OutputFile = "cc_project_dir.md",
     [int]$MaxDepth = 20,
     [string]$Profile = "auto",
-    [switch]$IncludeAllTopLevel
+    [int]$Lod = 0,
+    [string]$Scope = "",
+    [switch]$ProfileOnly,
+    [string]$ProfileOutput = "",
+    [string]$ProfileFile = "",
+    [switch]$IncludeArtifacts,
+    [switch]$IncludeAllTopLevel,
+    [switch]$NoClipboard
 )
 
 $ErrorActionPreference = "Stop"
-
-$Fence3 = [string]::Concat(([char]96), ([char]96), ([char]96))
 
 $ExcludeDirs = @(
     ".git",
@@ -93,6 +98,46 @@ $ExcludeFileExtensions = @(
 
 $ExcludeFileNames = @()
 
+$ArtifactExcludeDirs = @(
+    ".contextcontrol",
+    ".ccReplace.versions",
+    ".ccWorkbench.browser-data",
+    ".ccWorkbench.generated-projects",
+    ".gptReplace.versions",
+    ".tmp",
+    ".tmp-build",
+    "codex-harness",
+    "dotnet-obj",
+    "dotnet-out",
+    "generated",
+    "ps1_nat",
+    "ps1_nat_gist_review",
+    "test-harness",
+    "test-results"
+)
+
+$ArtifactExcludeFileNames = @(
+    ".ccWorkbench.chat-history*.json",
+    "cc_chat_export_*.md",
+    "cc_code_export.md",
+    ".ccDirProfile.json",
+    "cc_project_dir.md",
+    "cc_semantic_map.md",
+    "cleanup-*.ps1",
+    "mainwindow_axaml.txt",
+    "nat-*.ps1",
+    "*-nat-*.ps1",
+    "*.generated.json",
+    "*.generated.md",
+    "*.nat.*",
+    "*.tmp.md",
+    "*.tmp.txt",
+    "*_nat_*",
+    "*bug-hunt*",
+    "*bughunt*",
+    "patch.txt"
+)
+
 $VulkanVXTopLevelAllowList = @(
     "include",
     "src",
@@ -105,540 +150,21 @@ $VulkanVXTopLevelAllowList = @(
 )
 
 $script:OutputLines = New-Object System.Collections.Generic.List[string]
-
-function Add-Line {
-    param([AllowNull()][string]$Text)
-
-    if ($null -eq $Text) {
-        $Text = ""
-    }
-
-    [void]$script:OutputLines.Add($Text)
-}
-
-function Get-OutputText {
-    $text = [string]::Join([Environment]::NewLine, [string[]]$script:OutputLines.ToArray())
-
-    if (-not $text.EndsWith([Environment]::NewLine)) {
-        $text += [Environment]::NewLine
-    }
-
-    return $text
-}
-
-function Normalize-CcDirRulePath {
-    param([AllowNull()][string]$Value)
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        return ""
-    }
-
-    $clean = ([string]$Value).Trim() -replace '\\', '/'
-    while ($clean.StartsWith("./")) {
-        $clean = $clean.Substring(2)
-    }
-
-    return $clean.Trim("/")
-}
-
-function Normalize-CcDirExtension {
-    param([AllowNull()][string]$Value)
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        return ""
-    }
-
-    $clean = ([string]$Value).Trim().ToLowerInvariant()
-    if (-not $clean.StartsWith(".")) {
-        $clean = ".$clean"
-    }
-
-    return $clean
-}
-
-function Get-CcDirRelativePath {
-    param([System.IO.FileSystemInfo]$Item)
-
-    $root = (Get-Location).Path
-    try {
-        return (Normalize-CcDirRulePath ([System.IO.Path]::GetRelativePath($root, $Item.FullName)))
-    }
-    catch {
-        $relative = $Item.FullName
-        if ($relative.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
-            $relative = $relative.Substring($root.Length)
-        }
-
-        return (Normalize-CcDirRulePath $relative)
-    }
-}
-
-function Test-CcDirDirectoryRule {
-    param(
-        [System.IO.FileSystemInfo]$Item,
-        [string]$Rule
-    )
-
-    $cleanRule = Normalize-CcDirRulePath $Rule
-    if ([string]::IsNullOrWhiteSpace($cleanRule)) {
-        return $false
-    }
-
-    if ($cleanRule.Contains("/")) {
-        $relative = Get-CcDirRelativePath $Item
-        return $relative.Equals($cleanRule, [System.StringComparison]::OrdinalIgnoreCase) -or
-            $relative.StartsWith("$cleanRule/", [System.StringComparison]::OrdinalIgnoreCase)
-    }
-
-    return $Item.Name.Equals($cleanRule, [System.StringComparison]::OrdinalIgnoreCase)
-}
-
-function Test-CcDirFileRule {
-    param(
-        [System.IO.FileSystemInfo]$Item,
-        [string]$Rule
-    )
-
-    $cleanRule = Normalize-CcDirRulePath $Rule
-    if ([string]::IsNullOrWhiteSpace($cleanRule)) {
-        return $false
-    }
-
-    if ($cleanRule.Contains("/")) {
-        return (Get-CcDirRelativePath $Item).Equals($cleanRule, [System.StringComparison]::OrdinalIgnoreCase)
-    }
-
-    return $Item.Name.Equals($cleanRule, [System.StringComparison]::OrdinalIgnoreCase)
-}
-
-function Import-CcDirWorkbenchFileRules {
-    $path = $env:CC_WORKBENCH_FILE_RULES_PATH
-    if ([string]::IsNullOrWhiteSpace($path) -or -not (Test-Path -LiteralPath $path)) {
-        return
-    }
-
-    try {
-        $rules = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-
-        if ($rules.PSObject.Properties.Name -contains "IgnoredDirectories") {
-            foreach ($value in @($rules.IgnoredDirectories)) {
-                $clean = Normalize-CcDirRulePath $value
-                if (-not [string]::IsNullOrWhiteSpace($clean) -and $ExcludeDirs -notcontains $clean) {
-                    $script:ExcludeDirs += $clean
-                }
-            }
-        }
-
-        $ignoredFiles = @()
-        if ($rules.PSObject.Properties.Name -contains "IgnoredFileNames") {
-            $ignoredFiles += @($rules.IgnoredFileNames)
-        }
-        if ($rules.PSObject.Properties.Name -contains "IgnoredFiles") {
-            $ignoredFiles += @($rules.IgnoredFiles)
-        }
-        foreach ($value in $ignoredFiles) {
-            $clean = Normalize-CcDirRulePath $value
-            if (-not [string]::IsNullOrWhiteSpace($clean) -and $ExcludeFileNames -notcontains $clean) {
-                $script:ExcludeFileNames += $clean
-            }
-        }
-
-        if ($rules.PSObject.Properties.Name -contains "IgnoredExtensions") {
-            foreach ($value in @($rules.IgnoredExtensions)) {
-                $clean = Normalize-CcDirExtension $value
-                if (-not [string]::IsNullOrWhiteSpace($clean) -and $ExcludeFileExtensions -notcontains $clean) {
-                    $script:ExcludeFileExtensions += $clean
-                }
-            }
-        }
-
-        Write-Host "File rules: $path" -ForegroundColor DarkGray
-    }
-    catch {
-        Write-Host "Workbench file rules could not be read, using DIR defaults: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-}
-
-function New-CcSharedDefaultSettings {
-    return [pscustomobject]@{
-        # "auto" detects the project root from the Context Control tool location.
-        # Default layout: <project-root>/contextcontrol/, so auto selects the parent
-        # project. Explicit paths are respected exactly; use "." to make the
-        # Context Control tool folder itself the project root.
-        ProjectRoot = "auto"
-        OutputRoot = "."
-    }
-}
-
-function Get-CcSharedScriptDirectory {
-    if (-not [string]::IsNullOrWhiteSpace($script:CcToolRoot)) {
-        return $script:CcToolRoot
-    }
-
-    if ($PSScriptRoot -ne "") {
-        if ((Split-Path -Leaf $PSScriptRoot) -ieq "lib") {
-            return (Split-Path -Parent $PSScriptRoot)
-        }
-
-        return $PSScriptRoot
-    }
-
-    return (Get-Location).Path
-}
-
-function Get-CcSharedSettingsPath {
-    return (Join-Path (Get-CcSharedScriptDirectory) ".ccReplace.settings.json")
-}
-
-function Merge-CcSharedSettings {
-    param($Loaded)
-
-    $settings = New-CcSharedDefaultSettings
-
-    if ($null -eq $Loaded) {
-        return $settings
-    }
-
-    foreach ($prop in $settings.PSObject.Properties.Name) {
-        if ($Loaded.PSObject.Properties.Name -contains $prop) {
-            $settings.$prop = $Loaded.$prop
-        }
-    }
-
-    return $settings
-}
-
-function Read-CcSharedSettings {
-    $path = Get-CcSharedSettingsPath
-
-    if (-not (Test-Path -LiteralPath $path)) {
-        return New-CcSharedDefaultSettings
-    }
-
-    try {
-        $json = Get-Content -LiteralPath $path -Raw
-        if ([string]::IsNullOrWhiteSpace($json)) {
-            return New-CcSharedDefaultSettings
-        }
-
-        return Merge-CcSharedSettings ($json | ConvertFrom-Json)
-    }
-    catch {
-        Write-Host "Context Control settings could not be read, using defaults: $($_.Exception.Message)" -ForegroundColor Yellow
-        return New-CcSharedDefaultSettings
-    }
-}
-
-function Resolve-CcSharedPathRelativeToScript {
-    param([string]$PathText)
-
-    if ([string]::IsNullOrWhiteSpace($PathText)) {
-        return (Get-CcSharedScriptDirectory)
-    }
-
-    $clean = $PathText.Trim()
-    $clean = $clean -replace '/', [System.IO.Path]::DirectorySeparatorChar
-
-    if ([System.IO.Path]::IsPathRooted($clean)) {
-        return [System.IO.Path]::GetFullPath($clean)
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-CcSharedScriptDirectory) $clean))
-}
-
-function Resolve-CcSharedProjectRoot {
-    param($Settings)
-
-    if (-not [string]::IsNullOrWhiteSpace($env:CC_WORKBENCH_PROJECT_ROOT)) {
-        return [System.IO.Path]::GetFullPath($env:CC_WORKBENCH_PROJECT_ROOT)
-    }
-
-    $root = "auto"
-    if ($null -ne $Settings -and
-        ($Settings.PSObject.Properties.Name -contains "ProjectRoot") -and
-        -not [string]::IsNullOrWhiteSpace([string]$Settings.ProjectRoot)) {
-        $root = [string]$Settings.ProjectRoot
-    }
-
-    $clean = $root.Trim()
-
-    if ([string]::IsNullOrWhiteSpace($clean) -or $clean -ieq "auto") {
-        $toolRoot = Get-CcSharedScriptDirectory
-        $leaf = Split-Path -Leaf $toolRoot
-
-        if ($leaf -ieq "contextcontrol") {
-            $parent = Split-Path -Parent $toolRoot
-            if (-not [string]::IsNullOrWhiteSpace($parent)) {
-                return [System.IO.Path]::GetFullPath($parent)
-            }
-        }
-
-        return [System.IO.Path]::GetFullPath($toolRoot)
-    }
-
-    # Explicit user paths must win. In particular, do not auto-promote
-    # D:\...\contextcontrol or "." to the parent repo; those are valid when
-    # editing Context Control itself.
-    return Resolve-CcSharedPathRelativeToScript $clean
-}
-
-function Resolve-CcSharedOutputRoot {
-    param($Settings)
-
-    $root = "."
-    if ($null -ne $Settings -and
-        ($Settings.PSObject.Properties.Name -contains "OutputRoot") -and
-        -not [string]::IsNullOrWhiteSpace([string]$Settings.OutputRoot)) {
-        $root = [string]$Settings.OutputRoot
-    }
-
-    return Resolve-CcSharedPathRelativeToScript $root
-}
-
-function Resolve-CcSharedOutputPath {
-    param(
-        [string]$PathText,
-        $Settings = $null
-    )
-
-    if ([string]::IsNullOrWhiteSpace($PathText)) {
-        throw "Missing output path."
-    }
-
-    $clean = $PathText.Trim()
-    $clean = $clean -replace '/', [System.IO.Path]::DirectorySeparatorChar
-
-    if ([System.IO.Path]::IsPathRooted($clean)) {
-        return [System.IO.Path]::GetFullPath($clean)
-    }
-
-    if ($null -eq $Settings) {
-        $Settings = Read-CcSharedSettings
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Resolve-CcSharedOutputRoot $Settings) $clean))
-}
-
-function Save-OutputFile {
-    param([string]$Path)
-
-    $fullPath = Resolve-CcSharedOutputPath $Path $script:CcSharedSettings
-    $dir = [System.IO.Path]::GetDirectoryName($fullPath)
-
-    if ([string]::IsNullOrWhiteSpace($dir)) {
-        $dir = Resolve-CcSharedOutputRoot $script:CcSharedSettings
-    }
-
-    if (-not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Path $dir | Out-Null
-    }
-
-    $leaf = [System.IO.Path]::GetFileName($fullPath)
-    $tmpPath = Join-Path $dir (".$leaf.$PID.$([System.Guid]::NewGuid().ToString('N')).tmp")
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-
-    [System.IO.File]::WriteAllText($tmpPath, (Get-OutputText), $utf8NoBom)
-
-    $lastError = $null
-
-    for ($attempt = 1; $attempt -le 30; $attempt++) {
-        try {
-            if ([System.IO.File]::Exists($fullPath)) {
-                try {
-                    [System.IO.File]::Replace($tmpPath, $fullPath, $null, $true)
-                }
-                catch {
-                    Copy-Item -LiteralPath $tmpPath -Destination $fullPath -Force -ErrorAction Stop
-                    Remove-Item -LiteralPath $tmpPath -Force -ErrorAction SilentlyContinue
-                }
-            }
-            else {
-                Move-Item -LiteralPath $tmpPath -Destination $fullPath -Force -ErrorAction Stop
-            }
-
-            if (-not [System.IO.File]::Exists($fullPath)) {
-                throw "Export write reported success, but final file does not exist: $fullPath"
-            }
-
-            return $fullPath
-        }
-        catch {
-            $lastError = $_.Exception.Message
-            Start-Sleep -Milliseconds ([Math]::Min(1000, 50 * $attempt))
-        }
-    }
-
-    throw "Failed to write '$Path' after retries. Close any editor/preview/indexer using it and try again. Temp output was left at: $tmpPath. Last error: $lastError"
-}
-
-function Invoke-CcClipboardProgram {
-    param(
-        [string]$Program,
-        [string[]]$Arguments,
-        [AllowNull()][string]$Text
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Program)) {
-        throw "Clipboard backend program was empty."
-    }
-
-    if ($null -eq $Arguments) {
-        $Arguments = @()
-    }
-
-    if ($null -eq $Text) {
-        $Text = ""
-    }
-
-    $cmd = Get-Command $Program -ErrorAction SilentlyContinue
-    if ($null -eq $cmd) {
-        throw "$Program was not found."
-    }
-
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $cmd.Source
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardInput = $true
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-
-    foreach ($arg in $Arguments) {
-        [void]$psi.ArgumentList.Add($arg)
-    }
-
-    try {
-        $psi.StandardInputEncoding = New-Object System.Text.UTF8Encoding($false)
-    }
-    catch {
-        # Older runtimes may not expose StandardInputEncoding. The default still
-        # works for normal ASCII/UTF-8 project paths; this is only best-effort.
-    }
-
-    $process = [System.Diagnostics.Process]::Start($psi)
-    $process.StandardInput.Write($Text)
-    $process.StandardInput.Close()
-    $stderr = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
-
-    if ($process.ExitCode -ne 0) {
-        if ([string]::IsNullOrWhiteSpace($stderr)) {
-            $stderr = "exit code $($process.ExitCode)"
-        }
-        throw "$Program failed: $stderr"
-    }
-}
-
-function Copy-CcTextToClipboard {
-    [CmdletBinding()]
-    param([AllowNull()][string]$Text)
-
-    if ($null -eq $Text) {
-        $Text = ""
-    }
-
-    $errors = New-Object System.Collections.Generic.List[string]
-
-    try {
-        Microsoft.PowerShell.Management\Set-Clipboard -Value $Text -ErrorAction Stop
-        return "Set-Clipboard"
-    }
-    catch {
-        [void]$errors.Add("Set-Clipboard: $($_.Exception.Message)")
-    }
-
-    if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)) {
-        try {
-            Invoke-CcClipboardProgram "pbcopy" @() $Text
-            return "pbcopy"
-        }
-        catch {
-            [void]$errors.Add("pbcopy: $($_.Exception.Message)")
-        }
-    }
-
-    if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
-        try {
-            $clipExe = Join-Path $env:SystemRoot "System32\clip.exe"
-            Invoke-CcClipboardProgram $clipExe @() $Text
-            return "clip.exe"
-        }
-        catch {
-            [void]$errors.Add("clip.exe: $($_.Exception.Message)")
-        }
-    }
-
-    foreach ($candidate in @("wl-copy", "xclip", "xsel")) {
-        try {
-            if ($candidate -eq "xclip") {
-                Invoke-CcClipboardProgram $candidate @("-selection", "clipboard") $Text
-            }
-            elseif ($candidate -eq "xsel") {
-                Invoke-CcClipboardProgram $candidate @("--clipboard", "--input") $Text
-            }
-            else {
-                Invoke-CcClipboardProgram $candidate @() $Text
-            }
-            return $candidate
-        }
-        catch {
-            [void]$errors.Add("${candidate}: $($_.Exception.Message)")
-        }
-    }
-
-    throw "No clipboard backend worked. Tried: $([string]::Join('; ', [string[]]$errors.ToArray()))"
-}
-
-function Set-Clipboard {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [AllowNull()]
-        [string]$Value
-    )
-
-    begin {
-        $parts = New-Object System.Collections.Generic.List[string]
-    }
-
-    process {
-        if ($null -ne $Value) {
-            [void]$parts.Add([string]$Value)
-        }
-    }
-
-    end {
-        $text = [string]::Join([Environment]::NewLine, [string[]]$parts.ToArray())
-        [void](Copy-CcTextToClipboard $text)
-    }
-}
-
-
-function Detect-Profile {
-    if ($Profile.ToLowerInvariant() -ne "auto") {
-        return $Profile.ToLowerInvariant()
-    }
-
-    if ((Test-Path -LiteralPath "cc.ps1") -and
-        (Test-Path -LiteralPath "ccDir.ps1") -and
-        (Test-Path -LiteralPath "ccReplace.ps1") -and
-        (Test-Path -LiteralPath "lib")) {
-        return "contextcontrol"
-    }
-
-    if ((Test-Path -LiteralPath "CMakeLists.txt") -and
-        (Test-Path -LiteralPath "src") -and
-        (Test-Path -LiteralPath "include") -and
-        (Test-Path -LiteralPath "shaders")) {
-        return "vulkanvx"
-    }
-
-    if ((Test-Path -LiteralPath "project.godot") -or (Test-Path -LiteralPath "scenes")) {
-        return "godot"
-    }
-
-    return "generic"
-}
-
+$script:CcDirProjectHints = $null
+$script:CcDirRootPath = ""
+$script:CcDirRelativePathCache = @{}
+$script:CcDirArtifactPathCache = @{}
+$script:CcDirPathDepthCache = @{}
+$script:CcDirStableAnchorRootCache = @{}
+$script:CcDirRoutingCategoryCache = @{}
+$script:CcDirAnchorCategoryCache = @{}
+$script:CcDirAnchorScoreCache = @{}
+$script:CcDirRoleCache = @{}
+$script:CcDirRootRoleCache = @{}
+
+$script:CcToolRoot = if ((Split-Path -Leaf $PSScriptRoot) -ieq "lib") { Split-Path -Parent $PSScriptRoot } else { $PSScriptRoot }
+$script:CcDirModuleRoot = Join-Path $PSScriptRoot "dir"
+. (Join-Path $script:CcDirModuleRoot "Cc.Dir.Shared.ps1")
 $script:CcSharedSettings = Read-CcSharedSettings
 $script:CcProjectRoot = Resolve-CcSharedProjectRoot $script:CcSharedSettings
 $script:CcOutputRoot = Resolve-CcSharedOutputRoot $script:CcSharedSettings
@@ -654,189 +180,61 @@ if (-not (Test-Path -LiteralPath $script:CcOutputRoot)) {
 # Project-tree scanning is relative to the configured project root.
 # The markdown export is written to the configured Context Control output folder.
 Set-Location -LiteralPath $script:CcProjectRoot
+$script:CcDirRootPath = (Get-Location).Path
+$script:CcDirRelativePathCache = @{}
+$script:CcDirArtifactPathCache = @{}
+$script:CcDirPathDepthCache = @{}
+$script:CcDirStableAnchorRootCache = @{}
+$script:CcDirRoutingCategoryCache = @{}
+$script:CcDirAnchorCategoryCache = @{}
+$script:CcDirAnchorScoreCache = @{}
+$script:CcDirRoleCache = @{}
+$script:CcDirRootRoleCache = @{}
 
 Write-Host "Project root: $script:CcProjectRoot" -ForegroundColor DarkGray
 Write-Host "Output folder: $script:CcOutputRoot" -ForegroundColor DarkGray
+Add-CcDirDefaultArtifactRules
 Import-CcDirWorkbenchFileRules
+$script:CcDirProjectHints = Read-CcDirOptionalProjectHints
 
 
 $ResolvedProfile = Detect-Profile
 
-function Is-ExcludedItem($Item) {
-    if ($Item.Name -like "*.ccbak.*") {
-        return $true
-    }
-
-    if ($Item.PSIsContainer) {
-        # Context Control is usually a tool folder under the real project root.
-        # Keep parent-project DIR exports clean by excluding that child folder.
-        # To work on Context Control itself, set ProjectRoot to "." or to the
-        # absolute contextcontrol path; then this rule does not exclude the root.
-        if ($Item.Name -ieq "contextcontrol") {
-            return $true
-        }
-
-        foreach ($rule in $ExcludeDirs) {
-            if (Test-CcDirDirectoryRule $Item $rule) {
-                return $true
-            }
-        }
-
-        return $false
-    }
-
-    foreach ($rule in $ExcludeFileNames) {
-        if (Test-CcDirFileRule $Item $rule) {
-            return $true
-        }
-    }
-
-    $ext = [System.IO.Path]::GetExtension($Item.Name).ToLower()
-    return $ExcludeFileExtensions -contains $ext
+. (Join-Path $script:CcDirModuleRoot "Cc.Dir.Classification.ps1")
+. (Join-Path $script:CcDirModuleRoot "Cc.Dir.Selection.ps1")
+. (Join-Path $script:CcDirModuleRoot "Cc.Dir.RootSelection.ps1")
+. (Join-Path $script:CcDirModuleRoot "Cc.Dir.Manifest.ps1")
+$scopeInfo = Resolve-CcDirScope
+$allFiles = @(Get-CcDirIncludedFiles $scopeInfo.FullPath)
+$profilePath = Get-CcDirProfilePath
+$projectProfile = if (-not $scopeInfo.Scoped) { Read-CcDirProjectProfile $profilePath } else { $null }
+$rebuiltProjectProfile = $false
+if ($null -ne $projectProfile -and -not (Test-CcDirProjectProfileFresh $projectProfile $allFiles)) {
+    Write-Host "DIR profile cache is stale; rebuilding: $profilePath" -ForegroundColor DarkGray
+    $projectProfile = $null
 }
 
-function Should-Include-TopLevelItem($Item) {
-    if ($IncludeAllTopLevel) {
-        return $true
-    }
-
-    if ($ResolvedProfile -ne "vulkanvx") {
-        return $true
-    }
-
-    $root = (Get-Location).Path
-    $relative = $Item.FullName.Substring($root.Length)
-    $relative = $relative -replace '^[\\/]+', ''
-    $relative = $relative -replace '\\', '/'
-
-    if ($relative -eq "") {
-        return $true
-    }
-
-    $top = ($relative -split '/')[0]
-
-    foreach ($allowed in $VulkanVXTopLevelAllowList) {
-        if ($relative -eq $allowed) {
-            return $true
-        }
-
-        if (($allowed -notmatch '\.') -and ($top -eq $allowed)) {
-            return $true
-        }
-    }
-
-    return $false
+if ($null -eq $projectProfile -and -not $scopeInfo.Scoped) {
+    $projectProfile = New-CcDirProjectProfile $allFiles
+    $rebuiltProjectProfile = $true
 }
 
-function Add-Tree($Dir, $Prefix, $Depth) {
-    if ($Depth -ge $MaxDepth) {
-        Add-Line "$Prefix..."
-        return
+if ($rebuiltProjectProfile -and -not [string]::IsNullOrWhiteSpace($profilePath)) {
+    [void](Save-CcDirProjectProfile $projectProfile $profilePath)
+}
+
+if ($ProfileOnly) {
+    if ($null -eq $projectProfile) {
+        $projectProfile = New-CcDirProjectProfile $allFiles
     }
 
-    $children = Get-ChildItem -LiteralPath $Dir -Force |
-        Where-Object { -not (Is-ExcludedItem $_) } |
-        Where-Object { if ($Depth -eq 0) { Should-Include-TopLevelItem $_ } else { $true } } |
-        Sort-Object @{ Expression = { -not $_.PSIsContainer } }, Name
-
-    for ($i = 0; $i -lt $children.Count; $i++) {
-        $item = $children[$i]
-        $isLast = ($i -eq $children.Count - 1)
-
-        if ($isLast) {
-            $connector = "└── "
-            $nextPrefix = $Prefix + "    "
-        }
-        else {
-            $connector = "├── "
-            $nextPrefix = $Prefix + "│   "
-        }
-
-        $name = $item.Name
-        if ($item.PSIsContainer) {
-            $name += "/"
-        }
-
-        Add-Line "$Prefix$connector$name"
-
-        if ($item.PSIsContainer) {
-            Add-Tree $item.FullName $nextPrefix ($Depth + 1)
-        }
-    }
+    $savedProfilePath = Save-CcDirProjectProfile $projectProfile $ProfileOutput
+    Write-Host "DIR profile created: $savedProfilePath"
+    return
 }
 
-$rootPath = (Get-Location).Path
-$rootName = Split-Path -Leaf $rootPath
-
-if ($rootName -eq "") {
-    $rootName = "project"
-}
-
-Add-Line "# Project directory for Context Control"
-Add-Line ""
-Add-Line "Project root: $rootPath"
-Add-Line "Detected profile: $ResolvedProfile"
-Add-Line ""
-Add-Line "## Prompt"
-Add-Line ""
-Add-Line "Use the standing Context Control agent instructions for the full workflow. This export is only the project map/navigation layer."
-Add-Line ""
-Add-Line "For the user's request, return only the smallest safe file/function list needed for cc.ps1. One path per line, relative to project root, ending with END."
-Add-Line ""
-Add-Line "File-list example:"
-Add-Line ""
-Add-Line "$Fence3`text"
-
-if ($ResolvedProfile -eq "vulkanvx") {
-    Add-Line "src/core/engine/Engine.cpp"
-    Add-Line "include/core/engine/Engine.h"
-    Add-Line "src/rendering/lighting/ShadowSystemUpdate.cpp"
-    Add-Line "include/rendering/lighting/ShadowSystem.h"
-    Add-Line "shaders/common/shadow_sampling.glsl"
-}
-elseif ($ResolvedProfile -eq "godot") {
-    Add-Line "scenes/main.gd"
-    Add-Line "scenes/main.tscn"
-    Add-Line "scripts/core/player.gd"
-    Add-Line "scripts/ui/hud.gd"
-}
-else {
-    Add-Line "src/main.cpp"
-    Add-Line "include/main.h"
-}
-
-Add-Line "END"
-Add-Line "$Fence3"
-Add-Line ""
-Add-Line "Function/discovery examples accepted by upgraded cc.ps1:"
-Add-Line ""
-Add-Line "$Fence3`text"
-Add-Line "FUNCTION src/world/World.cpp :: World::markTextureMaterialsDirty"
-Add-Line "FUNCTION src/world/World*.cpp :: World::beginTerrainEditVisualTracking"
-Add-Line "FUNC: beginTerrainEditVisualTracking"
-Add-Line "FIND: TerrainEditDiag"
-Add-Line "END"
-Add-Line "$Fence3"
-Add-Line ""
-Add-Line "Map-stage reminders:"
-Add-Line "- Do not solve yet; request context only."
-Add-Line "- Prefer narrow subsystem files/functions over giant exports."
-Add-Line "- Function syntax must be exactly: FUNCTION src/path/File.cpp :: SymbolName."
-Add-Line "- Wildcard FUNCTION paths are supported for split implementation families, e.g. FUNCTION src/world/World*.cpp :: World::foo, but prefer exact files when known."
-Add-Line "- Use FUNC: SymbolName only when the owning file is unknown and you want cc.ps1 to search and extract function bodies."
-Add-Line "- Do not request SYMBOL:. It is disabled because whole-file symbol export causes token explosions."
-Add-Line "- Use FIND: TextToLocate only for cheap discovery; it lists matching files and occurrence previews without exporting source bodies."
-Add-Line "- cc.ps1 now auto-adds matching headers for .cpp files and direct GLSL #include files, so do not list obvious duplicates unless the specific header/include is central to the change."
-Add-Line "- Include CMakeLists.txt only when adding/removing C++ source files or build config."
-Add-Line "- Never request build/, vcpkg_installed/, vendor/external/third_party/, generated caches, binaries, or unrelated modules."
-Add-Line ""
-
-Add-Line "## Project tree"
-Add-Line ""
-Add-Line "$Fence3`text"
-Add-Line "$rootName/"
-Add-Tree $rootPath "" 0
-Add-Line "$Fence3"
+$visibleFiles = @(Get-CcDirVisibleFiles $scopeInfo $allFiles $projectProfile)
+Add-CcDirManifest $scopeInfo $allFiles $visibleFiles $projectProfile
 
 $SavedOutputFile = Save-OutputFile $OutputFile
 
@@ -844,26 +242,35 @@ Write-Host ""
 Write-Host "Done."
 Write-Host "Created: $SavedOutputFile"
 Write-Host "Detected profile: $ResolvedProfile"
+Write-Host "DIR LOD: $($scopeInfo.Label)"
+if ($scopeInfo.Scoped) {
+    Write-Host "Scope: $($scopeInfo.Relative)"
+}
 Write-Host "Open it: code `"$SavedOutputFile`""
 Write-Host "Fallback copy: Get-Content -LiteralPath `"$SavedOutputFile`" -Raw | Set-Clipboard"
 
-$exportText = Get-OutputText
-try {
-    Set-Clipboard -Value $exportText -ErrorAction Stop
-    Write-Host "Copied project tree + prompt to clipboard."
-}
-catch {
-    $setClipboardError = $_.Exception.Message
+if (-not $NoClipboard) {
+    $exportText = Get-OutputText
     try {
-        $clipExe = Join-Path $env:SystemRoot "System32\clip.exe"
-        if (-not (Test-Path -LiteralPath $clipExe)) {
-            throw "clip.exe not found; Set-Clipboard failed: $setClipboardError"
-        }
-
-        $exportText | & $clipExe
-        Write-Host "Copied project tree + prompt to clipboard via clip.exe."
+        Set-Clipboard -Value $exportText -ErrorAction Stop
+        Write-Host "Copied DIR manifest to clipboard."
     }
     catch {
-        Write-Host "Clipboard copy skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+        $setClipboardError = $_.Exception.Message
+        try {
+            $clipExe = Join-Path $env:SystemRoot "System32\clip.exe"
+            if (-not (Test-Path -LiteralPath $clipExe)) {
+                throw "clip.exe not found; Set-Clipboard failed: $setClipboardError"
+            }
+
+            $exportText | & $clipExe
+            Write-Host "Copied DIR manifest to clipboard via clip.exe."
+        }
+        catch {
+            Write-Host "Clipboard copy skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
     }
+}
+else {
+    Write-Host "Clipboard copy disabled by -NoClipboard."
 }

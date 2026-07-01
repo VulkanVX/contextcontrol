@@ -64,9 +64,12 @@ public sealed partial class ContextControlViewModel
         {
             var elapsed = item.ElapsedSeconds;
             item.Status = progress.Status;
-            item.SizeLabel = progress.EvalCount is { } evalCount
-                ? $"{evalCount} output tok"
-                : "loading";
+            if (!string.IsNullOrWhiteSpace(progress.ThinkingDelta))
+            {
+                item.AppendThinking(progress.ThinkingDelta);
+            }
+
+            item.SizeLabel = BuildGenerationSizeLabel(progress);
             item.SpeedLabel = BuildGenerationSpeedLabel(progress, elapsed);
             item.RefreshElapsed();
             item.IsIndeterminate = !progress.Done;
@@ -94,6 +97,21 @@ public sealed partial class ContextControlViewModel
         }
 
         return elapsedSeconds > 0 ? $"pending {elapsedSeconds:0.0}s" : "speed pending";
+    }
+
+    private static string BuildGenerationSizeLabel(LocalLlmGenerationProgress progress)
+    {
+        if (progress.PromptEvalCount is { } promptCount && progress.EvalCount is { } evalCount)
+        {
+            return $"{promptCount:N0} in / {evalCount:N0} out";
+        }
+
+        if (progress.EvalCount is { } outputCount)
+        {
+            return $"{outputCount:N0} output tok";
+        }
+
+        return "loading";
     }
 
     private void AppendTerminalOutput(string line)
@@ -294,10 +312,10 @@ public sealed partial class ContextControlViewModel
         MoveToCcStage(CcStageRequest);
         PhaseTitle = IsAutopilotEnabled ? "CC flow" : "Raw";
         PhaseDetail = IsAutopilotEnabled
-            ? "Bus stop 1: write the request, press DIR, then send the attached tree so the model returns CC request lines."
+            ? "Phase 1: write the request, run DIR, then send the project map so the model returns a minimal CC list."
             : "Raw chat: Send passes only your prompt text to the selected model.";
         AppendTerminalOutput(IsAutopilotEnabled
-            ? "CC flow enabled: fixed bus stops are Request -> DIR -> Files -> CC -> Patch -> GO -> Apply."
+            ? "CC flow enabled: DIR + Request -> CC -> GO."
             : "Raw enabled: clean chat with no ContextControl capsule, attachments, or workflow instructions.");
     }
 
@@ -325,14 +343,7 @@ public sealed partial class ContextControlViewModel
             || text.Contains("scope", StringComparison.OrdinalIgnoreCase)
             || text.Contains("tree", StringComparison.OrdinalIgnoreCase))
         {
-            return CcStageDir;
-        }
-
-        if (text.Contains("resolver", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("file request", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("FIND", StringComparison.OrdinalIgnoreCase))
-        {
-            return CcStageResolve;
+            return CcStageRequest;
         }
 
         if (text.Contains("Raw", StringComparison.OrdinalIgnoreCase)
@@ -346,9 +357,14 @@ public sealed partial class ContextControlViewModel
         if (text.Contains("CC export", StringComparison.OrdinalIgnoreCase)
             || text.Contains("Context ready", StringComparison.OrdinalIgnoreCase)
             || text.Contains("CC request", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("source context", StringComparison.OrdinalIgnoreCase))
+            || text.Contains("source context", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("resolver", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("file request", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("FIND", StringComparison.OrdinalIgnoreCase))
         {
-            return CcStageExport;
+            return text.Contains("DIR", StringComparison.OrdinalIgnoreCase)
+                ? CcStageRequest
+                : CcStageExport;
         }
 
         if (text.Contains("patch write", StringComparison.OrdinalIgnoreCase)
@@ -553,6 +569,7 @@ public sealed partial class ContextControlViewModel
     private void RaiseTransferProgressCommandStates()
     {
         OnPropertyChanged(nameof(CanCloseTransferProgress));
+        OnPropertyChanged(nameof(IsTransferProgressLoading));
         OnPropertyChanged(nameof(TransferProgressHistoryPositionLabel));
         (PreviousTransferStatusCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (NextTransferStatusCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();

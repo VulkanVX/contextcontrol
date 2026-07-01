@@ -106,10 +106,14 @@ public sealed partial class ContextControlViewModel
     {
         SavePendingAttachmentsToSelectedChat();
         OnPropertyChanged(nameof(AttachmentSummary));
+        OnPropertyChanged(nameof(AttachmentButtonLabel));
         OnPropertyChanged(nameof(PromptFooterSummary));
         OnPropertyChanged(nameof(PromptTokenomicsLabel));
         OnPropertyChanged(nameof(PromptContextPressureLabel));
         OnPropertyChanged(nameof(HasAttachments));
+        OnPropertyChanged(nameof(IsDirSendMissingRequestWarning));
+        OnPropertyChanged(nameof(PromptSendButtonToolTip));
+        RefreshPromptFlowSteps();
         if (!_isSyncingChatAttachments && !_isSwitchingProjectState)
         {
             SaveChatHistory();
@@ -217,8 +221,14 @@ public sealed partial class ContextControlViewModel
 
     private void LogResult(ContextControlCommandResult result)
     {
-        Log(result.Succeeded ? "ok" : "fail", $"{result.Command} exited {result.ExitCode}");
-        AppendTerminalOutput($"{result.Command} exited {result.ExitCode}");
+        var summary = FormatCommandResultSummary(result);
+        Log(result.Succeeded ? "ok" : "fail", summary);
+        AppendTerminalOutput(summary);
+        if (!string.IsNullOrWhiteSpace(result.FallbackReason))
+        {
+            AppendTerminalOutput($"fallback: {result.FallbackReason}");
+        }
+
         foreach (var line in InterestingLines(result.StandardOutput).Take(5))
         {
             Log("out", line);
@@ -230,6 +240,17 @@ public sealed partial class ContextControlViewModel
             Log("err", line);
             AppendTerminalOutput($"err: {line}");
         }
+    }
+
+    private static string FormatCommandResultSummary(ContextControlCommandResult result)
+    {
+        var runner = string.IsNullOrWhiteSpace(result.Runner) ? "PowerShell" : result.Runner;
+        var elapsed = result.Elapsed is { } duration
+            ? duration.TotalMilliseconds < 1000
+                ? $" in {duration.TotalMilliseconds:0} ms"
+                : $" in {duration.TotalSeconds:0.00} s"
+            : "";
+        return $"{result.Command} via {runner}{elapsed} exited {result.ExitCode}";
     }
 
     private void Log(string level, string message)
@@ -289,6 +310,7 @@ public sealed partial class ContextControlViewModel
     {
         (RunDirCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (RunCcCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+        (RunDirTreeExportCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (RunGoCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (ApplyPatchCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (ApplyAllPatchCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
@@ -299,6 +321,8 @@ public sealed partial class ContextControlViewModel
         (UninstallBackendDependencyCommand as RelayCommand<LlmBackendDependencyViewModel>)?.RaiseCanExecuteChanged();
         (ConfirmExternalDependencyDeleteCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (PullLocalModelCommand as RelayCommand<LocalLlmModelViewModel>)?.RaiseCanExecuteChanged();
+        (InstallCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
+        (OpenCodexGuideCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (OpenCodexLoginCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (LogoutCodexCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         (RefreshCodexStatusCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();

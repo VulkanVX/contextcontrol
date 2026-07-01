@@ -15,37 +15,58 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class ContextControlViewModel
 {
-    private async Task RefreshLocalModelsAsync()
+    private enum LocalModelRefreshDepth
+    {
+        Fast,
+        Full
+    }
+
+    private Task RefreshLocalModelsAsync()
+    {
+        return RefreshLocalModelsAsync(LocalModelRefreshDepth.Full);
+    }
+
+    private async Task RefreshLocalModelsAsync(LocalModelRefreshDepth refreshDepth)
     {
         if (IsRefreshingLocalModels)
         {
             return;
         }
 
+        var scanDependencies = refreshDepth == LocalModelRefreshDepth.Full;
         var refreshCancellation = new CancellationTokenSource();
-        var progress = CreateTransferProgress("Refreshing models", refreshCancellation, revealTerminal: false);
+        var progress = CreateTransferProgress("Refreshing Models", refreshCancellation, revealTerminal: false);
         var cancellationToken = refreshCancellation.Token;
         IsRefreshingLocalModels = true;
         LocalLlmStatus = "Detecting GPU and local Ollama models...";
-        PhaseTitle = "Refreshing models";
-        PhaseDetail = "Detecting GPU, Ollama, installed tags, and local role delegation.";
-        ReportRefreshProgress(progress, "Detecting GPU, Ollama, installed tags, and local role delegation.", 0);
+        PhaseTitle = "Refreshing Models";
+        PhaseDetail = scanDependencies
+            ? "Detecting GPU, Ollama, installed tags, dependency runtimes, and local role delegation."
+            : "Detecting GPU, Ollama, and installed tags.";
+        ReportRefreshProgress(progress, PhaseDetail, 0);
         try
         {
             await Task.Yield();
             var refreshTask = _localLlmService.RefreshAsync(progress, cancellationToken);
-            var dependencyStatusTask = DetectBackendDependencyStatusesAsync(cancellationToken, progress);
+            var dependencyStatusTask = scanDependencies
+                ? DetectBackendDependencyStatusesAsync(cancellationToken, progress)
+                : null;
             var result = await refreshTask;
-            ReportRefreshProgress(progress, "Validating dependency runtimes.", 62);
-            var dependencyStatuses = await dependencyStatusTask;
+            var dependencyStatuses = scanDependencies
+                ? await AwaitDependencyStatusScanAsync(dependencyStatusTask!, progress)
+                : DetectCachedBackendDependencyStatuses();
             cancellationToken.ThrowIfCancellationRequested();
             ReportRefreshProgress(progress, "Applying local role delegation.", 88);
             HardwareSummary = result.Hardware.Summary;
             LocalLlmStatus = result.Status;
             IsOllamaInstalled = result.OllamaInstalled;
             ApplyDetectedBackendDependencyStatuses(dependencyStatuses);
-            ApplyLocalModelRefresh(result);
-            await ApplyBackendModelCacheStatesAsync(cancellationToken, progress);
+            ApplyLocalModelRefresh(result, preserveBackendModelStates: !scanDependencies);
+            if (scanDependencies)
+            {
+                await ApplyBackendModelCacheStatesAsync(cancellationToken, progress);
+            }
+
             ReportRefreshProgress(progress, "Refresh complete.", 100);
             CompleteTransferProgress($"Refresh complete: {result.Status}", succeeded: true);
             AppendTerminalOutput($"Hardware: {HardwareSummary}");
@@ -71,6 +92,14 @@ public sealed partial class ContextControlViewModel
             IsRefreshingLocalModels = false;
             refreshCancellation.Dispose();
         }
+    }
+
+    private static async Task<IReadOnlyDictionary<string, DependencyRuntimeStatus>> AwaitDependencyStatusScanAsync(
+        Task<IReadOnlyDictionary<string, DependencyRuntimeStatus>> dependencyStatusTask,
+        IProgress<LocalLlmTransferProgress> progress)
+    {
+        ReportRefreshProgress(progress, "Validating dependency runtimes.", 62);
+        return await dependencyStatusTask.ConfigureAwait(false);
     }
 
     private async Task RefreshLocalModelInstallStateAsync()
@@ -101,7 +130,7 @@ public sealed partial class ContextControlViewModel
         double percent)
     {
         progress.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             status,
             (long)Math.Clamp((int)Math.Ceiling(percent / 25d), 0, 4),
             4,
@@ -327,7 +356,7 @@ public sealed partial class ContextControlViewModel
         IProgress<LocalLlmTransferProgress>? progress = null)
     {
         progress?.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             "Detecting dependency runtimes.",
             2,
             4,
@@ -382,7 +411,7 @@ public sealed partial class ContextControlViewModel
         await Task.WhenAll(checks.Values);
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             "Dependency runtime scan complete.",
             3,
             4,
@@ -392,6 +421,62 @@ public sealed partial class ContextControlViewModel
             pair => pair.Key,
             pair => pair.Value.Result,
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyDictionary<string, DependencyRuntimeStatus> DetectCachedBackendDependencyStatuses()
+    {
+        var statuses = new Dictionary<string, DependencyRuntimeStatus>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var spec in PythonDependencyEnvironment.AllSpecs)
+        {
+            if (PythonDependencyEnvironment.HasManagedReadyStamp(spec))
+            {
+                var managedPython = PythonDependencyEnvironment.ManagedPythonExecutable(spec.Id);
+                statuses[spec.Id] = new DependencyRuntimeStatus(
+                    true,
+                    $"{spec.DisplayName} ready in {managedPython} (cached managed ContextControl venv).",
+                    managedPython,
+                    IsManaged: true);
+                continue;
+            }
+
+            var externalPython = PythonDependencyEnvironment.ReadRememberedExternalPython(spec);
+            if (!string.IsNullOrWhiteSpace(externalPython))
+            {
+                statuses[spec.Id] = new DependencyRuntimeStatus(
+                    true,
+                    $"{spec.DisplayName} ready in {externalPython} (cached external Python).",
+                    externalPython);
+            }
+        }
+
+        foreach (var spec in NativeDependencyEnvironment.AllSpecs)
+        {
+            var executable = NativeDependencyEnvironment.FindManagedExecutable(spec.Id, spec.ExecutableNames);
+            if (!string.IsNullOrWhiteSpace(executable))
+            {
+                statuses[spec.Id] = new DependencyRuntimeStatus(
+                    true,
+                    $"{spec.DisplayName} ready in ContextControl's managed native store: {executable}.",
+                    executable,
+                    IsManaged: true);
+            }
+        }
+
+        foreach (var spec in SourceDependencyEnvironment.AllSpecs)
+        {
+            var sourcePath = SourceDependencyEnvironment.FindManagedSource(spec.Id, spec.RequiredFiles);
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+            {
+                statuses[spec.Id] = new DependencyRuntimeStatus(
+                    true,
+                    $"{spec.DisplayName} source ready in ContextControl's managed source store: {sourcePath}.",
+                    sourcePath,
+                    IsManaged: true);
+            }
+        }
+
+        return statuses;
     }
 
     private static async Task<DependencyRuntimeStatus> DetectPythonDependencyAsync(

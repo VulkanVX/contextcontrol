@@ -22,7 +22,7 @@ public sealed partial class LocalLlmService
         CancellationToken cancellationToken = default)
     {
         progress?.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             "Detecting GPU and Ollama state.",
             1,
             4,
@@ -37,7 +37,7 @@ public sealed partial class LocalLlmService
         var hardware = await hardwareTask.ConfigureAwait(false);
         var installed = await installedTask.ConfigureAwait(false);
         progress?.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             "Resolving installed tags.",
             2,
             4,

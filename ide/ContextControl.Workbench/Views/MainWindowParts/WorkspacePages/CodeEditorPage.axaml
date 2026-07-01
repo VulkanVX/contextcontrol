@@ -23,6 +23,7 @@
                   ThemeKey="{Binding ThemeKey}"
                   SyntaxThemeKey="{Binding SyntaxThemeKey}"
                   CodeFontFamily="{Binding CodeFontFamily}"
+                  EditorFontSize="{Binding CodeEditorFontSize}"
                   SkinKey="{Binding SkinKey}"
                   ShowMinimap="{Binding ShowAppearanceCodePreview}"
                   ShowFoldArrows="{Binding ShowFoldArrows}"

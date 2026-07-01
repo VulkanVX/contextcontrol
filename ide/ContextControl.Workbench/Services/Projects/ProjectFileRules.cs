@@ -3,6 +3,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace ContextControl.Workbench.Services;
 
@@ -15,6 +16,7 @@ public sealed class ProjectFileRules
     [
         ".ccReplace.versions",
         ".ccWorkbench.browser-data",
+        ".ccWorkbench.generated-projects",
         ".angular",
         ".claude",
         ".conan",
@@ -39,6 +41,7 @@ public sealed class ProjectFileRules
         ".svelte-kit",
         ".terraform",
         ".tmp",
+        ".tmp-build",
         ".turbo",
         ".venv",
         ".vs",
@@ -54,17 +57,25 @@ public sealed class ProjectFileRules
         "cmake-build-debug",
         "cmake-build-release",
         "CMakeFiles",
+        "codex-harness",
         "coverage",
         "DerivedData",
         "deps",
         "dist",
+        "dotnet-obj",
+        "dotnet-out",
         "external",
         "extern",
+        "generated",
         "node_modules",
         "obj",
         "out",
         "packages",
         "Pods",
+        "ps1_nat",
+        "ps1_nat_gist_review",
+        "test-harness",
+        "test-results",
         "third_party",
         "thirdparty",
         "vendor",
@@ -116,9 +127,27 @@ public sealed class ProjectFileRules
     private static readonly string[] DefaultIgnoredFileNames =
     [
         ".ccFileRules.json",
+        ".ccWorkbench.chat-history*.json",
         ".ccWorkbench.settings.json",
         ".DS_Store",
+        "*.generated.json",
+        "*.generated.md",
+        "*.nat.*",
+        "*.tmp.md",
+        "*.tmp.txt",
+        "*-nat-*.ps1",
+        "*_nat_*",
+        "*bug-hunt*",
+        "*bughunt*",
+        "cc_chat_export_*.md",
+        "cc_code_export.md",
+        "cc_project_dir.md",
+        "cc_semantic_map.md",
+        "cleanup-*.ps1",
         "desktop.ini",
+        "mainwindow_axaml.txt",
+        "nat-*.ps1",
+        "patch.txt",
         "Thumbs.db"
     ];
 
@@ -138,33 +167,48 @@ public sealed class ProjectFileRules
         ".frag",
         ".fs",
         ".fsproj",
+        ".geom",
         ".glsl",
         ".h",
         ".hh",
         ".hpp",
         ".html",
+        ".hlsl",
         ".hxx",
         ".inc",
         ".ini",
         ".inl",
         ".ipp",
+        ".go",
+        ".gradle",
+        ".java",
         ".js",
         ".json",
         ".jsx",
+        ".kt",
+        ".kts",
+        ".lock",
         ".lua",
         ".m",
         ".md",
+        ".mesh",
         ".metal",
         ".mm",
+        ".mod",
         ".props",
         ".ps1",
         ".psd1",
         ".psm1",
         ".py",
         ".rs",
+        ".shader",
         ".sh",
         ".slang",
+        ".sum",
         ".targets",
+        ".task",
+        ".tesc",
+        ".tese",
         ".toml",
         ".ts",
         ".tsx",
@@ -631,7 +675,7 @@ public sealed class ProjectFileRules
         {
             if (IsPathRule(ignoredFile))
             {
-                if (string.Equals(normalizedRelativePath, ignoredFile, StringComparison.OrdinalIgnoreCase))
+                if (RuleMatchesText(normalizedRelativePath, ignoredFile))
                 {
                     return true;
                 }
@@ -639,7 +683,7 @@ public sealed class ProjectFileRules
                 continue;
             }
 
-            if (string.Equals(cleanFileName, ignoredFile, StringComparison.OrdinalIgnoreCase))
+            if (RuleMatchesText(cleanFileName, ignoredFile))
             {
                 return true;
             }
@@ -656,7 +700,7 @@ public sealed class ProjectFileRules
         {
             if (IsPathRule(shownFile))
             {
-                if (string.Equals(normalizedRelativePath, shownFile, StringComparison.OrdinalIgnoreCase))
+                if (RuleMatchesText(normalizedRelativePath, shownFile))
                 {
                     return true;
                 }
@@ -664,7 +708,7 @@ public sealed class ProjectFileRules
                 continue;
             }
 
-            if (string.Equals(cleanFileName, shownFile, StringComparison.OrdinalIgnoreCase))
+            if (RuleMatchesText(cleanFileName, shownFile))
             {
                 return true;
             }
@@ -736,6 +780,27 @@ public sealed class ProjectFileRules
     private static bool IsPathRule(string rule)
     {
         return rule.Contains('/', StringComparison.Ordinal);
+    }
+
+    private static bool RuleMatchesText(string value, string rule)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(rule))
+        {
+            return false;
+        }
+
+        if (!ContainsWildcard(rule))
+        {
+            return string.Equals(value, rule, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var pattern = "^" + Regex.Escape(rule).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+        return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool ContainsWildcard(string rule)
+    {
+        return rule.Contains('*', StringComparison.Ordinal) || rule.Contains('?', StringComparison.Ordinal);
     }
 
     private static bool IsBackupOrTemporaryFile(string fileName)

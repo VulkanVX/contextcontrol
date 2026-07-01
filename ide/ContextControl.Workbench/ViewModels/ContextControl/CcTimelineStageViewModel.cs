@@ -2,7 +2,7 @@
 
 namespace ContextControl.Workbench.ViewModels;
 
-public sealed class CcTimelineStageViewModel(string key, string title, string detail) : ObservableObject
+public sealed class CcTimelineStageViewModel(string key, string title, string detail, string capsule) : ObservableObject
 {
     private bool _isCurrent;
     private bool _isComplete;
@@ -10,6 +10,7 @@ public sealed class CcTimelineStageViewModel(string key, string title, string de
     public string Key { get; } = key;
     public string Title { get; } = title;
     public string Detail { get; } = detail;
+    public string Capsule { get; } = capsule;
 
     public bool IsCurrent
     {
@@ -18,7 +19,6 @@ public sealed class CcTimelineStageViewModel(string key, string title, string de
         {
             if (SetProperty(ref _isCurrent, value))
             {
-                OnPropertyChanged(nameof(StateLabel));
                 OnPropertyChanged(nameof(Marker));
             }
         }
@@ -31,15 +31,14 @@ public sealed class CcTimelineStageViewModel(string key, string title, string de
         {
             if (SetProperty(ref _isComplete, value))
             {
-                OnPropertyChanged(nameof(StateLabel));
                 OnPropertyChanged(nameof(Marker));
             }
         }
     }
 
-    public string StateLabel => IsCurrent ? "current" : IsComplete ? "done" : "next";
+    public string Marker => IsCurrent ? ">" : IsComplete ? "*" : "-";
 
-    public string Marker => IsCurrent ? ">" : IsComplete ? "ok" : "--";
+    public string ToolTipText => $"{Title}: {Detail}{Environment.NewLine}Capsule: {Capsule}";
 
     public void ApplyState(bool isCurrent, bool isComplete)
     {

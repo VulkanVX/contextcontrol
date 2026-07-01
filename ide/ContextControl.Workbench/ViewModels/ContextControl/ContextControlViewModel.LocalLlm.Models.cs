@@ -71,7 +71,7 @@ public sealed partial class ContextControlViewModel
 
                     if (result.Succeeded)
                     {
-                        await RefreshLocalModelsAsync();
+                        await RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
                     }
                 }
                 catch (OperationCanceledException)
@@ -280,7 +280,7 @@ public sealed partial class ContextControlViewModel
         }
 
         progress?.Report(new LocalLlmTransferProgress(
-            "Refreshing models",
+            "Refreshing Models",
             "Checking cached Diffusers image model files.",
             3,
             4,
@@ -688,6 +688,7 @@ public sealed partial class ContextControlViewModel
         OnPropertyChanged(nameof(InstalledLocalModelCount));
         OnPropertyChanged(nameof(LlmCompactInfoLabel));
         OnPropertyChanged(nameof(ImageGenerationModelSummary));
+        OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
         OnPropertyChanged(nameof(ActiveInstalledLocalModels));
 
         var preferred = InstalledLocalModels.FirstOrDefault(model =>

@@ -70,13 +70,19 @@ function Apply-CcReplacePlanEntry {
 }
 
 function New-CcReplacePlanSummary {
-    param($Plan)
+    param($Plan, $Settings = $null)
 
-    $items = @($Plan)
+    if ($null -eq $Settings) {
+        $Settings = Read-CcReplaceSettings
+    }
+
+    $items = @(Set-CcReplacePlanVersionHints $Plan $Settings)
     $effective = @($items | Where-Object { $_.IsEffective })
     $duplicates = @($items | Where-Object { $_.IsDuplicate })
     $fileEntries = @($items | Where-Object { -not $_.IsDirectory })
+    $directoryEntries = @($items | Where-Object { $_.IsDirectory })
     $fileGroups = @($fileEntries | Group-Object TargetHeader)
+    $bucketCounts = Get-CcReplaceBucketCounts $items
 
     $added = 0
     $removed = 0
@@ -86,17 +92,39 @@ function New-CcReplacePlanSummary {
     }
 
     $actions = @($items | ForEach-Object {
+        $kind = Get-CcReplaceActionKind $_
+        $bucket = Get-CcReplaceActionBucket $_
+        $versionBefore = 0
+        $versionAfter = 0
+
+        if ($_.PSObject.Properties.Name -contains "VersionBefore") {
+            $versionBefore = [int]$_.VersionBefore
+        }
+
+        if ($_.PSObject.Properties.Name -contains "VersionAfter") {
+            $versionAfter = [int]$_.VersionAfter
+        }
+
         [pscustomobject]@{
             Mode = $_.Mode
             Target = $_.TargetHeader
+            Name = $_.Name
             Part = $_.PartLabel
+            Action = $_.ActionLabel
+            Kind = $kind
+            Bucket = $bucket
             Added = [int]$_.Added
             Removed = [int]$_.Removed
             TotalLocAfter = [int]$_.TotalLocAfter
             IsDirectory = [bool]$_.IsDirectory
             IsDuplicate = [bool]$_.IsDuplicate
             IsEffective = [bool]$_.IsEffective
+            CreatesFile = [bool]$_.CreatesFile
+            CreatesDirectory = [bool]$_.CreatesDirectory
             DuplicateAction = [string]$_.DuplicateAction
+            DuplicateTarget = [string]$_.DuplicateTarget
+            VersionBefore = $versionBefore
+            VersionAfter = $versionAfter
         }
     })
 
@@ -104,6 +132,10 @@ function New-CcReplacePlanSummary {
         EffectiveCount = $effective.Count
         DuplicateCount = $duplicates.Count
         FileCount = $fileGroups.Count
+        DirectoryCount = $directoryEntries.Count
+        CreatedCount = [int]$bucketCounts.Created
+        ChangedCount = [int]$bucketCounts.Changed
+        RemovedCount = [int]$bucketCounts.Removed
         Added = $added
         Removed = $removed
         Actions = $actions
@@ -142,7 +174,7 @@ function Invoke-CcReplacePlanText {
     $plan = @(Analyze-CcReplaceBlocks $blocks)
 
     if ($Json) {
-        New-CcReplacePlanSummary $plan | ConvertTo-Json -Depth 8
+        New-CcReplacePlanSummary $plan $settings | ConvertTo-Json -Depth 8
         return
     }
 

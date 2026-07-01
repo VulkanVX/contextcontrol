@@ -157,6 +157,7 @@ public sealed class ChatHistoryService
             CreatedUtc = session.CreatedUtc == default ? DateTime.UtcNow : session.CreatedUtc,
             UpdatedUtc = session.UpdatedUtc == default ? DateTime.UtcNow : session.UpdatedUtc,
             DraftPromptText = TrimLargeMessage(session.DraftPromptText),
+            WorkflowTaskText = TrimLargeMessage(session.WorkflowTaskText),
             PendingAttachments = (session.PendingAttachments ?? [])
                 .Take(24)
                 .Select(CleanAttachment)
@@ -324,6 +325,11 @@ public sealed class ChatHistoryService
                 score += 10;
             }
 
+            if (!string.IsNullOrWhiteSpace(session.WorkflowTaskText))
+            {
+                score += 10;
+            }
+
             if ((session.PendingAttachments?.Count ?? 0) > 0)
             {
                 score += 10;
@@ -452,6 +458,7 @@ public sealed class ChatHistorySessionData
     public DateTime CreatedUtc { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public string DraftPromptText { get; set; } = "";
+    public string WorkflowTaskText { get; set; } = "";
     public List<ChatHistoryAttachmentData> PendingAttachments { get; set; } = [];
     public List<ChatHistoryMessageData> Messages { get; set; } = [];
 }

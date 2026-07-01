@@ -8,7 +8,7 @@ if [ -z "$SCRIPT_DIR" ]; then
     SCRIPT_DIR=.
 fi
 TARGET="$SCRIPT_DIR/$SCRIPT_NAME"
-PROJECT_ROOT="${CC_PROJECT_ROOT:-$(CDPATH= cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)}"
+PROJECT_ROOT="${CC_PROJECT_ROOT:-$SCRIPT_DIR}"
 
 if [ ! -f "$TARGET" ]; then
     echo "Context Control launcher error: $SCRIPT_NAME was not found next to $(basename -- "$0")." >&2
@@ -16,7 +16,7 @@ if [ ! -f "$TARGET" ]; then
 fi
 
 if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
-    echo "Context Control launcher error: project root was not found. Expected parent of: $SCRIPT_DIR" >&2
+    echo "Context Control launcher error: project root was not found. Expected script directory: $SCRIPT_DIR" >&2
     echo "Set CC_PROJECT_ROOT to override." >&2
     exit 1
 fi

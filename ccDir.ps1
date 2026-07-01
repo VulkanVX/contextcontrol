@@ -5,7 +5,14 @@ param(
     [string]$OutputFile = "cc_project_dir.md",
     [int]$MaxDepth = 20,
     [string]$Profile = "auto",
-    [switch]$IncludeAllTopLevel
+    [int]$Lod = 0,
+    [string]$Scope = "",
+    [switch]$ProfileOnly,
+    [string]$ProfileOutput = "",
+    [string]$ProfileFile = "",
+    [switch]$IncludeArtifacts,
+    [switch]$IncludeAllTopLevel,
+    [switch]$NoClipboard
 )
 
 $ErrorActionPreference = "Stop"

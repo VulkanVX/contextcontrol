@@ -338,7 +338,7 @@ public sealed partial class WorkbenchViewModel
         AddScanSections(ProjectScanIdentitySections, sections, "Detected Stack", "Uses");
         AddScanSections(ProjectScanFileSections, sections, "Languages", "Top File Types", "Manifests");
         AddScanSections(ProjectScanRuleSections, sections, "Unsupported Visible Types", "Autosetup Plan", "Already Allowed", "Already Counted LOC");
-        AddScanSections(ProjectScanDiagnosticSections, sections, "Skipped Samples");
+        AddScanSections(ProjectScanDiagnosticSections, sections, "Skipped File Types", "Skipped Samples");
     }
 
     private void ClearProjectScanCollections()

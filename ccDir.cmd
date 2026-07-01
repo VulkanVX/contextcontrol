@@ -4,7 +4,7 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 set "TARGET=%SCRIPT_DIR%ccDir.ps1"
 set "DEFAULT_OUTPUT=%SCRIPT_DIR%cc_project_dir.md"
-for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
+for %%I in ("%SCRIPT_DIR%.") do set "PROJECT_ROOT=%%~fI"
 if not "%CC_PROJECT_ROOT%"=="" set "PROJECT_ROOT=%CC_PROJECT_ROOT%"
 
 if not exist "%TARGET%" (
@@ -13,7 +13,7 @@ if not exist "%TARGET%" (
 )
 
 if not exist "%PROJECT_ROOT%" (
-    echo Context Control launcher error: project root was not found. Expected parent of: %SCRIPT_DIR%
+    echo Context Control launcher error: project root was not found. Expected script directory: %SCRIPT_DIR%
     echo Set CC_PROJECT_ROOT to override.
     exit /b 1
 )

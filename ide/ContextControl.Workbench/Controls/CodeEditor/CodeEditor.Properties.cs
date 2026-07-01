@@ -53,6 +53,12 @@ public sealed partial class CodeEditor
         set => SetValue(CodeFontFamilyProperty, value);
     }
 
+    public double EditorFontSize
+    {
+        get => GetValue(EditorFontSizeProperty);
+        set => SetValue(EditorFontSizeProperty, value);
+    }
+
     public string SkinKey
     {
         get => GetValue(SkinKeyProperty);
@@ -157,6 +163,10 @@ public sealed partial class CodeEditor
         else if (change.Property == CodeFontFamilyProperty)
         {
             ApplyCodeFont();
+        }
+        else if (change.Property == EditorFontSizeProperty)
+        {
+            ApplyEditorFontSize();
         }
         else if (change.Property == SkinKeyProperty)
         {

@@ -300,6 +300,41 @@ public sealed partial class WorkbenchViewModel
         }
     }
 
+    private void OpenContextControlPatchTarget(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) || CurrentProject is null)
+        {
+            return;
+        }
+
+        var cleanPath = NormalizeProjectPath(relativePath);
+        if (string.IsNullOrWhiteSpace(cleanPath))
+        {
+            return;
+        }
+
+        IsProjectFilesPaneOpen = true;
+        var node = FindProjectNodeByPath(ProjectTree, cleanPath);
+        if (node is not null)
+        {
+            FocusProjectTreeNode(node);
+            SelectedNode = node;
+            SelectedWorkspaceMode = WorkspaceModes[0];
+            return;
+        }
+
+        var fullPath = Path.Combine(CurrentProject.ProjectRoot, cleanPath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(fullPath))
+        {
+            return;
+        }
+
+        ClearActiveVersion();
+        SelectHistory(cleanPath);
+        OpenDocumentAsync(fullPath, cleanPath, "live");
+        SelectedWorkspaceMode = WorkspaceModes[0];
+    }
+
     public void OpenAttachment(string? path)
     {
         if (!TryResolveAttachment(path, out var fullPath, out var displayPath))

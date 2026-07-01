@@ -9,7 +9,11 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
 {
-    private readonly string _rawText;
+    private string _rawText;
+    private string _capsuleSummary;
+    private string _visibleText = "";
+    private string _thinkingText = "";
+    private LocalLlmUsageStats? _stats;
     private bool _isThinkingExpanded;
     private bool _isDiagnosticExpanded;
 
@@ -27,17 +31,17 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         Role = string.IsNullOrWhiteSpace(role) ? "assistant" : role.Trim();
         ModelId = modelId ?? "";
         Phase = phase ?? "";
-        CapsuleSummary = capsuleSummary ?? "";
-        Stats = stats;
+        _capsuleSummary = capsuleSummary ?? "";
+        _stats = stats;
         DiagnosticPrompt = diagnosticPrompt ?? "";
         AttachedFiles = new ObservableCollection<ContextControlAttachmentViewModel>(attachments ?? []);
         CreatedUtc = createdUtc ?? DateTime.UtcNow;
         Time = CreatedUtc.ToLocalTime().ToString("HH:mm");
 
         _rawText = text ?? "";
-        var parsed = ParseMessage(_rawText);
-        ThinkingText = parsed.Thinking;
-        VisibleText = parsed.VisibleText;
+        var parsed = ParseMessage(_rawText, ShouldExtractRequestSnippets(Role, Phase, _rawText));
+        _thinkingText = parsed.Thinking;
+        _visibleText = parsed.VisibleText;
         Parts = new ObservableCollection<LocalLlmChatPartViewModel>(parsed.Parts);
         Snippets = new ObservableCollection<ChatSnippetViewModel>(parsed.Snippets);
     }
@@ -47,11 +51,11 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     public string Time { get; }
     public string ModelId { get; }
     public string Phase { get; }
-    public string CapsuleSummary { get; }
-    public LocalLlmUsageStats? Stats { get; }
+    public string CapsuleSummary => _capsuleSummary;
+    public LocalLlmUsageStats? Stats => _stats;
     public string DiagnosticPrompt { get; }
-    public string VisibleText { get; }
-    public string ThinkingText { get; }
+    public string VisibleText => _visibleText;
+    public string ThinkingText => _thinkingText;
     public ObservableCollection<LocalLlmChatPartViewModel> Parts { get; }
     public ObservableCollection<ChatSnippetViewModel> Snippets { get; }
     public ObservableCollection<ContextControlAttachmentViewModel> AttachedFiles { get; }
@@ -59,7 +63,13 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     public bool IsUser => string.Equals(Role, "user", StringComparison.OrdinalIgnoreCase);
     public bool IsContextControlGenerated => string.Equals(ModelId, "ContextControl", StringComparison.OrdinalIgnoreCase)
         || string.Equals(ModelId, "ccReplace", StringComparison.OrdinalIgnoreCase);
-    public string RoleLabel => IsUser ? "You" : IsContextControlGenerated ? ModelId : "Local";
+    public bool IsCodexGenerated => Phase.StartsWith("Codex", StringComparison.OrdinalIgnoreCase)
+        || ModelId.Contains("codex", StringComparison.OrdinalIgnoreCase);
+    public string RoleLabel => IsUser ? "You" : IsContextControlGenerated ? ModelId : IsCodexGenerated ? "Codex" : "Local";
+    public string HeaderTitle => RoleLabel;
+    public string ModelLabel => SplitModelAndEffort(ModelId).Model;
+    public string EffortLabel => SplitModelAndEffort(ModelId).Effort;
+    public string FlowLabel => BuildFlowLabel(Phase);
     public bool HasStats => Stats is not null;
     public bool HasDiagnosticPrompt => !string.IsNullOrWhiteSpace(DiagnosticPrompt);
     public bool HasThinking => !string.IsNullOrWhiteSpace(ThinkingText);
@@ -76,19 +86,27 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         get
         {
             var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(ModelId))
+            var model = ModelLabel;
+            if (!string.IsNullOrWhiteSpace(model)
+                && !model.Equals(RoleLabel, StringComparison.OrdinalIgnoreCase)
+                && !model.Equals("ContextControl", StringComparison.OrdinalIgnoreCase))
             {
-                parts.Add(ModelId);
+                parts.Add(model);
             }
 
-            if (!string.IsNullOrWhiteSpace(Phase))
+            if (!string.IsNullOrWhiteSpace(EffortLabel))
             {
-                parts.Add(Phase);
+                parts.Add(EffortLabel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(FlowLabel))
+            {
+                parts.Add(FlowLabel);
             }
 
             if (Stats is not null)
             {
-                parts.Add(Stats.Summary);
+                parts.Add($"tokens {Stats.Summary}");
             }
             else if (!string.IsNullOrWhiteSpace(CapsuleSummary))
             {
@@ -121,7 +139,171 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         IsDiagnosticExpanded = !IsDiagnosticExpanded;
     }
 
-    private static ParsedMessage ParseMessage(string text)
+    public void UpdateContent(
+        string text,
+        string capsuleSummary = "",
+        LocalLlmUsageStats? stats = null)
+    {
+        _rawText = text ?? "";
+        if (!string.IsNullOrWhiteSpace(capsuleSummary))
+        {
+            _capsuleSummary = capsuleSummary;
+        }
+
+        if (stats is not null)
+        {
+            _stats = stats;
+        }
+
+        var parsed = ParseMessage(_rawText, ShouldExtractRequestSnippets(Role, Phase, _rawText));
+        _thinkingText = parsed.Thinking;
+        _visibleText = parsed.VisibleText;
+        Parts.Clear();
+        foreach (var part in parsed.Parts)
+        {
+            Parts.Add(part);
+        }
+
+        Snippets.Clear();
+        foreach (var snippet in parsed.Snippets)
+        {
+            Snippets.Add(snippet);
+        }
+
+        RaiseContentChanged();
+    }
+
+    public void UpdateLiveStatus(string status)
+    {
+        var clean = (status ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return;
+        }
+
+        _rawText = clean;
+        _visibleText = clean;
+        Parts.Clear();
+        Parts.Add(new LocalLlmChatPartViewModel("text", clean));
+        RaiseContentChanged();
+    }
+
+    public void AppendLiveThinking(string thinkingDelta)
+    {
+        var clean = (thinkingDelta ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return;
+        }
+
+        _thinkingText = string.IsNullOrWhiteSpace(_thinkingText)
+            ? clean
+            : $"{_thinkingText}{Environment.NewLine}{clean}";
+        if (!_isThinkingExpanded)
+        {
+            IsThinkingExpanded = true;
+        }
+
+        OnPropertyChanged(nameof(ThinkingText));
+        OnPropertyChanged(nameof(HasThinking));
+    }
+
+    private void RaiseContentChanged()
+    {
+        OnPropertyChanged(nameof(CapsuleSummary));
+        OnPropertyChanged(nameof(Stats));
+        OnPropertyChanged(nameof(HasStats));
+        OnPropertyChanged(nameof(VisibleText));
+        OnPropertyChanged(nameof(ThinkingText));
+        OnPropertyChanged(nameof(HasThinking));
+        OnPropertyChanged(nameof(Text));
+        OnPropertyChanged(nameof(RawText));
+        OnPropertyChanged(nameof(Parts));
+        OnPropertyChanged(nameof(Snippets));
+        OnPropertyChanged(nameof(HasSnippets));
+        OnPropertyChanged(nameof(CanCreateProject));
+        OnPropertyChanged(nameof(PrimaryTextPart));
+        OnPropertyChanged(nameof(HeaderTitle));
+        OnPropertyChanged(nameof(ModelLabel));
+        OnPropertyChanged(nameof(EffortLabel));
+        OnPropertyChanged(nameof(FlowLabel));
+        OnPropertyChanged(nameof(MetaLabel));
+    }
+
+    private static (string Model, string Effort) SplitModelAndEffort(string value)
+    {
+        var clean = CleanHeaderSegment(value);
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return ("", "");
+        }
+
+        var separator = clean.IndexOf(" / ", StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return (clean, "");
+        }
+
+        return (
+            clean[..separator].Trim(),
+            clean[(separator + 3)..].Trim());
+    }
+
+    private static string BuildFlowLabel(string phase)
+    {
+        var clean = CleanHeaderSegment(phase);
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return "";
+        }
+
+        var normalized = clean.StartsWith("Codex ", StringComparison.OrdinalIgnoreCase)
+            ? clean["Codex ".Length..].Trim()
+            : clean;
+        return normalized.ToLowerInvariant() switch
+        {
+            "file request" => "DIR + Request",
+            "dir request" => "DIR + Request",
+            "dir + request" => "DIR + Request",
+            "cc" => "CC",
+            "source audit" => "CC",
+            "patch write" => "CC patch",
+            "patch review" => "Patch Review",
+            "go preview" => "GO preview",
+            "go apply" => "GO apply",
+            "chat" => "Chat",
+            _ => normalized
+        };
+    }
+
+    private static string CleanHeaderSegment(string value)
+    {
+        var clean = (value ?? "")
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+        return string.Join(' ', clean.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static bool ShouldExtractRequestSnippets(string role, string phase, string text)
+    {
+        if (string.Equals(role, "user", StringComparison.OrdinalIgnoreCase))
+        {
+            return IsMostlyRequestList(text ?? "");
+        }
+
+        var cleanPhase = (phase ?? "").Trim();
+        if (cleanPhase.StartsWith("Codex", StringComparison.OrdinalIgnoreCase)
+            && (text ?? "").Contains("Codex phase audit: Error", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return !cleanPhase.EndsWith("chat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ParsedMessage ParseMessage(string text, bool allowRequestSnippets)
     {
         var clean = text ?? "";
         var thinking = ExtractThinking(clean, out clean);
@@ -129,54 +311,64 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         var parts = new List<LocalLlmChatPartViewModel>();
 
         var patchMatches = PatchBlockRegex().Matches(clean).Cast<Match>().ToArray();
-        foreach (var patch in patchMatches)
+        if (patchMatches.Length > 0)
         {
-            snippets.Add(new ChatSnippetViewModel("patch", "cc-replace", patch.Value.Trim()));
+            var aggregatePatch = string.Join(
+                Environment.NewLine + Environment.NewLine,
+                patchMatches.Select(patch => patch.Value.Trim()));
+            snippets.Add(new ChatSnippetViewModel("patch", "cc-replace", aggregatePatch));
         }
 
-        var patchIndex = 0;
-        clean = PatchBlockRegex().Replace(clean, _ =>
-        {
-            patchIndex++;
-            return $"{Environment.NewLine}[CC-REPLACE patch block {patchIndex}]{Environment.NewLine}";
-        });
+        clean = PatchBlockRegex().Replace(clean, Environment.NewLine);
 
-        var requestScanText = CodeFenceRegex().Replace(clean, Environment.NewLine);
+        var codeFences = ParseCodeFences(clean);
+        var requestScanText = RemoveCodeFences(clean, codeFences);
         requestScanText = PatchPlaceholderRegex().Replace(requestScanText, Environment.NewLine);
 
         var cursor = 0;
-        foreach (Match match in CodeFenceRegex().Matches(clean))
+        foreach (var fence in codeFences)
         {
-            var precedingText = clean[cursor..match.Index];
+            var precedingText = clean[cursor..fence.Index];
             AddTextPart(precedingText, parts);
-            var language = match.Groups["lang"].Value;
-            var code = match.Groups["code"].Value.Trim();
+            var language = fence.Language;
+            var code = fence.Code.Trim();
             if (PatchPlaceholderRegex().IsMatch(code))
             {
-                cursor = match.Index + match.Length;
+                cursor = fence.Index + fence.Length;
                 continue;
             }
 
-            var requestFromFence = IsMostlyRequestList(code)
-                ? ExtractRequestList(code)
-                : null;
-            var snippet = requestFromFence ?? new ChatSnippetViewModel(
-                "code",
-                language,
-                code,
-                InferSuggestedFileName(language, precedingText));
-            snippets.Add(snippet);
-            parts.Add(new LocalLlmChatPartViewModel("snippet", "", snippet));
-            cursor = match.Index + match.Length;
+            var requestFromFence = allowRequestSnippets && IsMostlyRequestList(code)
+                ? ExtractRequestSnippets(code)
+                : [];
+            if (requestFromFence.Count > 0)
+            {
+                AddRequestSnippetParts(requestFromFence, parts, snippets);
+            }
+            else
+            {
+                var snippet = string.Equals(language.Trim(), "cc-patch-plan", StringComparison.OrdinalIgnoreCase)
+                    ? new ChatSnippetViewModel("patch-plan", "cc-patch-plan", code)
+                    : new ChatSnippetViewModel(
+                        "code",
+                        language,
+                        code,
+                        InferSuggestedFileName(language, precedingText));
+                snippets.Add(snippet);
+                parts.Add(new LocalLlmChatPartViewModel("snippet", "", snippet));
+            }
+
+            cursor = fence.Index + fence.Length;
         }
 
         AddTextPart(clean[cursor..], parts);
 
-        var requestSnippet = ExtractRequestList(requestScanText);
-        if (requestSnippet is not null && snippets.All(snippet => !snippet.IsRequestList))
+        var requestSnippets = allowRequestSnippets
+            ? ExtractRequestSnippets(requestScanText)
+            : [];
+        if (requestSnippets.Count > 0 && snippets.All(snippet => !snippet.IsRequestList))
         {
-            snippets.Add(requestSnippet);
-            parts.Add(new LocalLlmChatPartViewModel("snippet", "", requestSnippet));
+            AddRequestSnippetParts(requestSnippets, parts, snippets);
         }
 
         foreach (var patch in snippets.Where(snippet => snippet.IsPatch))
@@ -200,6 +392,134 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         }
     }
 
+    private static void AddRequestSnippetParts(
+        IReadOnlyList<ChatSnippetViewModel> requestSnippets,
+        List<LocalLlmChatPartViewModel> parts,
+        List<ChatSnippetViewModel> snippets)
+    {
+        if (requestSnippets.Count > 1
+            && parts.All(part => !string.Equals(part.Text, "Source and FIND run separately.", StringComparison.OrdinalIgnoreCase)))
+        {
+            parts.Add(new LocalLlmChatPartViewModel("text", "Source and FIND run separately."));
+        }
+
+        foreach (var snippet in requestSnippets)
+        {
+            snippets.Add(snippet);
+            parts.Add(new LocalLlmChatPartViewModel("snippet", "", snippet));
+        }
+    }
+
+    private static IReadOnlyList<CodeFenceBlock> ParseCodeFences(string text)
+    {
+        var blocks = new List<CodeFenceBlock>();
+        var index = 0;
+        while (index < text.Length)
+        {
+            var line = ReadLine(text, index, out var lineEnd, out var nextLineStart);
+            if (!TryParseFenceOpen(line, out var fence, out var language))
+            {
+                index = nextLineStart;
+                continue;
+            }
+
+            var codeStart = nextLineStart;
+            var scan = codeStart;
+            while (scan < text.Length)
+            {
+                var closeLine = ReadLine(text, scan, out _, out var afterCloseLine);
+                if (IsFenceClose(closeLine, fence))
+                {
+                    blocks.Add(new CodeFenceBlock(index, afterCloseLine - index, language, text[codeStart..scan]));
+                    index = afterCloseLine;
+                    break;
+                }
+
+                scan = afterCloseLine;
+            }
+
+            if (scan >= text.Length)
+            {
+                blocks.Add(new CodeFenceBlock(index, text.Length - index, language, text[codeStart..]));
+                index = text.Length;
+            }
+        }
+
+        return blocks;
+    }
+
+    private static string RemoveCodeFences(string text, IReadOnlyList<CodeFenceBlock> fences)
+    {
+        if (fences.Count == 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var cursor = 0;
+        foreach (var fence in fences)
+        {
+            builder.Append(text, cursor, fence.Index - cursor);
+            builder.AppendLine();
+            cursor = fence.Index + fence.Length;
+        }
+
+        builder.Append(text, cursor, text.Length - cursor);
+        return builder.ToString();
+    }
+
+    private static bool TryParseFenceOpen(string line, out string fence, out string language)
+    {
+        fence = "";
+        language = "";
+        var trimmed = line.TrimStart(' ', '\t');
+        if (trimmed.Length < 3 || (trimmed[0] != '`' && trimmed[0] != '~'))
+        {
+            return false;
+        }
+
+        var fenceChar = trimmed[0];
+        var count = 0;
+        while (count < trimmed.Length && trimmed[count] == fenceChar)
+        {
+            count++;
+        }
+
+        if (count < 3)
+        {
+            return false;
+        }
+
+        fence = new string(fenceChar, count);
+        language = trimmed[count..].Trim();
+        return true;
+    }
+
+    private static bool IsFenceClose(string line, string fence)
+    {
+        return line.Trim(' ', '\t').Equals(fence, StringComparison.Ordinal);
+    }
+
+    private static string ReadLine(string text, int start, out int lineEnd, out int nextLineStart)
+    {
+        lineEnd = text.IndexOf('\n', start);
+        if (lineEnd < 0)
+        {
+            lineEnd = text.Length;
+            nextLineStart = text.Length;
+        }
+        else
+        {
+            nextLineStart = lineEnd + 1;
+            if (lineEnd > start && text[lineEnd - 1] == '\r')
+            {
+                lineEnd--;
+            }
+        }
+
+        return text[start..lineEnd];
+    }
+
     private static string ExtractThinking(string text, out string withoutThinking)
     {
         var builder = new StringBuilder();
@@ -217,7 +537,7 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         return builder.ToString().Trim();
     }
 
-    private static ChatSnippetViewModel? ExtractRequestList(string text)
+    private static IReadOnlyList<ChatSnippetViewModel> ExtractRequestSnippets(string text)
     {
         var lines = (text ?? "")
             .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -235,8 +555,7 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
             {
                 if (requestLines.Count > 0)
                 {
-                    requestLines.Add("END");
-                    return new ChatSnippetViewModel("request", "cc-request", string.Join(Environment.NewLine, requestLines));
+                    return BuildRequestSnippets(requestLines);
                 }
 
                 continue;
@@ -250,11 +569,64 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
 
         if (requestLines.Count == 0)
         {
-            return null;
+            return [];
         }
 
-        requestLines.Add("END");
-        return new ChatSnippetViewModel("request", "cc-request", string.Join(Environment.NewLine, requestLines.Distinct(StringComparer.OrdinalIgnoreCase)));
+        return BuildRequestSnippets(requestLines);
+    }
+
+    private static IReadOnlyList<ChatSnippetViewModel> BuildRequestSnippets(IReadOnlyList<string> requestLines)
+    {
+        var clean = requestLines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Where(line => !line.Equals("END", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (clean.Length == 0)
+        {
+            return [];
+        }
+
+        var findLines = clean
+            .Where(line => line.StartsWith("FIND:", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var expandLines = clean
+            .Where(line => line.StartsWith("EXPAND:", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var sourceLines = clean
+            .Except(findLines, StringComparer.OrdinalIgnoreCase)
+            .Except(expandLines, StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var snippets = new List<ChatSnippetViewModel>();
+        if (sourceLines.Length > 0)
+        {
+            snippets.Add(BuildRequestSnippet(sourceLines, "cc-request-source"));
+        }
+
+        if (expandLines.Length > 0)
+        {
+            snippets.Add(BuildRequestSnippet([expandLines[0]], "cc-request-expand"));
+        }
+
+        if (findLines.Length > 0)
+        {
+            snippets.Add(BuildRequestSnippet(findLines, "cc-request-find"));
+        }
+
+        return snippets.Count > 0
+            ? snippets
+            : [BuildRequestSnippet(clean.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), "cc-request")];
+    }
+
+    private static ChatSnippetViewModel BuildRequestSnippet(IReadOnlyList<string> requestLines, string language)
+    {
+        var finalLines = requestLines
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Concat(["END"]);
+        return new ChatSnippetViewModel("request", language, string.Join(Environment.NewLine, finalLines));
     }
 
     private static bool IsMostlyRequestList(string text)
@@ -355,17 +727,16 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         IReadOnlyList<LocalLlmChatPartViewModel> Parts,
         IReadOnlyList<ChatSnippetViewModel> Snippets);
 
+    private sealed record CodeFenceBlock(int Index, int Length, string Language, string Code);
+
     [GeneratedRegex("(?ms)<think>\\s*(?<body>.*?)\\s*</think>")]
     private static partial Regex ThinkRegex();
 
     [GeneratedRegex("(?ms)^\\s*BEGIN\\s+CC-REPLACE\\s*$.*?^\\s*END\\s+CC-REPLACE\\s*$")]
     private static partial Regex PatchBlockRegex();
 
-    [GeneratedRegex("^\\s*\\[CC-REPLACE patch block \\d+\\]\\s*$")]
+    [GeneratedRegex("^\\s*\\[CC-REPLACE patch(?: block(?: \\d+)?|: \\d+(?:,\\d{3})* blocks)\\]\\s*$")]
     private static partial Regex PatchPlaceholderRegex();
-
-    [GeneratedRegex("(?ms)^[ \\t]*(?<fence>`{3,}|~{3,})[ \\t]*(?<lang>[^\\r\\n`]*)\\r?\\n(?<code>.*?)(?:\\r?\\n[ \\t]*\\k<fence>[ \\t]*$|\\z)")]
-    private static partial Regex CodeFenceRegex();
 
     [GeneratedRegex(@"(?i)(?:\(|`|file\s+named\s+|file\s+|named\s+|save\s+(?:it|this|as)?\s*)(?<file>[A-Z0-9._/\- ]+\.[A-Z0-9]{1,12})(?:\)|`|:)?")]
     private static partial Regex FileNameHintRegex();

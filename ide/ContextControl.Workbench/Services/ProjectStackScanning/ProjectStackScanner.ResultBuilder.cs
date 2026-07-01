@@ -112,6 +112,12 @@ public static partial class ProjectStackScanner
             .Take(8)
             .Select(item => $"{item.Key}: {item.Value:N0}")
             .ToArray();
+        var skippedExtensionItems = state.SkippedExtensionCounts
+            .OrderByDescending(item => item.Value)
+            .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .Select(item => $"{item.Key}: {item.Value:N0}")
+            .ToArray();
 
         AppendSection(builder, "Stack", stackItems);
         AppendSection(builder, "Uses", useItems);
@@ -119,6 +125,7 @@ public static partial class ProjectStackScanner
         AppendSection(builder, "Manifests", state.ManifestSamples);
         AppendSection(builder, "Top file types", topFileTypeItems);
         AppendSection(builder, "Unsupported visible types", unsupportedItems);
+        AppendSection(builder, "Skipped file types", skippedExtensionItems);
         AppendSection(builder, "Already allowed stack file types", coveredSupported);
         AppendSection(builder, "Already counted LOC file types", coveredLoc);
         AppendSection(builder, "Suggested allowed types", supportedSuggestions);
@@ -144,6 +151,7 @@ public static partial class ProjectStackScanner
             new("Manifests", state.ManifestSamples.ToArray()),
             new("Top File Types", topFileTypeItems),
             new("Unsupported Visible Types", unsupportedItems),
+            new("Skipped File Types", skippedExtensionItems),
             new("Already Allowed", coveredSupported.ToArray()),
             new("Already Counted LOC", coveredLoc.ToArray()),
             new("Autosetup Plan", BuildAutosetupDeltaItems(supportedSuggestions, locSuggestions, skippedDirectorySuggestions)),

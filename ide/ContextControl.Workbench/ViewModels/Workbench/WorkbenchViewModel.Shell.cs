@@ -222,7 +222,7 @@ public sealed partial class WorkbenchViewModel
 
         var projects = new ObservableCollection<ProjectTabViewModel>
         {
-            new("cc", "CC", "Context Control", "18,284 LOC", "601", "239", "b9ef261", @"D:\Projects\vulkanas\contextcontrol"),
+            new("cc", "CC", "Context Control", "18,284 LOC", "601", "239", "b9ef261", @"D:\Projects\contextcontrol"),
             new("vx", "VX", "VulkanVX", "open to scan", "project", "project", "linked", @"D:\Projects\vulkanas"),
             new("ide", "IDE", "Workbench", "native shell", "app", "native", "b9ef261", @"contextcontrol\ide"),
             new("ps", "PS", "PowerShell Core", "script core", "32", "3", "b9ef261", @"contextcontrol\lib")
@@ -242,6 +242,13 @@ public sealed partial class WorkbenchViewModel
 
     private WorkbenchModeOptionViewModel FindModeByKey(string? key)
     {
+        if (key?.Trim().Equals("imagegen", StringComparison.OrdinalIgnoreCase) == true
+            || key?.Trim().Equals("image-gen", StringComparison.OrdinalIgnoreCase) == true
+            || key?.Trim().Equals("image", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            key = "chat";
+        }
+
         return WorkspaceModes.FirstOrDefault(mode => string.Equals(mode.Key, key, StringComparison.OrdinalIgnoreCase))
             ?? WorkspaceModes[0];
     }
@@ -340,6 +347,7 @@ public sealed partial class WorkbenchViewModel
         _workbenchSettings.CodeFontKey = CodeFontKey;
         _workbenchSettings.UiFontKey = UiFontKey;
         _workbenchSettings.UiFontColorModeKey = UiFontColorModeKey;
+        _workbenchSettings.ChatAppearanceKey = ChatAppearanceKey;
         _workbenchSettings.CustomUiFontColor = CustomUiFontColorHex;
         _workbenchSettings.FoldArrowPositionKey = SelectedFoldArrowPosition.Key;
         _workbenchSettings.ShowFoldArrows = ShowFoldArrows;
@@ -353,6 +361,11 @@ public sealed partial class WorkbenchViewModel
         _workbenchSettings.ThemeAdaptLocColor = ThemeAdaptLocColor;
         _workbenchSettings.ThemeAdaptVersionColor = ThemeAdaptVersionColor;
         _workbenchSettings.ThemeAdaptBytesColor = ThemeAdaptBytesColor;
+        _workbenchSettings.AutoSwitchPromptModesToChat = AutoSwitchPromptModesToChat;
+        _workbenchSettings.UiFontSize = UiFontSize;
+        _workbenchSettings.CodeEditorFontSize = CodeEditorFontSize;
+        _workbenchSettings.PromptWindowFontSize = PromptWindowFontSize;
+        _workbenchSettings.ChatWindowFontSize = ChatWindowFontSize;
         _workbenchSettings.WorkspaceModeKey = SelectedWorkspaceMode.Key;
         _workbenchSettings.ExternalBrowserKey = BrowserPane.SelectedExternalBrowser?.Key ?? "default";
         _workbenchSettings.ShowSkippedFiles = ShowSkippedFiles;
@@ -408,6 +421,26 @@ public sealed partial class WorkbenchViewModel
         }
 
         return null;
+    }
+
+    private static double NormalizeAppearanceFontSize(double value, double fallback)
+    {
+        var next = double.IsFinite(value) && value > 0 ? value : fallback;
+        return Math.Round(Math.Clamp(next, 8.0, 22.0), 1);
+    }
+
+    private void SwitchToChatFromPromptMode()
+    {
+        if (!AutoSwitchPromptModesToChat)
+        {
+            return;
+        }
+
+        var chatMode = FindModeByKey("chat");
+        if (!ReferenceEquals(_selectedWorkspaceMode, chatMode))
+        {
+            SelectedWorkspaceMode = chatMode;
+        }
     }
 
     private void ToggleProjectGraphLayoutMode()

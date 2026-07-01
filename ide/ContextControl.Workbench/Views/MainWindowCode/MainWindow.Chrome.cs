@@ -125,7 +125,9 @@ public sealed partial class MainWindow
             viewModel.CodeFontFamily,
             viewModel.SkinKey,
             viewModel.UiFontColorModeKey,
-            viewModel.CustomUiFontColorHex);
+            viewModel.CustomUiFontColorHex,
+            viewModel.UiFontSize,
+            viewModel.ChatAppearanceKey);
 
         if (!_themeSettingsWindow.IsVisible)
         {

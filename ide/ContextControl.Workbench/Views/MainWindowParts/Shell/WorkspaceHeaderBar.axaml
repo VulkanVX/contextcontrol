@@ -7,9 +7,9 @@
     xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
 >
-          <Grid RowDefinitions="30,42">
-            <Border Grid.Row="0" Classes="workspace-mode-bar" Padding="6,0">
-              <Grid ColumnDefinitions="*,Auto,Auto,*" ColumnSpacing="10">
+          <Grid RowDefinitions="22,32">
+            <Border Grid.Row="0" Classes="workspace-mode-bar" Padding="4,0">
+              <Grid ColumnDefinitions="*,Auto,Auto,*" ColumnSpacing="6">
                 <ItemsControl
                     Grid.Column="1"
                     ItemsSource="{Binding WorkspaceModes}"
@@ -17,7 +17,7 @@
                     VerticalAlignment="Center">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="5" />
+                      <StackPanel Orientation="Horizontal" Spacing="3" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
@@ -96,72 +96,41 @@
             </Border>
 
             <Border Grid.Row="1" Classes="pane-header" Padding="12,0" IsVisible="{Binding IsChatMode}">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="{Binding ContextControl.ChatWorkspaceTitle}" FontSize="12" FontWeight="ExtraBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Text="{Binding ContextControl.PromptContextPressureLabel}" Classes="editor-meta" Margin="0,2,0,0" />
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
+                    <TextBlock
+                        Grid.Column="0"
+                        Text="{Binding ContextControl.ChatWorkspaceTitle}"
+                        FontSize="11"
+                        FontWeight="ExtraBold"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Text="{Binding ContextControl.ChatWorkspaceSubtitle}"
+                        Classes="editor-meta"
+                        FontSize="10.5"
+                        FontWeight="SemiBold"
+                        VerticalAlignment="Center"
+                        TextTrimming="CharacterEllipsis" />
+                  </Grid>
                   <TextBlock Text="{Binding ContextControl.PromptTokenomicsLabel}" Classes="scanner-status" />
                 </StackPanel>
-                <ComboBox
-                    Grid.Column="1"
-                    Classes="cc-local-model-picker"
-                    IsVisible="{Binding ContextControl.IsContextPromptMode}"
-                    ItemsSource="{Binding ContextControl.InstalledLocalModels}"
-                    SelectedItem="{Binding ContextControl.SelectedLocalModel, Mode=TwoWay}"
-                    MaxDropDownHeight="180">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:LocalLlmModelViewModel}">
-                      <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <TextBlock
-                    Grid.Column="1"
-                    Classes="editor-meta type"
-                    Text="Codex CLI"
-                    VerticalAlignment="Center"
-                    FontWeight="Bold"
-                    IsVisible="{Binding ContextControl.IsCodexPromptMode}" />
                 <Button
-                    Grid.Column="2"
+                    Grid.Column="1"
                     Classes="browser-open-button"
                     Content="Refresh"
-                    IsVisible="{Binding ContextControl.IsContextPromptMode}"
+                    IsVisible="{Binding ContextControl.IsLocalOrImageGenPromptMode}"
                     Command="{Binding ContextControl.RefreshLocalModelsCommand}" />
                 <Button
-                    Grid.Column="3"
-                    Classes="browser-open-button primary"
-                    Content="Prompt"
-                    Command="{Binding ContextControl.OpenPromptCommand}" />
-              </Grid>
-            </Border>
-
-            <Border Grid.Row="1" Classes="pane-header" Padding="12,0" IsVisible="{Binding IsImageGenMode}">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="Image Gen" FontSize="12" FontWeight="ExtraBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Text="{Binding ContextControl.ImageGenerationModelSummary}" Classes="editor-meta" Margin="0,2,0,0" />
-                  <TextBlock Text="{Binding ContextControl.PromptTokenomicsLabel}" Classes="scanner-status" />
-                </StackPanel>
-                <ComboBox
                     Grid.Column="1"
-                    Classes="cc-local-model-picker"
-                    ItemsSource="{Binding ContextControl.InstalledImageGenerationModels}"
-                    SelectedItem="{Binding ContextControl.SelectedImageGenerationModel, Mode=TwoWay}"
-                    MaxDropDownHeight="180">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:LocalLlmModelViewModel}">
-                      <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <Button
-                    Grid.Column="2"
                     Classes="browser-open-button"
                     Content="Refresh"
-                    Command="{Binding ContextControl.RefreshLocalModelsCommand}" />
+                    IsVisible="{Binding ContextControl.IsChatHeaderCodexStatusVisible}"
+                    Command="{Binding ContextControl.RefreshCodexStatusCommand}" />
                 <Button
-                    Grid.Column="3"
+                    Grid.Column="2"
                     Classes="browser-open-button primary"
                     Content="Prompt"
                     Command="{Binding ContextControl.OpenPromptCommand}" />
@@ -169,7 +138,7 @@
             </Border>
 
             <Border Grid.Row="1" Classes="browser-nav-bar" Padding="6,2" IsVisible="{Binding IsBrowserMode}">
-              <Grid ColumnDefinitions="24,24,24,*,24,Auto" ColumnSpacing="4">
+              <Grid ColumnDefinitions="20,20,20,*,20,Auto" ColumnSpacing="3">
                 <Button
                     Classes="browser-nav-button"
                     Content="‹"
@@ -278,13 +247,19 @@
             </Border>
 
             <Border Grid.Row="1" Classes="pane-header" Padding="12,0" IsVisible="{Binding IsSkillbookMode}">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                 <StackPanel VerticalAlignment="Center">
                   <TextBlock Text="Skillbook" FontSize="12" FontWeight="ExtraBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Text="{Binding ContextControl.SkillbookSummary}" Classes="editor-meta" Margin="0,2,0,0" />
                   <TextBlock Text="{Binding ContextControl.SkillbookProjectPath}" Classes="scanner-status" />
                 </StackPanel>
-                <TextBlock Grid.Column="1" Text="{Binding ContextControl.SkillbookGlobalPath}" Classes="path-text" VerticalAlignment="Center" />
+                <Button
+                    Grid.Column="1"
+                    Classes="browser-open-button"
+                    Content="Info"
+                    ToolTip.Tip="Show or hide Skillbook info"
+                    Command="{Binding ContextControl.ToggleSkillbookInfoCommand}" />
+                <TextBlock Grid.Column="2" Text="{Binding ContextControl.SkillbookGlobalPath}" Classes="path-text" VerticalAlignment="Center" />
               </Grid>
             </Border>
 
@@ -301,7 +276,7 @@
                     VerticalAlignment="Center">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="5" />
+                      <StackPanel Orientation="Horizontal" Spacing="4" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>

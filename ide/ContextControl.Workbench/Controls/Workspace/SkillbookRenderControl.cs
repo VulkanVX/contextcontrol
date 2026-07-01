@@ -658,7 +658,8 @@ public sealed class SkillbookRenderControl : Control
         return source.ToLowerInvariant() switch
         {
             "codex" => "Every built-in instruction injected into the Codex harness.",
-            "skillflow" => "The visible user action, expected output, and Codex duty for each development phase.",
+            "cc-main" => "Phase-neutral operating law for the Context Control workflow.",
+            "cc-flow" or "skillflow" => "The visible user action, expected output, and Codex duty for each Context Control phase.",
             "project" => "Project-local instructions that override matching global entries.",
             "global" => "Reusable instructions from the user profile Skillbook.",
             _ => "ContextControl instruction entries."

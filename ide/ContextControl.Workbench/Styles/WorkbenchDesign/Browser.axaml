@@ -12,15 +12,15 @@
     </Style>
 
     <Style Selector="Button.workspace-mode-button">
-      <Setter Property="Height" Value="22" />
-      <Setter Property="MinHeight" Value="22" />
-      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Height" Value="17" />
+      <Setter Property="MinHeight" Value="17" />
+      <Setter Property="Padding" Value="6,0" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="5" />
-      <Setter Property="FontSize" Value="9.5" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="ExtraBold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -105,16 +105,16 @@
     </Style>
 
     <Style Selector="Border.browser-nav-bar">
-      <Setter Property="Height" Value="42" />
-      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
       <Setter Property="Background" Value="{DynamicResource HeaderBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
 
     <Style Selector="Button.browser-nav-button">
-      <Setter Property="Width" Value="22" />
-      <Setter Property="Height" Value="22" />
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
       <Setter Property="MinWidth" Value="0" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Padding" Value="0" />
@@ -124,7 +124,7 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="10" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -137,15 +137,15 @@
     </Style>
 
     <Style Selector="Button.browser-open-button">
-      <Setter Property="Height" Value="22" />
+      <Setter Property="Height" Value="18" />
       <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Padding" Value="6,0" />
       <Setter Property="Background" Value="{DynamicResource HistoryHoverBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="FontSize" Value="9.5" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="ExtraBold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -164,15 +164,15 @@
     </Style>
 
     <Style Selector="ToggleButton.browser-open-button">
-      <Setter Property="Height" Value="22" />
+      <Setter Property="Height" Value="18" />
       <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Padding" Value="6,0" />
       <Setter Property="Background" Value="{DynamicResource HistoryHoverBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="FontSize" Value="9.5" />
+      <Setter Property="FontSize" Value="8.5" />
       <Setter Property="FontWeight" Value="ExtraBold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -201,11 +201,11 @@
     </Style>
 
     <Style Selector="TextBox.browser-url-input">
-      <Setter Property="MinHeight" Value="22" />
-      <Setter Property="Height" Value="22" />
-      <Setter Property="Padding" Value="7,0" />
+      <Setter Property="MinHeight" Value="19" />
+      <Setter Property="Height" Value="19" />
+      <Setter Property="Padding" Value="6,0" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="FontSize" Value="9.5" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />

@@ -23,7 +23,6 @@
                     HorizontalAlignment="Left"
                     VerticalAlignment="Stretch"
                     ClipToBounds="True"
-                    PointerEntered="OnChatHistoryHoverEntered"
                     PointerExited="OnChatHistoryHoverExited">
                   <Border
                       x:Name="ChatHistoryPanel"
@@ -57,7 +56,7 @@
                           ItemsSource="{Binding ContextControl.ChatSessions}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:ChatSessionViewModel}">
-                            <Grid ColumnDefinitions="*,24" ColumnSpacing="4" MinHeight="46" Margin="0,0,0,5">
+                            <Grid ColumnDefinitions="*,22" ColumnSpacing="3" MinHeight="34" Margin="0,0,0,3">
                               <Button
                                   Classes="chat-session-row"
                                   Classes.active="{Binding IsActive}"
@@ -66,7 +65,7 @@
                                   CommandParameter="{Binding}">
                                 <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
                                   <TextBlock Text="{Binding Title}" Classes="chat-session-title" />
-                                  <TextBlock Grid.Row="1" Text="{Binding Summary}" Classes="history-meta" />
+                                  <TextBlock Grid.Row="1" Text="{Binding Summary}" Classes="history-meta chat-session-summary" />
                                 </Grid>
                               </Button>
                               <Button
@@ -86,7 +85,20 @@
                   <Border
                       Width="10"
                       HorizontalAlignment="Left"
-                      Background="Transparent" />
+                      Background="Transparent"
+                      PointerPressed="OnChatHistoryRailPressed" />
+                  <Border
+                      Classes="chat-history-trigger-line"
+                      Width="1"
+                      HorizontalAlignment="Right"
+                      ZIndex="1"
+                      IsHitTestVisible="False" />
+                  <controls:DisclosureArrowControl
+                      x:Name="ChatHistoryRailArrow"
+                      Classes="chat-history-rail-arrow"
+                      ThemeKey="{Binding ThemeKey}"
+                      ZIndex="2"
+                      PointerPressed="OnChatHistoryRailPressed" />
                 </Grid>
 
                 <ScrollViewer
@@ -104,6 +116,7 @@
                       ThemeKey="{Binding ThemeKey}"
                       UiFontFamily="{Binding UiFontFamily}"
                       CodeFontFamily="{Binding CodeFontFamily}"
+                      ChatFontSize="{Binding ChatWindowFontSize}"
                       OpenAttachmentCommand="{Binding OpenAttachmentCommand}"
                       CopyChatTextCommand="{Binding ContextControl.CopyChatTextCommand}"
                       CreateProjectFromMessageCommand="{Binding ContextControl.CreateProjectFromMessageCommand}"
@@ -112,6 +125,9 @@
                       SaveSnippetAsCommand="{Binding ContextControl.SaveSnippetAsCommand}"
                       UseSnippetForCcCommand="{Binding ContextControl.UseSnippetForCcCommand}"
                       PreviewSnippetCommand="{Binding ContextControl.PreviewSnippetCommand}"
+                      ApplyPatchCommand="{Binding ContextControl.ApplyPatchCommand}"
+                      ApplyAllPatchCommand="{Binding ContextControl.ApplyAllPatchCommand}"
+                      OpenPatchPlanFileCommand="{Binding ContextControl.OpenPatchPlanFileCommand}"
                       ToggleThinkingCommand="{Binding ContextControl.ToggleThinkingCommand}"
                       ToggleDiagnosticCommand="{Binding ContextControl.ToggleDiagnosticCommand}" />
                 </ScrollViewer>

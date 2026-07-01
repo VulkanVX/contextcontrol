@@ -176,10 +176,10 @@ public sealed partial class ContextControlViewModel
     {
         return phase switch
         {
-            ContextCapsulePhase.FileRequest => "file request",
-            ContextCapsulePhase.SourceAudit => "source audit",
-            ContextCapsulePhase.PatchWrite => "patch write",
-            ContextCapsulePhase.PatchReview => "patch review",
+            ContextCapsulePhase.FileRequest => "DIR + Request",
+            ContextCapsulePhase.SourceAudit => "CC",
+            ContextCapsulePhase.PatchWrite => "CC",
+            ContextCapsulePhase.PatchReview => "CC",
             _ => "chat"
         };
     }

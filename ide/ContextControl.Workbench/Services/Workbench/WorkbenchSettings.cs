@@ -33,6 +33,11 @@ public sealed class WorkbenchSettings
         bool themeAdaptLocColor,
         bool themeAdaptVersionColor,
         bool themeAdaptBytesColor,
+        double uiFontSize,
+        double codeEditorFontSize,
+        double promptWindowFontSize,
+        double chatWindowFontSize,
+        string chatAppearanceKey,
         string selectedAiRoute,
         string selectedLocalModel,
         string selectedImageModel,
@@ -40,6 +45,8 @@ public sealed class WorkbenchSettings
         string patchWriteModel,
         string patchReviewModel,
         string chatModel,
+        string codexModel,
+        string codexReasoningEffort,
         string ollamaModelsDirectory,
         string huggingFaceToken,
         string localLlmSortOption,
@@ -52,6 +59,7 @@ public sealed class WorkbenchSettings
         string promptModeKey,
         bool isAutopilotEnabled,
         bool promptBarOpenByDefault,
+        bool autoSwitchPromptModesToChat,
         string workspaceModeKey,
         string externalBrowserKey,
         bool showSkippedFiles,
@@ -82,6 +90,11 @@ public sealed class WorkbenchSettings
         ThemeAdaptLocColor = themeAdaptLocColor;
         ThemeAdaptVersionColor = themeAdaptVersionColor;
         ThemeAdaptBytesColor = themeAdaptBytesColor;
+        UiFontSize = NormalizeFontSize(uiFontSize, 11.0);
+        CodeEditorFontSize = NormalizeFontSize(codeEditorFontSize, 12.0);
+        PromptWindowFontSize = NormalizeFontSize(promptWindowFontSize, 12.0);
+        ChatWindowFontSize = NormalizeFontSize(chatWindowFontSize, 10.0);
+        ChatAppearanceKey = NormalizeChatAppearanceKey(chatAppearanceKey);
         SelectedAiRoute = string.IsNullOrWhiteSpace(selectedAiRoute) ? "Browser: ChatGPT" : selectedAiRoute.Trim();
         SelectedLocalModel = string.IsNullOrWhiteSpace(selectedLocalModel) ? "qwen2.5-coder:3b" : selectedLocalModel.Trim();
         SelectedImageModel = string.IsNullOrWhiteSpace(selectedImageModel) ? "segmind/tiny-sd" : selectedImageModel.Trim();
@@ -89,6 +102,8 @@ public sealed class WorkbenchSettings
         PatchWriteModel = NormalizeModelId(patchWriteModel, "qwen2.5-coder:3b");
         PatchReviewModel = NormalizeModelId(patchReviewModel, "phi4-mini");
         ChatModel = NormalizeModelId(chatModel, "qwen2.5-coder:3b");
+        CodexModel = NormalizeOptionalModelId(codexModel);
+        CodexReasoningEffort = NormalizeCodexReasoningEffort(codexReasoningEffort);
         OllamaModelsDirectory = NormalizeDirectoryPath(ollamaModelsDirectory);
         HuggingFaceToken = NormalizeToken(huggingFaceToken);
         LocalLlmSortOption = NormalizeLocalLlmFilter(localLlmSortOption, "Newest");
@@ -101,6 +116,7 @@ public sealed class WorkbenchSettings
         PromptModeKey = NormalizePromptModeKey(promptModeKey);
         IsAutopilotEnabled = isAutopilotEnabled;
         PromptBarOpenByDefault = promptBarOpenByDefault;
+        AutoSwitchPromptModesToChat = autoSwitchPromptModesToChat;
         WorkspaceModeKey = NormalizeWorkspaceModeKey(workspaceModeKey);
         ExternalBrowserKey = NormalizeExternalBrowserKey(externalBrowserKey);
         ShowSkippedFiles = showSkippedFiles;
@@ -132,6 +148,11 @@ public sealed class WorkbenchSettings
     public bool ThemeAdaptLocColor { get; set; }
     public bool ThemeAdaptVersionColor { get; set; }
     public bool ThemeAdaptBytesColor { get; set; }
+    public double UiFontSize { get; set; }
+    public double CodeEditorFontSize { get; set; }
+    public double PromptWindowFontSize { get; set; }
+    public double ChatWindowFontSize { get; set; }
+    public string ChatAppearanceKey { get; set; }
     public string SelectedAiRoute { get; set; }
     public string SelectedLocalModel { get; set; }
     public string SelectedImageModel { get; set; }
@@ -139,6 +160,8 @@ public sealed class WorkbenchSettings
     public string PatchWriteModel { get; set; }
     public string PatchReviewModel { get; set; }
     public string ChatModel { get; set; }
+    public string CodexModel { get; set; }
+    public string CodexReasoningEffort { get; set; }
     public string OllamaModelsDirectory { get; set; }
     public string HuggingFaceToken { get; set; }
     public string LocalLlmSortOption { get; set; }
@@ -151,6 +174,7 @@ public sealed class WorkbenchSettings
     public string PromptModeKey { get; set; }
     public bool IsAutopilotEnabled { get; set; }
     public bool PromptBarOpenByDefault { get; set; }
+    public bool AutoSwitchPromptModesToChat { get; set; }
     public string WorkspaceModeKey { get; set; }
     public string ExternalBrowserKey { get; set; }
     public bool ShowSkippedFiles { get; set; }
@@ -201,6 +225,11 @@ public sealed class WorkbenchSettings
             data.ThemeAdaptLocColor ?? false,
             data.ThemeAdaptVersionColor ?? false,
             data.ThemeAdaptBytesColor ?? false,
+            data.UiFontSize ?? 11.0,
+            data.CodeEditorFontSize ?? 12.0,
+            data.PromptWindowFontSize ?? 12.0,
+            data.ChatWindowFontSize ?? 10.0,
+            data.ChatAppearanceKey ?? "dark",
             data.SelectedAiRoute ?? "Browser: ChatGPT",
             data.SelectedLocalModel ?? "qwen2.5-coder:3b",
             data.SelectedImageModel ?? "segmind/tiny-sd",
@@ -208,6 +237,8 @@ public sealed class WorkbenchSettings
             data.PatchWriteModel ?? "qwen2.5-coder:3b",
             data.PatchReviewModel ?? "phi4-mini",
             data.ChatModel ?? "qwen2.5-coder:3b",
+            data.CodexModel ?? "",
+            data.CodexReasoningEffort ?? "",
             data.OllamaModelsDirectory ?? ResolveDefaultOllamaModelsDirectory(),
             data.HuggingFaceToken ?? "",
             data.LocalLlmSortOption ?? "Newest",
@@ -220,6 +251,7 @@ public sealed class WorkbenchSettings
             data.PromptModeKey ?? "context",
             data.IsAutopilotEnabled ?? false,
             data.PromptBarOpenByDefault ?? false,
+            data.AutoSwitchPromptModesToChat ?? true,
             data.WorkspaceModeKey ?? "code",
             data.ExternalBrowserKey ?? "default",
             data.ShowSkippedFiles ?? false,
@@ -259,6 +291,11 @@ public sealed class WorkbenchSettings
             ThemeAdaptLocColor = ThemeAdaptLocColor,
             ThemeAdaptVersionColor = ThemeAdaptVersionColor,
             ThemeAdaptBytesColor = ThemeAdaptBytesColor,
+            UiFontSize = NormalizeFontSize(UiFontSize, 11.0),
+            CodeEditorFontSize = NormalizeFontSize(CodeEditorFontSize, 12.0),
+            PromptWindowFontSize = NormalizeFontSize(PromptWindowFontSize, 12.0),
+            ChatWindowFontSize = NormalizeFontSize(ChatWindowFontSize, 10.0),
+            ChatAppearanceKey = NormalizeChatAppearanceKey(ChatAppearanceKey),
             SelectedAiRoute = string.IsNullOrWhiteSpace(SelectedAiRoute) ? "Browser: ChatGPT" : SelectedAiRoute.Trim(),
             SelectedLocalModel = string.IsNullOrWhiteSpace(SelectedLocalModel) ? "qwen2.5-coder:3b" : SelectedLocalModel.Trim(),
             SelectedImageModel = string.IsNullOrWhiteSpace(SelectedImageModel) ? "segmind/tiny-sd" : SelectedImageModel.Trim(),
@@ -266,6 +303,8 @@ public sealed class WorkbenchSettings
             PatchWriteModel = NormalizeModelId(PatchWriteModel, "qwen2.5-coder:3b"),
             PatchReviewModel = NormalizeModelId(PatchReviewModel, "phi4-mini"),
             ChatModel = NormalizeModelId(ChatModel, "qwen2.5-coder:3b"),
+            CodexModel = string.IsNullOrWhiteSpace(CodexModel) ? null : NormalizeOptionalModelId(CodexModel),
+            CodexReasoningEffort = string.IsNullOrWhiteSpace(CodexReasoningEffort) ? null : NormalizeCodexReasoningEffort(CodexReasoningEffort),
             OllamaModelsDirectory = NormalizeDirectoryPath(OllamaModelsDirectory),
             HuggingFaceToken = string.IsNullOrWhiteSpace(HuggingFaceToken) ? null : NormalizeToken(HuggingFaceToken),
             LocalLlmSortOption = NormalizeLocalLlmFilter(LocalLlmSortOption, "Newest"),
@@ -278,6 +317,7 @@ public sealed class WorkbenchSettings
             PromptModeKey = NormalizePromptModeKey(PromptModeKey),
             IsAutopilotEnabled = IsAutopilotEnabled,
             PromptBarOpenByDefault = PromptBarOpenByDefault,
+            AutoSwitchPromptModesToChat = AutoSwitchPromptModesToChat,
             WorkspaceModeKey = NormalizeWorkspaceModeKey(WorkspaceModeKey),
             ExternalBrowserKey = NormalizeExternalBrowserKey(ExternalBrowserKey),
             ShowSkippedFiles = ShowSkippedFiles,
@@ -354,6 +394,16 @@ public sealed class WorkbenchSettings
             : "theme";
     }
 
+    private static string NormalizeChatAppearanceKey(string? key)
+    {
+        return key?.Trim().ToLowerInvariant() switch
+        {
+            "light" => "light",
+            "adaptive" or "adapt" or "theme" => "adaptive",
+            _ => "dark"
+        };
+    }
+
     private static string NormalizeColor(string? value, string fallback)
     {
         var clean = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
@@ -368,6 +418,12 @@ public sealed class WorkbenchSettings
         }
     }
 
+    private static double NormalizeFontSize(double value, double fallback)
+    {
+        var next = double.IsFinite(value) && value > 0 ? value : fallback;
+        return Math.Round(Math.Clamp(next, 8.0, 22.0), 1);
+    }
+
     private static string NormalizeWorkspaceModeKey(string? key)
     {
         return key?.Trim().ToLowerInvariant() switch
@@ -376,8 +432,7 @@ public sealed class WorkbenchSettings
             "graph" or "cube" => "graph",
             "llms" => "llms",
             "dependencies" => "dependencies",
-            "chat" => "chat",
-            "imagegen" or "image-gen" or "image" => "imagegen",
+            "chat" or "imagegen" or "image-gen" or "image" => "chat",
             "skillbook" => "skillbook",
             "scanner" => "scanner",
             _ => "code"
@@ -389,6 +444,7 @@ public sealed class WorkbenchSettings
         return key?.Trim().ToLowerInvariant() switch
         {
             "codex" => "codex",
+            "imagegen" or "image-gen" or "image" => "imagegen",
             "terminal" => "terminal",
             _ => "context"
         };
@@ -397,6 +453,23 @@ public sealed class WorkbenchSettings
     private static string NormalizeModelId(string? modelId, string fallback)
     {
         return string.IsNullOrWhiteSpace(modelId) ? fallback : modelId.Trim();
+    }
+
+    private static string NormalizeOptionalModelId(string? modelId)
+    {
+        return string.IsNullOrWhiteSpace(modelId) ? "" : modelId.Trim();
+    }
+
+    private static string NormalizeCodexReasoningEffort(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "low" => "low",
+            "medium" => "medium",
+            "high" => "high",
+            "xhigh" => "xhigh",
+            _ => ""
+        };
     }
 
     private static string NormalizeToken(string? token)
@@ -527,6 +600,11 @@ public sealed class WorkbenchSettings
         public bool? ThemeAdaptLocColor { get; set; }
         public bool? ThemeAdaptVersionColor { get; set; }
         public bool? ThemeAdaptBytesColor { get; set; }
+        public double? UiFontSize { get; set; }
+        public double? CodeEditorFontSize { get; set; }
+        public double? PromptWindowFontSize { get; set; }
+        public double? ChatWindowFontSize { get; set; }
+        public string? ChatAppearanceKey { get; set; }
         public string? SelectedAiRoute { get; set; }
         public string? SelectedLocalModel { get; set; }
         public string? SelectedImageModel { get; set; }
@@ -534,6 +612,8 @@ public sealed class WorkbenchSettings
         public string? PatchWriteModel { get; set; }
         public string? PatchReviewModel { get; set; }
         public string? ChatModel { get; set; }
+        public string? CodexModel { get; set; }
+        public string? CodexReasoningEffort { get; set; }
         public string? OllamaModelsDirectory { get; set; }
         public string? HuggingFaceToken { get; set; }
         public string? LocalLlmSortOption { get; set; }
@@ -546,6 +626,7 @@ public sealed class WorkbenchSettings
         public string? PromptModeKey { get; set; }
         public bool? IsAutopilotEnabled { get; set; }
         public bool? PromptBarOpenByDefault { get; set; }
+        public bool? AutoSwitchPromptModesToChat { get; set; }
         public string? WorkspaceModeKey { get; set; }
         public string? ExternalBrowserKey { get; set; }
         public bool? ShowSkippedFiles { get; set; }

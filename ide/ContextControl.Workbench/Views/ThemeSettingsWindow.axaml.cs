@@ -44,6 +44,8 @@ public sealed partial class ThemeSettingsWindow : Window
     private string? _pendingSkinKey;
     private string? _pendingUiFontColorModeKey;
     private string? _pendingCustomUiFontColor;
+    private string? _pendingChatAppearanceKey;
+    private double? _pendingUiFontSize;
 
     public ThemeSettingsWindow()
     {
@@ -60,7 +62,9 @@ public sealed partial class ThemeSettingsWindow : Window
         string? codeFontFamily = null,
         string? skinKey = null,
         string? uiFontColorModeKey = null,
-        string? customUiFontColor = null)
+        string? customUiFontColor = null,
+        double? uiFontSize = null,
+        string? chatAppearanceKey = null)
     {
         if (IsAnyOptionPickerOpen())
         {
@@ -70,6 +74,8 @@ public sealed partial class ThemeSettingsWindow : Window
             _pendingSkinKey = skinKey;
             _pendingUiFontColorModeKey = uiFontColorModeKey;
             _pendingCustomUiFontColor = customUiFontColor;
+            _pendingChatAppearanceKey = chatAppearanceKey;
+            _pendingUiFontSize = uiFontSize;
             return;
         }
 
@@ -80,11 +86,13 @@ public sealed partial class ThemeSettingsWindow : Window
             codeFontFamily,
             skinKey: skinKey,
             uiFontColorModeKey: uiFontColorModeKey,
+            chatAppearanceKey: chatAppearanceKey ?? ViewModel?.ChatAppearanceKey,
             customUiFontColor: customUiFontColor,
             themeAdaptFileCountColor: ViewModel?.ThemeAdaptFileCountColor ?? false,
             themeAdaptLocColor: ViewModel?.ThemeAdaptLocColor ?? false,
             themeAdaptVersionColor: ViewModel?.ThemeAdaptVersionColor ?? false,
-            themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false);
+            themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false,
+            uiFontSize: uiFontSize ?? ViewModel?.UiFontSize);
         RefreshAppearancePreview();
     }
 
@@ -94,6 +102,7 @@ public sealed partial class ThemeSettingsWindow : Window
     private ComboBox SyntaxThemePicker => AppearancePage.SyntaxThemePickerControl;
     private ComboBox CodeFontPicker => AppearancePage.CodeFontPickerControl;
     private ComboBox UiFontPicker => AppearancePage.UiFontPickerControl;
+    private ComboBox ChatAppearancePicker => AppearancePage.ChatAppearancePickerControl;
     private Button SummaryArrowOptionsToggleButton => AppearancePage.SummaryArrowOptionsToggleButtonControl;
     private Border SummaryArrowOptionsPanel => AppearancePage.SummaryArrowOptionsPanelControl;
     private ComboBox FoldArrowPositionPicker => AppearancePage.FoldArrowPositionPickerControl;
@@ -207,6 +216,11 @@ public sealed partial class ThemeSettingsWindow : Window
         ShowFileRulesPage();
     }
 
+    private void OnPromptWindowNavClick(object? sender, RoutedEventArgs e)
+    {
+        ShowPromptWindowPage();
+    }
+
     private void OnLlmsNavClick(object? sender, RoutedEventArgs e)
     {
         ShowLlmsPage();
@@ -250,9 +264,11 @@ public sealed partial class ThemeSettingsWindow : Window
     {
         AppearancePage.IsVisible = true;
         FileRulesPage.IsVisible = false;
+        PromptWindowPage.IsVisible = false;
         LlmsPage.IsVisible = false;
         SetActive(AppearanceNavButton, true);
         SetActive(FileRulesNavButton, false);
+        SetActive(PromptWindowNavButton, false);
         SetActive(LlmsNavButton, false);
     }
 
@@ -260,9 +276,23 @@ public sealed partial class ThemeSettingsWindow : Window
     {
         AppearancePage.IsVisible = false;
         FileRulesPage.IsVisible = true;
+        PromptWindowPage.IsVisible = false;
         LlmsPage.IsVisible = false;
         SetActive(AppearanceNavButton, false);
         SetActive(FileRulesNavButton, true);
+        SetActive(PromptWindowNavButton, false);
+        SetActive(LlmsNavButton, false);
+    }
+
+    private void ShowPromptWindowPage()
+    {
+        AppearancePage.IsVisible = false;
+        FileRulesPage.IsVisible = false;
+        PromptWindowPage.IsVisible = true;
+        LlmsPage.IsVisible = false;
+        SetActive(AppearanceNavButton, false);
+        SetActive(FileRulesNavButton, false);
+        SetActive(PromptWindowNavButton, true);
         SetActive(LlmsNavButton, false);
     }
 
@@ -270,9 +300,11 @@ public sealed partial class ThemeSettingsWindow : Window
     {
         AppearancePage.IsVisible = false;
         FileRulesPage.IsVisible = false;
+        PromptWindowPage.IsVisible = false;
         LlmsPage.IsVisible = true;
         SetActive(AppearanceNavButton, false);
         SetActive(FileRulesNavButton, false);
+        SetActive(PromptWindowNavButton, false);
         SetActive(LlmsNavButton, true);
     }
 
@@ -319,6 +351,11 @@ public sealed partial class ThemeSettingsWindow : Window
     }
 
     internal void OnUiFontSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        RefreshAppearancePreview();
+    }
+
+    internal void OnChatAppearanceSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         RefreshAppearancePreview();
     }
@@ -400,6 +437,7 @@ public sealed partial class ThemeSettingsWindow : Window
         var selectedSyntaxTheme = SyntaxThemePicker?.SelectedItem as ThemeOptionViewModel ?? ViewModel?.SelectedSyntaxTheme;
         var selectedCodeFont = CodeFontPicker?.SelectedItem as ThemeOptionViewModel ?? ViewModel?.SelectedCodeFont;
         var selectedUiFont = UiFontPicker?.SelectedItem as ThemeOptionViewModel ?? ViewModel?.SelectedUiFont;
+        var selectedChatAppearance = ChatAppearancePicker?.SelectedItem as ThemeOptionViewModel ?? ViewModel?.SelectedChatAppearance;
         var previewTheme = _hoveredTheme ?? selectedTheme;
         var previewSyntaxTheme = _hoveredSyntaxTheme ?? selectedSyntaxTheme;
         var previewCodeFont = _hoveredCodeFont ?? selectedCodeFont;
@@ -418,11 +456,13 @@ public sealed partial class ThemeSettingsWindow : Window
                 updateThemeVariant: !IsAnyOptionPickerOpen(),
                 skinKey: skin.Key,
                 uiFontColorModeKey: ViewModel?.UiFontColorModeKey,
+                chatAppearanceKey: selectedChatAppearance?.Key ?? ViewModel?.ChatAppearanceKey ?? "dark",
                 customUiFontColor: ViewModel?.CustomUiFontColorHex,
                 themeAdaptFileCountColor: ViewModel?.ThemeAdaptFileCountColor ?? false,
                 themeAdaptLocColor: ViewModel?.ThemeAdaptLocColor ?? false,
                 themeAdaptVersionColor: ViewModel?.ThemeAdaptVersionColor ?? false,
-                themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false);
+                themeAdaptBytesColor: ViewModel?.ThemeAdaptBytesColor ?? false,
+                uiFontSize: ViewModel?.UiFontSize);
         }
         catch
         {
@@ -466,7 +506,8 @@ public sealed partial class ThemeSettingsWindow : Window
             || SkinPicker?.IsDropDownOpen == true
             || SyntaxThemePicker?.IsDropDownOpen == true
             || CodeFontPicker?.IsDropDownOpen == true
-            || UiFontPicker?.IsDropDownOpen == true;
+            || UiFontPicker?.IsDropDownOpen == true
+            || ChatAppearancePicker?.IsDropDownOpen == true;
     }
 
     private void ApplyPendingThemeIfNeeded()
@@ -482,14 +523,18 @@ public sealed partial class ThemeSettingsWindow : Window
         var skin = _pendingSkinKey;
         var uiFontColorMode = _pendingUiFontColorModeKey;
         var customUiFontColor = _pendingCustomUiFontColor;
+        var chatAppearance = _pendingChatAppearanceKey;
+        var uiFontSize = _pendingUiFontSize;
         _pendingThemeKey = null;
         _pendingUiFontFamily = null;
         _pendingCodeFontFamily = null;
         _pendingSkinKey = null;
         _pendingUiFontColorModeKey = null;
         _pendingCustomUiFontColor = null;
+        _pendingChatAppearanceKey = null;
+        _pendingUiFontSize = null;
 
-        Dispatcher.UIThread.Post(() => ApplyTheme(theme, uiFont, codeFont, skin, uiFontColorMode, customUiFontColor));
+        Dispatcher.UIThread.Post(() => ApplyTheme(theme, uiFont, codeFont, skin, uiFontColorMode, customUiFontColor, uiFontSize, chatAppearance));
     }
 
     private void InitializeAppearancePreview()

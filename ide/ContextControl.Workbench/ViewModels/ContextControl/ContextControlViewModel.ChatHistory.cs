@@ -103,9 +103,17 @@ public sealed partial class ContextControlViewModel
 
         _legacyPromptText = document.PromptText ?? "";
         PromptText = "";
-        if (!string.IsNullOrWhiteSpace(document.PromptModeKey))
+        if (!_isSwitchingConversationKind)
         {
-            PromptModeKey = document.PromptModeKey;
+            var restoredPromptMode = IsImageGenConversationKind(_activeConversationKind)
+                ? "imagegen"
+                : NormalizePromptModeKey(document.PromptModeKey) == "imagegen"
+                    ? "context"
+                    : document.PromptModeKey;
+            if (!string.IsNullOrWhiteSpace(restoredPromptMode))
+            {
+                PromptModeKey = restoredPromptMode;
+            }
         }
 
         IsAutopilotEnabled = document.IsAutopilotEnabled ?? _settings.IsAutopilotEnabled;
@@ -176,6 +184,11 @@ public sealed partial class ContextControlViewModel
             LoadPendingAttachmentsForSession(session);
 
             _lastAssistantPatchBlocks = session.FindLastPatchText();
+            if (!string.IsNullOrWhiteSpace(session.WorkflowTaskText))
+            {
+                _lastUserRequest = session.WorkflowTaskText;
+            }
+
             PhaseTitle = "Chat selected";
             PhaseDetail = session.Title;
         }
@@ -288,12 +301,14 @@ public sealed partial class ContextControlViewModel
         Attachments.Clear();
         _lastAssistantPatchBlocks = "";
         _lastUserRequest = "";
+        SelectedChatSession?.SetWorkflowTaskText("");
         _semanticIndex = null;
         PromptText = "";
         LastExportPath = "";
         IsPatchPlanReady = false;
         PatchSummary = "No patch loaded.";
         UpdatePatchPlanActions(null);
+        MoveToCcStage(CcStageRequest);
         NotifyAttachmentStateChanged();
         PhaseTitle = "New chat";
         PhaseDetail = "Fresh local chat with no DIR, CC, patch, or previous request context.";
@@ -346,6 +361,7 @@ public sealed partial class ContextControlViewModel
         if (ReferenceEquals(SelectedChatSession, session))
         {
             ChatMessages.Add(message);
+            OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
         }
 
         var index = ChatSessions.IndexOf(session);
@@ -439,47 +455,115 @@ public sealed partial class ContextControlViewModel
         }
         catch (Exception ex)
         {
-            Log("warn", $"Image Gen response history update skipped: {ex.Message}");
+            Log("warn", $"ImageGen response history update skipped: {ex.Message}");
         }
     }
 
     private void UpdatePatchPlanActions(PatchPlanSummary? summary)
     {
         PatchPlanActions.Clear();
+        PatchPlanFiles.Clear();
         if (summary is not null)
         {
             foreach (var action in summary.Actions.Take(24))
             {
                 PatchPlanActions.Add(new PatchPlanActionViewModel(action));
             }
+
+            foreach (var group in BuildPatchPlanFileGroups(summary, 16))
+            {
+                PatchPlanFiles.Add(group);
+            }
         }
 
         OnPropertyChanged(nameof(HasPatchPlanActions));
+        OnPropertyChanged(nameof(HasPatchPlanFiles));
+        (OpenPatchPlanFileCommand as RelayCommand<PatchPlanFileViewModel>)?.RaiseCanExecuteChanged();
     }
 
     private static string BuildPatchPlanChatText(PatchPlanSummary summary)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("GO preview ready.");
+        builder.AppendLine("ccReplace | GO preview COMPLETE.");
         builder.AppendLine(summary.CompactLabel);
         if (summary.Actions.Count > 0)
         {
-            builder.AppendLine();
-            builder.AppendLine("Files:");
-            foreach (var action in summary.Actions.Take(18))
+            var fileGroups = BuildPatchPlanFileGroups(summary, 12)
+                .Where(file => !file.IsDirectory)
+                .ToArray();
+            if (fileGroups.Length > 0)
             {
-                builder.AppendLine($"{action.AddedLabel} {action.RemovedLabel} {action.FileLabel} :: {action.PartLabel} [{action.StatusLabel}]");
+                builder.AppendLine();
+                AppendPatchPlanFence(builder, fileGroups);
             }
 
-            if (summary.Actions.Count > 18)
+            var directories = summary.Actions.Where(action => action.IsDirectory).Take(12).ToArray();
+            if (directories.Length > 0)
             {
-                builder.AppendLine($"... {summary.Actions.Count - 18:N0} more action(s)");
+                builder.AppendLine();
+                builder.AppendLine("Directories:");
+                foreach (var action in directories)
+                {
+                    builder.AppendLine($"  [{action.KindLabel}] {action.FileLabel}");
+                }
             }
         }
 
         builder.AppendLine();
-        builder.AppendLine("GO preview did not write source files. Apply effective writes non-duplicate edits through ccReplace.");
+        builder.AppendLine("Preview only: source files are unchanged. Apply effective writes non-duplicate edits through ccReplace.");
         return builder.ToString().TrimEnd();
+    }
+
+    private static IReadOnlyList<PatchPlanFileViewModel> BuildPatchPlanFileGroups(PatchPlanSummary summary, int take)
+    {
+        return summary.Actions
+            .Where(action => !string.IsNullOrWhiteSpace(action.FileLabel))
+            .GroupBy(action => action.FileLabel, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Any(action => action.IsDirectory))
+            .ThenBy(group => BucketOrder(group.FirstOrDefault()?.BucketLabel ?? ""))
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(Math.Max(1, take))
+            .Select(group => new PatchPlanFileViewModel(group.Key, group.ToArray()))
+            .ToArray();
+    }
+
+    private static void AppendPatchPlanFence(StringBuilder builder, IReadOnlyList<PatchPlanFileViewModel> files)
+    {
+        builder.AppendLine("```cc-patch-plan");
+        foreach (var file in files)
+        {
+            builder.AppendLine(string.Join('\t',
+                CleanPatchPlanCell(file.FileName),
+                CleanPatchPlanCell(file.Version),
+                CleanPatchPlanCell(file.AddedLabel),
+                CleanPatchPlanCell(file.RemovedLabel),
+                CleanPatchPlanCell(file.LocLabel),
+                CleanPatchPlanCell(file.Target),
+                CleanPatchPlanCell(file.ActionSummary)));
+        }
+
+        builder.AppendLine("```");
+    }
+
+    private static string CleanPatchPlanCell(string value)
+    {
+        return (value ?? "")
+            .Replace('\t', ' ')
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+    }
+
+    private static int BucketOrder(string bucket)
+    {
+        return bucket.ToLowerInvariant() switch
+        {
+            "created" => 0,
+            "changed" => 1,
+            "removed" => 2,
+            "duplicate" => 3,
+            _ => 9
+        };
     }
 
     private static string BuildPatchFailureChatText(string title, ContextControlCommandResult result, PatchPlanSummary summary)
@@ -490,13 +574,21 @@ public sealed partial class ContextControlViewModel
         builder.AppendLine(detail);
         builder.AppendLine();
         builder.AppendLine("GO needs raw BEGIN/END CC-REPLACE blocks with FILE and MODE headers.");
-        builder.AppendLine("Minimum shape:");
+        builder.AppendLine("For unmarked files, use whole_file with the complete replacement file:");
+        builder.AppendLine("BEGIN CC-REPLACE");
+        builder.AppendLine("FILE: path/relative/to/project");
+        builder.AppendLine("MODE: whole_file");
+        builder.AppendLine("---");
+        builder.AppendLine("complete file contents");
+        builder.AppendLine("END CC-REPLACE");
+        builder.AppendLine();
+        builder.AppendLine("Use replace_region only when the source contains CC-REPLACE-BEGIN/END markers for NAME:");
         builder.AppendLine("BEGIN CC-REPLACE");
         builder.AppendLine("FILE: path/relative/to/project");
         builder.AppendLine("MODE: replace_region");
-        builder.AppendLine("NAME: marker_name");
+        builder.AppendLine("NAME: exact_marker_name");
         builder.AppendLine("---");
-        builder.AppendLine("replacement text");
+        builder.AppendLine("replacement region contents");
         builder.AppendLine("END CC-REPLACE");
         return builder.ToString().TrimEnd();
     }
@@ -507,14 +599,15 @@ public sealed partial class ContextControlViewModel
         builder.AppendLine("GO preview cancelled before ccReplace.");
         builder.AppendLine(detail);
         builder.AppendLine();
-        builder.AppendLine("Valid minimum shape:");
+        builder.AppendLine("Valid minimum shape for an unmarked file:");
         builder.AppendLine("BEGIN CC-REPLACE");
         builder.AppendLine("FILE: path/relative/to/project");
-        builder.AppendLine("MODE: replace_region");
-        builder.AppendLine("NAME: marker_name");
+        builder.AppendLine("MODE: whole_file");
         builder.AppendLine("---");
-        builder.AppendLine("replacement text");
+        builder.AppendLine("complete file contents");
         builder.AppendLine("END CC-REPLACE");
+        builder.AppendLine();
+        builder.AppendLine("Use MODE: replace_region only when the source contains CC-REPLACE-BEGIN/END markers for NAME.");
         builder.AppendLine();
         builder.AppendLine("For includes:");
         builder.AppendLine("BEGIN CC-REPLACE");
@@ -549,11 +642,23 @@ public sealed partial class ContextControlViewModel
             : summaryError;
     }
 
-    private static string BuildPatchApplyChatText(ContextControlCommandResult result, string decision)
+    private static string BuildPatchApplyChatText(
+        ContextControlCommandResult result,
+        string decision,
+        IReadOnlyList<PatchPlanFileViewModel>? plannedFiles = null)
     {
         if (result.Succeeded)
         {
-            return $"GO apply complete.{Environment.NewLine}ccReplace applied {decision} edits. Version snapshots are kept by the existing ccReplace cache when enabled.";
+            var builder = new StringBuilder();
+            builder.AppendLine("ccReplace | GO apply COMPLETE.");
+
+            if (plannedFiles is { Count: > 0 })
+            {
+                builder.AppendLine();
+                AppendPatchPlanFence(builder, plannedFiles);
+            }
+
+            return builder.ToString().TrimEnd();
         }
 
         return $"GO apply failed.{Environment.NewLine}{FirstErrorLine(result)}";
@@ -600,15 +705,19 @@ public sealed partial class ContextControlViewModel
         }
     }
 
-    private void SwitchConversationKindForWorkspace()
+    private void SwitchConversationKindForPromptMode(bool saveCurrent = true)
     {
-        var nextKind = IsImageGenWorkspaceActive ? ImageGenConversationKind : ChatConversationKind;
+        var nextKind = ResolveConversationKindForPromptMode(PromptModeKey);
         if (string.Equals(_activeConversationKind, nextKind, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        SaveChatHistory();
+        if (saveCurrent)
+        {
+            SaveChatHistory();
+        }
+
         _isSwitchingConversationKind = true;
         try
         {
@@ -620,12 +729,19 @@ public sealed partial class ContextControlViewModel
             _isSwitchingConversationKind = false;
         }
 
-        PhaseTitle = IsImageGenConversationKind(nextKind) ? "Image Gen chat loaded" : "Chat loaded";
+        PhaseTitle = IsImageGenConversationKind(nextKind) ? "ImageGen chat loaded" : "Chat loaded";
         PhaseDetail = IsImageGenConversationKind(nextKind)
             ? "Image generation has its own chat history."
             : "Regular chat history restored.";
         OnPropertyChanged(nameof(ChatHistoryPanelTitle));
         OnPropertyChanged(nameof(ChatHistorySummary));
+    }
+
+    private static string ResolveConversationKindForPromptMode(string? promptModeKey)
+    {
+        return string.Equals(NormalizePromptModeKey(promptModeKey), "imagegen", StringComparison.OrdinalIgnoreCase)
+            ? ImageGenConversationKind
+            : ChatConversationKind;
     }
 
     private static bool IsChatConversationKind(string? conversationKind)

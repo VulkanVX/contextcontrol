@@ -56,16 +56,45 @@ $script:BinaryExtensions = @(
     ".db", ".opendb", ".sdf", ".ipch"
 )
 
-$script:IgnoredFiles = @()
+$script:IgnoredFiles = @(
+    ".ccDirProfile.json",
+    ".ccFileRules.json",
+    ".ccReplace.settings*.json",
+    ".ccWorkbench.chat-history*.json",
+    ".ccWorkbench.settings.json",
+    "cc_chat_export_*.md",
+    "cc_code_export*.md",
+    "cc_project_dir.md",
+    "cc_semantic_map.md",
+    "patch.txt"
+)
 $script:DefaultTextExtensions = @($script:TextExtensions)
 $script:DefaultCodeSearchExtensions = @($script:CodeSearchExtensions)
 $script:DefaultExcludeDirs = @($script:ExcludeDirs)
 $script:DefaultIgnoredFiles = @($script:IgnoredFiles)
 $script:SearchSupportedExtensions = @($script:CodeSearchExtensions)
 $script:SearchIgnoredExtensions = @()
+$script:TextExtensionSet = $null
+$script:SearchSupportedExtensionSet = $null
+$script:SearchIgnoredExtensionSet = $null
+$script:BinaryExtensionSet = $null
+$script:ExcludeDirSet = $null
 
 if ($null -eq $script:ExportedFileKeys) {
     $script:ExportedFileKeys = @{}
+}
+
+function New-CcExportStringSet {
+    param($Values)
+
+    $set = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($value in @($Values)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
+            [void]$set.Add([string]$value)
+        }
+    }
+
+    return $set
 }
 
 function Normalize-CcExportExtensionList {
@@ -161,6 +190,11 @@ function Set-CcExportFilterRules {
     $script:SearchIgnoredExtensions = @(Normalize-CcExportExtensionList $searchIgnored.ToArray())
     $script:TextExtensions = @(Normalize-CcExportExtensionList $textSupported.ToArray() | Where-Object { $script:SearchIgnoredExtensions -notcontains $_ })
     $script:SearchSupportedExtensions = @(Normalize-CcExportExtensionList $searchSupported.ToArray() | Where-Object { $script:SearchIgnoredExtensions -notcontains $_ })
+    $script:TextExtensionSet = New-CcExportStringSet $script:TextExtensions
+    $script:SearchSupportedExtensionSet = New-CcExportStringSet $script:SearchSupportedExtensions
+    $script:SearchIgnoredExtensionSet = New-CcExportStringSet $script:SearchIgnoredExtensions
+    $script:BinaryExtensionSet = New-CcExportStringSet $script:BinaryExtensions
+    $script:ExcludeDirSet = New-CcExportStringSet $script:ExcludeDirs
     $script:SearchCandidateFilesCacheRoot = $null
     $script:SearchCandidateFilesCache = $null
 }
@@ -172,10 +206,22 @@ function Get-NormalizedPathKey {
         return ""
     }
 
+    if ($null -eq $script:NormalizedPathKeyCache) {
+        $script:NormalizedPathKeyCache = @{}
+    }
+
+    $cacheKey = [string]$Path
+    if ($script:NormalizedPathKeyCache.ContainsKey($cacheKey)) {
+        return [string]$script:NormalizedPathKeyCache[$cacheKey]
+    }
+
+    $result = ""
     try {
         if (Test-Path -LiteralPath $Path) {
             $resolved = (Resolve-Path -LiteralPath $Path).Path
-            return ($resolved -replace '\\', '/').ToLowerInvariant()
+            $result = ($resolved -replace '\\', '/').ToLowerInvariant()
+            $script:NormalizedPathKeyCache[$cacheKey] = $result
+            return $result
         }
     }
     catch {
@@ -183,11 +229,14 @@ function Get-NormalizedPathKey {
 
     try {
         $full = [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $Path))
-        return ($full -replace '\\', '/').ToLowerInvariant()
+        $result = ($full -replace '\\', '/').ToLowerInvariant()
     }
     catch {
-        return ($Path -replace '\\', '/').ToLowerInvariant()
+        $result = ($Path -replace '\\', '/').ToLowerInvariant()
     }
+
+    $script:NormalizedPathKeyCache[$cacheKey] = $result
+    return $result
 }
 
 function Is-GptGeneratedExportFile {
@@ -257,11 +306,32 @@ function Is-IgnoredFilePath {
             continue
         }
 
+        $hasWildcard = [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($entryNorm)
+        $pattern = if ($hasWildcard) {
+            New-Object System.Management.Automation.WildcardPattern($entryNorm, ([System.Management.Automation.WildcardOptions]::IgnoreCase))
+        }
+        else {
+            $null
+        }
+
         if ($entryNorm -contains "/") {
-            if ($entryNorm -eq $normalizedPathLower) {
+            if ($hasWildcard) {
+                if ($pattern.IsMatch($normalizedPathLower)) {
+                    return $true
+                }
+                if ($null -ne $relativePath -and $pattern.IsMatch($relativePath)) {
+                    return $true
+                }
+            }
+            elseif ($entryNorm -eq $normalizedPathLower) {
                 return $true
             }
-            if ($null -ne $relativePath -and $entryNorm -eq $relativePath) {
+            elseif ($null -ne $relativePath -and $entryNorm -eq $relativePath) {
+                return $true
+            }
+        }
+        elseif ($hasWildcard) {
+            if ($pattern.IsMatch($name)) {
                 return $true
             }
         }
@@ -409,10 +479,26 @@ function Is-ExcludedPath {
         }
     }
 
-    $split = $parts -split '/'
+    $split = $parts.Split([char]'/')
 
-    foreach ($part in $split) {
-        if ($script:ExcludeDirs -contains $part) {
+    for ($i = 0; $i -lt $split.Count; $i++) {
+        $part = $split[$i]
+        if ($part -eq "") {
+            continue
+        }
+
+        $excluded = if ($null -ne $script:ExcludeDirSet) {
+            $script:ExcludeDirSet.Contains($part)
+        }
+        else {
+            $script:ExcludeDirs -contains $part
+        }
+
+        if ($excluded) {
+            if ($part -ieq "contextcontrol" -and $i -ne 0) {
+                continue
+            }
+
             return $true
         }
     }
@@ -426,12 +512,23 @@ function Is-CodeSearchExtension {
     $name = [System.IO.Path]::GetFileName($Path).ToLowerInvariant()
     $ext = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
 
-    if ($script:SearchIgnoredExtensions -contains $ext) {
+    $ignored = if ($null -ne $script:SearchIgnoredExtensionSet) {
+        $script:SearchIgnoredExtensionSet.Contains($ext)
+    }
+    else {
+        $script:SearchIgnoredExtensions -contains $ext
+    }
+
+    if ($ignored) {
         return $false
     }
 
     if ($name -eq "cmakelists.txt") {
         return $true
+    }
+
+    if ($null -ne $script:SearchSupportedExtensionSet) {
+        return $script:SearchSupportedExtensionSet.Contains($ext)
     }
 
     return ($script:SearchSupportedExtensions -contains $ext)
@@ -467,7 +564,14 @@ function Is-TextSearchCandidate {
         return $false
     }
 
-    if ($script:BinaryExtensions -contains $ext) {
+    $isBinary = if ($null -ne $script:BinaryExtensionSet) {
+        $script:BinaryExtensionSet.Contains($ext)
+    }
+    else {
+        $script:BinaryExtensions -contains $ext
+    }
+
+    if ($isBinary) {
         return $false
     }
 
@@ -481,25 +585,53 @@ function Is-TextSearchCandidate {
 function Get-RelativeDisplayPath {
     param([string]$Path)
 
+    if ($null -eq $script:RelativeDisplayPathCache) {
+        $script:RelativeDisplayPathCache = @{}
+    }
+
+    $cacheKey = [string]$Path
+    if ($script:RelativeDisplayPathCache.ContainsKey($cacheKey)) {
+        return [string]$script:RelativeDisplayPathCache[$cacheKey]
+    }
+
     $resolved = (Resolve-Path -LiteralPath $Path).Path
     $root = (Get-Location).Path
 
+    $result = ""
     if ($resolved.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
         $rel = $resolved.Substring($root.Length)
         $rel = $rel -replace '^[\\/]+', ''
-        return ($rel -replace '\\', '/')
+        $result = ($rel -replace '\\', '/')
+    }
+    else {
+        $result = ($resolved -replace '\\', '/')
     }
 
-    return ($resolved -replace '\\', '/')
+    $script:RelativeDisplayPathCache[$cacheKey] = $result
+    return $result
 }
 
 function Get-PathKey {
     param([string]$Path)
 
+    if ($null -eq $script:PathKeyCache) {
+        $script:PathKeyCache = @{}
+    }
+
+    $cacheKey = [string]$Path
+    if ($script:PathKeyCache.ContainsKey($cacheKey)) {
+        return [string]$script:PathKeyCache[$cacheKey]
+    }
+
+    $result = ""
     if (-not (Test-Path -LiteralPath $Path)) {
-        return ($Path -replace '\\', '/').ToLowerInvariant()
+        $result = ($Path -replace '\\', '/').ToLowerInvariant()
+        $script:PathKeyCache[$cacheKey] = $result
+        return $result
     }
 
     $resolved = (Resolve-Path -LiteralPath $Path).Path
-    return ($resolved -replace '\\', '/').ToLowerInvariant()
+    $result = ($resolved -replace '\\', '/').ToLowerInvariant()
+    $script:PathKeyCache[$cacheKey] = $result
+    return $result
 }

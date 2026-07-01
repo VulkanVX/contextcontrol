@@ -1,4 +1,4 @@
-// CC-DESC: Defines visible Codex harness instructions and Skillflow phases.
+// CC-DESC: Defines visible CC Flow phase instructions.
 
 using System.Text;
 
@@ -6,180 +6,127 @@ namespace ContextControl.Workbench.Services;
 
 public static class CodexInstructionCatalog
 {
-    private static readonly SkillbookEntry[] HarnessInstructions =
+    public const string CcMainKey = "cc-main";
+
+    private static readonly SkillbookEntry[] CcMainEntries =
     [
         new(
-            "codex-harness-purpose",
-            "Codex harness purpose",
+            CcMainKey,
+            "CC Main",
             """
-            Codex is the reasoning engine inside ContextControl, not the write authority.
-            ContextControl owns DIR, CC, GO, patch preview, and patch apply.
-            Codex should spend its effort on choosing focused context and writing source-grounded answers.
+            ContextControl is a mediated code workflow. The model reasons; the user is the NI assistant who runs DIR, CC export, GO preview, and Apply through local ContextControl scripts.
+            Do not use extra actions for repository navigation, shell commands, filesystem reads, or direct edits. Those actions are outsourced to ContextControl and the user.
+            Treat each attached capsule as the complete visible workspace for that turn. Spend attention on interpreting the capsule and solving the request, not on guessing unseen files.
+            Before choosing the next output, decide whether the visible context is sufficient. If not, request the smallest next CC input that can change the answer.
+            Each model turn includes a phase-specific CC Flow instruction. Obey the active phase instruction over generic habits.
+            Keep outputs compact, mechanical, and directly usable by the next ContextControl step.
             """,
-            "codex",
-            true),
-        new(
-            "codex-no-repo-navigation",
-            "Codex no repo navigation",
-            """
-            Use the visible ContextControl capsule and attachments as the source of truth.
-            Do not browse the repository, run search commands, inspect git state, or read files outside the capsule for normal CC phases.
-            If the attached context is insufficient, ask for exact CC request lines instead of exploring.
-            """,
-            "codex",
-            true),
-        new(
-            "codex-bus-stop-discipline",
-            "Codex bus stop discipline",
-            """
-            Stay at the current CC bus stop.
-            DIR context means request the smallest next CC export.
-            CC source context means audit, explain, or write CC-REPLACE blocks from visible source.
-            Patch context means review or repair the patch.
-            Do not skip ahead to later phases unless the user explicitly asks for that phase.
-            """,
-            "codex",
-            true),
-        new(
-            "codex-file-request-shape",
-            "Codex file request shape",
-            """
-            In file-request phase, output only useful CC request lines.
-            Valid lines are exact relative file paths copied from DIR, FUNCTION path :: symbol, FUNC: symbol, SYMBOL: name, or FIND: exactText.
-            End with END.
-            Do not output prose, absolute paths, broad folders, invented paths, PATH:, FILE:, or DIR: labels.
-            """,
-            "codex",
-            true),
-        new(
-            "codex-patch-shape",
-            "Codex patch shape",
-            """
-            In patch-write phase, emit raw BEGIN CC-REPLACE blocks when code changes are requested.
-            Every block needs FILE and MODE, and function/region modes need NAME.
-            Use insert_include for C/C++ includes, replace_region when markers exist, and whole_file only for small/new files or when safer than a targeted block.
-            Do not emit git patches, apply_patch patches, shell write commands, or instructions that bypass ccReplace.
-            """,
-            "codex",
-            true),
-        new(
-            "codex-minimality",
-            "Codex minimality",
-            """
-            Remove unnecessary actions from the reasoning loop.
-            Prefer the smallest safe file/function set, the shortest sufficient answer, and the least invasive patch shape.
-            Do not ask for build files, tests, generated output, binary assets, or dependency folders unless they are truly needed.
-            """,
-            "codex",
-            true),
-        new(
-            "codex-evidence-boundary",
-            "Codex evidence boundary",
-            """
-            Separate what the visible code proves from what is inferred.
-            If a claim depends on missing source, request the missing CC context instead of guessing.
-            If a patch depends on an API not visible in the CC export, stop and ask for the exact file/function context.
-            """,
-            "codex",
+            "cc-main",
             true)
     ];
 
-    private static readonly SkillbookEntry[] SkillflowEntries =
+    private static readonly SkillbookEntry[] CcFlowEntries =
     [
         new(
-            "skillflow-01-request",
-            "Skillflow 01 - Request",
+            "cc-flow-01-dir-request",
+            "DIR + Request",
             """
-            User action: write the concrete task in the prompt bar.
-            User expectation: the task becomes the durable request for later DIR, CC, and patch phases.
-            Codex expectation: preserve the task intent and do not start editing before context exists.
+            Input: user request plus DIR project map.
+            Output only the smallest CC export request.
+            Allowed lines: exact relative file path; FUNCTION path :: symbol; FUNCTION wildcard-path :: symbol; FUNC: symbol; FIND: text; EXPAND: directory; END.
+            Use final source request lines, exactly one FIND, or exactly one EXPAND. Do not mix FIND/EXPAND with file/FUNCTION/FUNC lines.
+            Use EXPAND only when the likely subsystem is visible but exact files/functions are not. EXPAND returns a richer DIR manifest for that scope, not source code.
+            Use FIND only for cheap discovery when exact files/functions are not visible enough; FIND must be exactly one request line followed by END.
+            Do not use SYMBOL, prose, headings, code fences, absolute paths, broad folders, directories as file requests, generated/binary/vendor paths, shell commands, patch blocks, or duplicate obvious headers.
+            Copy paths exactly from FILE, ROOT, or FAMILY manifest records. Prefer exact files/functions. Include build/config files only when the requested change directly needs them.
             """,
-            "skillflow",
+            "cc-flow",
             true),
         new(
-            "skillflow-02-dir",
-            "Skillflow 02 - DIR",
+            "cc-flow-02-cc-patch",
+            "CC Export + Patch",
             """
-            User action: press DIR.
-            User expectation: ContextControl exports the filtered project tree and attaches it to the chat.
-            Codex expectation: read the DIR attachment and return the smallest safe CC request list.
+            Input: CC source export plus optional user clarification.
+
+            If source is insufficient, output only the next narrow CC request list ending with END. Prefer exact file/FUNCTION lines; use exactly one FIND only when the missing owner cannot be named from visible source.
+
+            If source is sufficient, output one GO patch containing raw BEGIN/END CC-REPLACE blocks only. GO writes that raw output to patch.txt.
+
+            One GO patch may contain many CC-REPLACE blocks across many files. Do not split patches into separate chat answers by file.
+
+            Do not emit prose mixed with the patch, git diff, shell commands, apply_patch syntax, direct file edits, markdown fences, or commentary inside the patch.
+
+            Supported MODE values: replace_region, insert_include, whole_file, insert_after_function, insert_before_function, delete_function, function, append_to_file, create_directory.
+
+            General rules:
+            Use FILE for file-targeting modes.
+            Use DIR only for create_directory.
+            Body modes require --- followed by replacement text.
+            Bodyless modes are insert_include, delete_function, and create_directory.
+            function, insert_before_function, insert_after_function, delete_function, and replace_region require NAME.
+            insert_include requires HEADER.
+            whole_file body must be the complete final file content.
+            New files use MODE: whole_file.
+            If adding, removing, or renaming C++ source files, include the required CMakeLists.txt/build-file CC-REPLACE block in the same GO patch.
+            Ground every edit in visible source and choose the least invasive valid ccReplace mode.
+            If a required target, declaration, dependency, or build owner is not visible, request the next narrow CC export instead of guessing.
+            Do not ask for more context when the visible export already contains the target file and enough surrounding source to write the edit.
+
+            Mode choice order:
+            1. replace_region: use for visible CC-REPLACE-BEGIN/END markers.
+            2. insert_include: use for one missing C/C++ include.
+            3. whole_file: use for new files, small files, unmarked files, or risky structure edits.
+            4. insert_after_function / insert_before_function / delete_function: use around one unique visible function.
+            5. function: use only when replacing one unique unambiguous function.
+            6. append_to_file: use only for additive tail content.
+            7. create_directory: use before creating files inside a new folder.
+
+            Patch block skeleton:
+            BEGIN CC-REPLACE
+            FILE: path/relative/to/project_root.cpp
+            MODE: whole_file
+            ---
+            replacement text
+            END CC-REPLACE
+
+            Header variants: create_directory uses DIR instead of FILE; insert_include adds HEADER and has no body; function/insert_before_function/insert_after_function/delete_function/replace_region require NAME; bodyless modes omit ---.
             """,
-            "skillflow",
+            "cc-flow",
             true),
         new(
-            "skillflow-03-resolve",
-            "Skillflow 03 - Resolve",
+            "cc-flow-03-chat",
+            "Chat",
             """
-            User action: send the DIR attachment in Codex mode or review locally resolved lines.
-            User expectation: receive exact file paths, FUNCTION lines, SYMBOL lines, or FIND terms ending with END.
-            Codex expectation: no prose and no patching; only request the next source context.
+            Input: normal chat without a DIR or CC source attachment.
+            Answer conversationally and do not output CC request lines, EXPAND/FIND lists, or CC-REPLACE blocks unless the user has attached the matching ContextControl artifact.
+            If the user asks for project code work, tell them to run DIR first so ContextControl can attach the project map.
+            Request-looking text in chat is advisory only and is not ready for CC.
             """,
-            "skillflow",
-            true),
-        new(
-            "skillflow-04-cc",
-            "Skillflow 04 - CC",
-            """
-            User action: press CC with the approved request lines.
-            User expectation: ContextControl exports selected source/function context and attaches it.
-            Codex expectation: treat attached source as the complete evidence set for audit or patch writing.
-            """,
-            "skillflow",
-            true),
-        new(
-            "skillflow-05-patch",
-            "Skillflow 05 - Patch",
-            """
-            User action: ask for an audit, implementation, or repair from the attached CC source.
-            User expectation: receive a source-grounded answer or raw CC-REPLACE blocks.
-            Codex expectation: use the CC patch shape and never write files directly.
-            """,
-            "skillflow",
-            true),
-        new(
-            "skillflow-06-go",
-            "Skillflow 06 - GO",
-            """
-            User action: press GO on a patch snippet or prompt text containing CC-REPLACE blocks.
-            User expectation: ccReplace writes patch.txt and previews the plan without changing source files.
-            Codex expectation: if GO fails, repair the patch from the visible failure and source context.
-            """,
-            "skillflow",
-            true),
-        new(
-            "skillflow-07-apply",
-            "Skillflow 07 - Apply",
-            """
-            User action: apply effective or all previewed actions.
-            User expectation: ccReplace performs the write and keeps the patch event auditable.
-            Codex expectation: discuss validation or follow-up only after ContextControl reports the apply result.
-            """,
-            "skillflow",
+            "cc-flow",
             true)
     ];
 
     public static IReadOnlyList<SkillbookEntry> SkillbookEntries =>
-        HarnessInstructions.Concat(SkillflowEntries).ToArray();
+        CcMainEntries.Concat(CcFlowEntries).ToArray();
 
     public static string BuildCodexInstructionText(ContextCapsulePhase phase)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Visible Codex harness instructions:");
-        foreach (var entry in HarnessInstructions)
-        {
-            builder.AppendLine();
-            builder.AppendLine($"## {entry.Title}");
-            builder.AppendLine(entry.Text.Trim());
-        }
-
+        builder.AppendLine("## CC Main");
+        builder.AppendLine(BuildCcMain());
         builder.AppendLine();
         builder.AppendLine("## Active phase contract");
         builder.AppendLine(BuildPhaseContract(phase));
         builder.AppendLine();
-        builder.AppendLine("## Skillflow phase");
-        builder.AppendLine(BuildSkillflowPhase(phase));
+        builder.AppendLine("## CC Flow phase");
+        builder.AppendLine(BuildCcFlowPhase(phase));
 
         return builder.ToString().TrimEnd();
+    }
+
+    public static string BuildCcMain()
+    {
+        return CcMainEntries.First(entry => entry.Key.Equals(CcMainKey, StringComparison.OrdinalIgnoreCase)).Text.Trim();
     }
 
     public static string BuildPhaseContract(ContextCapsulePhase phase)
@@ -187,41 +134,49 @@ public static class CodexInstructionCatalog
         return phase switch
         {
             ContextCapsulePhase.FileRequest => """
-                Output only CC request lines copied from DIR or valid discovery terms.
+                Output only a CC export request list.
+                Allowed lines: exact relative file path; FUNCTION path :: symbol; FUNCTION wildcard-path :: symbol; FUNC: symbol; FIND: text; EXPAND: directory; END.
                 End with END.
-                Do not solve the task, write code, summarize the tree, or add commentary.
+                Use final source request lines, exactly one FIND, or exactly one EXPAND. Do not mix FIND/EXPAND with file/FUNCTION/FUNC lines.
+                FIND must be exactly one request line followed by END.
+                Do not use SYMBOL, markdown fences, prose, headings, patch text, or commentary.
                 """,
             ContextCapsulePhase.SourceAudit => """
-                Analyze only the attached CC source context.
-                Keep findings grounded in exact visible code evidence.
-                If source is missing, ask for valid CC request lines ending with END.
+                Use only the attached CC source context.
+                If more context is required, output only the next CC request list ending with END. Prefer exact file/FUNCTION lines; use exactly one FIND only when exact owners are unknown.
+                If the edit is clear, emit GO-ready CC-REPLACE blocks.
                 """,
             ContextCapsulePhase.PatchWrite => """
-                Write raw CC-REPLACE blocks only when code changes are requested.
-                If visible source is insufficient, output NEED_MORE_CONTEXT followed by valid CC request lines and END.
-                Do not use shell commands, git patches, or direct file edits.
+                Emit raw CC-REPLACE blocks only.
+                If visible source is insufficient, output only the next CC request list ending with END. Prefer exact file/FUNCTION lines; use exactly one FIND only when exact owners are unknown.
+                One GO patch may contain many CC-REPLACE blocks across many files.
+                Supported MODE values: replace_region, insert_include, whole_file, insert_after_function, insert_before_function, delete_function, function, append_to_file, create_directory.
+                Do not use shell commands, git patches, apply_patch, direct file edits, markdown fences, or prose wrappers.
                 """,
             ContextCapsulePhase.PatchReview => """
                 Review or repair the attached patch using only visible patch/source context.
-                If repaired, emit complete CC-REPLACE blocks.
+                If repaired, emit complete CC-REPLACE blocks only.
                 """,
             _ => """
-                Normal chat is allowed, but ask for DIR/CC context before making code claims.
+                Normal chat is allowed, but ask for DIR + Request before making code claims.
                 """
         };
     }
 
-    private static string BuildSkillflowPhase(ContextCapsulePhase phase)
+    public static string BuildCcFlowPhase(ContextCapsulePhase phase)
     {
-        var key = phase switch
-        {
-            ContextCapsulePhase.FileRequest => "skillflow-03-resolve",
-            ContextCapsulePhase.SourceAudit => "skillflow-05-patch",
-            ContextCapsulePhase.PatchWrite => "skillflow-05-patch",
-            ContextCapsulePhase.PatchReview => "skillflow-06-go",
-            _ => "skillflow-01-request"
-        };
+        var key = GetCcFlowPhaseKey(phase);
 
-        return SkillflowEntries.First(entry => entry.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Text.Trim();
+        return CcFlowEntries.First(entry => entry.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Text.Trim();
+    }
+
+    public static string GetCcFlowPhaseKey(ContextCapsulePhase phase)
+    {
+        return phase switch
+        {
+            ContextCapsulePhase.FileRequest => "cc-flow-01-dir-request",
+            ContextCapsulePhase.SourceAudit or ContextCapsulePhase.PatchWrite or ContextCapsulePhase.PatchReview => "cc-flow-02-cc-patch",
+            _ => "cc-flow-03-chat"
+        };
     }
 }

@@ -106,6 +106,12 @@ public static partial class ProjectStackScanner
         if (!visibility.ShouldShow)
         {
             state.FilesSkippedByRules++;
+            if (!string.IsNullOrWhiteSpace(extension)
+                && visibility.IgnoredReason.StartsWith("ignored extension:", StringComparison.OrdinalIgnoreCase))
+            {
+                Increment(state.SkippedExtensionCounts, extension);
+            }
+
             AddSample(state.SkippedFileSamples, $"{relativePath} ({visibility.IgnoredReason})");
             return;
         }

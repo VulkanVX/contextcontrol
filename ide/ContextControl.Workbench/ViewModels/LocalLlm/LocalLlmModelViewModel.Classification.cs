@@ -143,7 +143,7 @@ public sealed partial class LocalLlmModelViewModel
         var tags = new List<string>();
         var isImageGeneration = DetectImageGenerationModel(model);
 
-        AddTagIf(tags, isImageGeneration, "Image Gen");
+        AddTagIf(tags, isImageGeneration, "ImageGen");
         AddTagIf(tags, DetectImageModel(model), "Image");
         AddTagIf(
             tags,
@@ -202,7 +202,7 @@ public sealed partial class LocalLlmModelViewModel
         var text = BuildClassificationText(model);
         if (DetectImageGenerationModel(model))
         {
-            return "Image Gen";
+            return "ImageGen";
         }
 
         if (ContainsAny(text, "embedding", "embed", "bge-m3", "nomic-embed", "jina-embeddings"))
@@ -252,7 +252,7 @@ public sealed partial class LocalLlmModelViewModel
     {
         return ResolveModelBaseLabel(model) switch
         {
-            "Image Gen" => "Text-to-image generation model; prompts produce image files rather than chat answers.",
+            "ImageGen" => "Text-to-image generation model; prompts produce image files rather than chat answers.",
             "Embedding" => "Encoder model for vector search and retrieval, not chat generation.",
             "Reranker" => "Ranking model for ordering retrieval candidates, not normal chat.",
             "VLM" => "Vision-language model for text plus image, screenshot, OCR, or video-style inputs.",
@@ -284,7 +284,7 @@ public sealed partial class LocalLlmModelViewModel
             return IsOllamaRwkvTag(model) ? "Ollama" : "RWKV runner";
         }
 
-        if (baseLabel.Equals("Image Gen", StringComparison.OrdinalIgnoreCase))
+        if (baseLabel.Equals("ImageGen", StringComparison.OrdinalIgnoreCase))
         {
             if (ContainsAny(text, "gguf", "stable-diffusion.cpp", "comfyui"))
             {

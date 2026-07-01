@@ -11,29 +11,30 @@
           ClipToBounds="True"
           IsVisible="{Binding IsProjectFilesPaneOpen}"
           IsHitTestVisible="{Binding IsProjectFilesPaneOpen}">
-        <Grid RowDefinitions="43,Auto,*">
-          <Border Grid.Row="0" Classes="pane-header" Padding="12,0,9,0">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+        <Grid RowDefinitions="24,Auto,*">
+          <Border Grid.Row="0" Classes="pane-header" Padding="5,0">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="3">
               <Button
+                  Grid.Column="0"
                   Classes="tree-detail-toggle"
                   Classes.active="{Binding IsTopLocMode}"
                   Content="{Binding TopLocToggleLabel}"
                   ToolTip.Tip="Toggle highest LOC files"
                   Command="{Binding ToggleTopLocModeCommand}" />
               <Button
-                  Grid.Column="2"
+                  Grid.Column="1"
                   Classes="tree-detail-toggle"
                   Classes.active="{Binding ShowFileDetails}"
                   Content="{Binding FileDetailsToggleLabel}"
                   Command="{Binding ToggleFileDetailsCommand}" />
               <Button
-                  Grid.Column="3"
+                  Grid.Column="2"
                   Classes="tree-detail-toggle"
                   Classes.active="{Binding ShowSkippedFiles}"
                   Content="{Binding SkippedFilesToggleLabel}"
                   Command="{Binding ToggleSkippedFilesCommand}" />
               <Button
-                  Grid.Column="4"
+                  Grid.Column="3"
                   Classes="tree-detail-toggle"
                   Content="x"
                   ToolTip.Tip="Close project files tree"

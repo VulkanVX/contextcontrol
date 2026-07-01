@@ -42,6 +42,7 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
     private ThemeOptionViewModel _selectedCodeFont;
     private ThemeOptionViewModel _selectedUiFont;
     private ThemeOptionViewModel _selectedUiFontColorMode;
+    private ThemeOptionViewModel _selectedChatAppearance;
     private ThemeOptionViewModel _selectedSkin;
     private ThemeOptionViewModel _selectedFoldArrowPosition;
     private WorkbenchModeOptionViewModel _selectedWorkspaceMode;
@@ -55,6 +56,11 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
     private bool _themeAdaptLocColor;
     private bool _themeAdaptVersionColor;
     private bool _themeAdaptBytesColor;
+    private bool _autoSwitchPromptModesToChat;
+    private double _uiFontSize;
+    private double _codeEditorFontSize;
+    private double _promptWindowFontSize;
+    private double _chatWindowFontSize;
     private Color _customUiFontColor;
     private bool _summarizeNamespace;
     private bool _summarizeClass;
@@ -132,6 +138,8 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         _uiContext = SynchronizationContext.Current;
         _workbenchSettings = workbenchSettings ?? WorkbenchSettings.Load();
         ContextControl = new ContextControlViewModel(_workbenchSettings);
+        ContextControl.SetProjectFileOpener(OpenContextControlPatchTarget);
+        ContextControl.SetPromptModeWorkspaceRequester(SwitchToChatFromPromptMode);
         ContextControl.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ContextControlViewModel.IsPromptOpen))
@@ -236,6 +244,12 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
             new ThemeOptionViewModel("theme", "Theme adapt", "use the selected theme's text colors"),
             new ThemeOptionViewModel("custom", "Custom", "use the selected color as the main UI text color")
         ];
+        ChatAppearances =
+        [
+            new ThemeOptionViewModel("dark", "Dark", "professional dark chat palette with calm role separation"),
+            new ThemeOptionViewModel("light", "Light", "professional light chat palette with clean neutral contrast"),
+            new ThemeOptionViewModel("adaptive", "Theme adapt", "derive chat colors from the selected workbench theme")
+        ];
         Skins = new ObservableCollection<ThemeOptionViewModel>(
             WorkbenchSkins.All.Select(skin => new ThemeOptionViewModel(skin.Key, skin.Name, skin.Description)));
         FoldArrowPositions =
@@ -247,7 +261,6 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         [
             new WorkbenchModeOptionViewModel("code", "Code Editor"),
             new WorkbenchModeOptionViewModel("chat", "Chat"),
-            new WorkbenchModeOptionViewModel("imagegen", "Image Gen"),
             new WorkbenchModeOptionViewModel("graph", "Graph"),
             new WorkbenchModeOptionViewModel("browser", "Browser"),
             new WorkbenchModeOptionViewModel("llms", "LLMs"),
@@ -260,11 +273,11 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         _selectedCodeFont = FindOptionByKey(CodeFonts, _workbenchSettings.CodeFontKey, CodeFonts[0]);
         _selectedUiFont = FindOptionByKey(UiFonts, _workbenchSettings.UiFontKey, UiFonts[0]);
         _selectedUiFontColorMode = FindOptionByKey(UiFontColorModes, _workbenchSettings.UiFontColorModeKey, UiFontColorModes[0]);
+        _selectedChatAppearance = FindOptionByKey(ChatAppearances, _workbenchSettings.ChatAppearanceKey, ChatAppearances[0]);
         _selectedSkin = FindOptionByKey(Skins, _workbenchSettings.SkinKey, Skins[0]);
         _selectedFoldArrowPosition = FindOptionByKey(FoldArrowPositions, _workbenchSettings.FoldArrowPositionKey, FoldArrowPositions[0]);
         _selectedWorkspaceMode = FindModeByKey(_workbenchSettings.WorkspaceModeKey);
         RefreshWorkspaceModeState();
-        ContextControl.IsImageGenWorkspaceActive = IsImageGenMode;
         _showFoldArrows = _workbenchSettings.ShowFoldArrows;
         _showSummaryArrowBorders = _workbenchSettings.ShowSummaryArrowBorders;
         _useParentChildArrowIndentation = _workbenchSettings.UseParentChildArrowIndentation;
@@ -275,6 +288,11 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         _themeAdaptLocColor = _workbenchSettings.ThemeAdaptLocColor;
         _themeAdaptVersionColor = _workbenchSettings.ThemeAdaptVersionColor;
         _themeAdaptBytesColor = _workbenchSettings.ThemeAdaptBytesColor;
+        _autoSwitchPromptModesToChat = _workbenchSettings.AutoSwitchPromptModesToChat;
+        _uiFontSize = _workbenchSettings.UiFontSize;
+        _codeEditorFontSize = _workbenchSettings.CodeEditorFontSize;
+        _promptWindowFontSize = _workbenchSettings.PromptWindowFontSize;
+        _chatWindowFontSize = _workbenchSettings.ChatWindowFontSize;
         _customUiFontColor = ParseColor(_workbenchSettings.CustomUiFontColor, Color.Parse("#DDE6E8"));
         _showSkippedFiles = _workbenchSettings.ShowSkippedFiles;
         _isProjectFilesPaneOpen = _workbenchSettings.ShowProjectFilesPane;
@@ -383,6 +401,7 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
     public ObservableCollection<ThemeOptionViewModel> CodeFonts { get; }
     public ObservableCollection<ThemeOptionViewModel> UiFonts { get; }
     public ObservableCollection<ThemeOptionViewModel> UiFontColorModes { get; }
+    public ObservableCollection<ThemeOptionViewModel> ChatAppearances { get; }
     public ObservableCollection<ThemeOptionViewModel> Skins { get; }
     public ObservableCollection<ThemeOptionViewModel> FoldArrowPositions { get; }
     public ObservableCollection<WorkbenchModeOptionViewModel> WorkspaceModes { get; }

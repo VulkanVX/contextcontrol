@@ -75,13 +75,63 @@ public sealed partial class ContextControlViewModel
     {
         if (!IsLikelyCcRequestList(message))
         {
-            _lastUserRequest = message;
+            RememberWorkflowTask(message);
             return message;
         }
 
-        return string.IsNullOrWhiteSpace(_lastUserRequest)
+        var savedTask = ResolveWorkflowTaskText();
+        return string.IsNullOrWhiteSpace(savedTask)
             ? message
-            : _lastUserRequest;
+            : savedTask;
+    }
+
+    private string ResolveWorkflowTaskText()
+    {
+        if (SelectedChatSession is { } session && !string.IsNullOrWhiteSpace(session.WorkflowTaskText))
+        {
+            return session.WorkflowTaskText;
+        }
+
+        return _lastUserRequest;
+    }
+
+    private void RememberWorkflowTask(string text, bool save = true)
+    {
+        var clean = NormalizeWorkflowTaskTextForMemory(text);
+        if (!IsMeaningfulTaskPrompt(clean))
+        {
+            return;
+        }
+
+        _lastUserRequest = clean;
+        SelectedChatSession?.SetWorkflowTaskText(clean);
+        if (save)
+        {
+            SaveChatHistory();
+        }
+    }
+
+    private static string NormalizeWorkflowTaskTextForMemory(string text)
+    {
+        var clean = (text ?? "").Trim();
+        if (!clean.StartsWith("Task:", StringComparison.OrdinalIgnoreCase))
+        {
+            return clean;
+        }
+
+        var body = clean["Task:".Length..].Trim();
+        var instructionSeparator = body.IndexOf($"{Environment.NewLine}{Environment.NewLine}", StringComparison.Ordinal);
+        if (instructionSeparator < 0)
+        {
+            instructionSeparator = body.IndexOf("\n\n", StringComparison.Ordinal);
+        }
+
+        if (instructionSeparator >= 0)
+        {
+            body = body[..instructionSeparator];
+        }
+
+        return body.Trim();
     }
 
     private static bool IsLikelyCcRequestList(string text)
@@ -168,7 +218,7 @@ public sealed partial class ContextControlViewModel
         {
             PromptText = EnsureEndsWithEnd(fallback);
             IsPromptOpen = true;
-            PromptModeKey = "context";
+            PreserveCodexOrUseContextPromptMode();
         }
         PhaseDetail = fallbackKind.Equals("semantic path", StringComparison.OrdinalIgnoreCase)
             ? "Semantic fallback loaded for the request. Select that chat, then press Send or CC to export those files."
@@ -191,9 +241,10 @@ public sealed partial class ContextControlViewModel
 
     private string SelectFallbackSourceText(string userMessage)
     {
-        if ((LooksLikeAttachmentDiagnostic(userMessage) || LooksLikeContextOnlyPrompt(userMessage)) && !string.IsNullOrWhiteSpace(_lastUserRequest))
+        var savedTask = ResolveWorkflowTaskText();
+        if ((LooksLikeAttachmentDiagnostic(userMessage) || LooksLikeContextOnlyPrompt(userMessage)) && !string.IsNullOrWhiteSpace(savedTask))
         {
-            return _lastUserRequest;
+            return savedTask;
         }
 
         var currentFallback = ResolveFileRequestFromIndex(userMessage);
@@ -202,9 +253,9 @@ public sealed partial class ContextControlViewModel
             return userMessage;
         }
 
-        return string.IsNullOrWhiteSpace(_lastUserRequest)
+        return string.IsNullOrWhiteSpace(savedTask)
             ? userMessage
-            : _lastUserRequest;
+            : savedTask;
     }
 
     private static bool LooksLikeAttachmentDiagnostic(string text)
@@ -351,6 +402,25 @@ public sealed partial class ContextControlViewModel
         }
 
         return missing.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private async Task<ContextDirManifest> LoadCurrentDirManifestAsync()
+    {
+        try
+        {
+            if (!File.Exists(_processService.DirectoryExportPath))
+            {
+                return ContextDirManifest.Empty;
+            }
+
+            var text = await _processService.ReadOutputFileAsync(_processService.DirectoryExportPath);
+            return ContextDirManifestParser.Parse(text);
+        }
+        catch (Exception ex)
+        {
+            Log("warn", $"DIR manifest validation skipped: {ex.Message}");
+            return ContextDirManifest.Empty;
+        }
     }
 
     private string ResolveEffectiveProjectRootPath()

@@ -340,6 +340,20 @@ public sealed partial class ContextSemanticMapBuilder
 
     private static IEnumerable<string> ExtractFilesFromDirExport(string directoryExportText)
     {
+        var manifest = ContextDirManifestParser.Parse(directoryExportText);
+        if (manifest.Files.Count > 0)
+        {
+            foreach (var file in manifest.Files)
+            {
+                yield return file.Path;
+            }
+
+            if (manifest.IsV2)
+            {
+                yield break;
+            }
+        }
+
         var stack = new Dictionary<int, string>();
         foreach (var rawLine in (directoryExportText ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
         {

@@ -20,7 +20,14 @@ function Get-GptDescription {
 
     $ext = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
 
-    if (-not ($script:TextExtensions -contains $ext)) {
+    $isText = if ($null -ne $script:TextExtensionSet) {
+        $script:TextExtensionSet.Contains($ext)
+    }
+    else {
+        $script:TextExtensions -contains $ext
+    }
+
+    if (-not $isText) {
         return "Binary or non-text file."
     }
 
@@ -97,7 +104,14 @@ function Add-DirectoryTree {
         else {
             $ext = [System.IO.Path]::GetExtension($item.Name).ToLowerInvariant()
 
-            if ($script:BinaryExtensions -contains $ext) {
+            $isBinary = if ($null -ne $script:BinaryExtensionSet) {
+                $script:BinaryExtensionSet.Contains($ext)
+            }
+            else {
+                $script:BinaryExtensions -contains $ext
+            }
+
+            if ($isBinary) {
                 continue
             }
 
@@ -135,12 +149,26 @@ function Add-FileBlock {
 
     $ext = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
 
-    if ($script:BinaryExtensions -contains $ext) {
+    $isBinary = if ($null -ne $script:BinaryExtensionSet) {
+        $script:BinaryExtensionSet.Contains($ext)
+    }
+    else {
+        $script:BinaryExtensions -contains $ext
+    }
+
+    if ($isBinary) {
         Add-Line "Skipped binary/runtime cache file: $Path"
         return
     }
 
-    if (-not ($script:TextExtensions -contains $ext)) {
+    $isText = if ($null -ne $script:TextExtensionSet) {
+        $script:TextExtensionSet.Contains($ext)
+    }
+    else {
+        $script:TextExtensions -contains $ext
+    }
+
+    if (-not $isText) {
         Add-Line "Skipped non-text file: $Path"
         return
     }

@@ -20,6 +20,7 @@ public static partial class ProjectStackScanner
         public bool LimitHit { get; set; }
         public Dictionary<string, int> ExtensionCounts { get; } = new(NameComparer);
         public Dictionary<string, int> UnsupportedExtensionCounts { get; } = new(NameComparer);
+        public Dictionary<string, int> SkippedExtensionCounts { get; } = new(NameComparer);
         public Dictionary<string, int> LanguageCounts { get; } = new(NameComparer);
         public Dictionary<string, SortedSet<string>> StackReasons { get; } = new(NameComparer);
         public Dictionary<string, SortedSet<string>> UseReasons { get; } = new(NameComparer);

@@ -93,20 +93,30 @@
 
           <Grid Grid.Row="3" Margin="10,0,10,0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5">
             <TextBlock Text="{Binding ContextControl.PatchSummary}" Classes="cc-state-detail" />
-            <Border Grid.Row="1" Classes="cc-log-host" MaxHeight="118" IsVisible="{Binding ContextControl.HasPatchPlanActions}">
+            <Border Grid.Row="1" Classes="cc-log-host" MaxHeight="138" IsVisible="{Binding ContextControl.HasPatchPlanFiles}">
               <ScrollViewer
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   controls:HoverScrollbarBehavior.IsEnabled="True"
                   controls:HoverScrollbarBehavior.ReserveRight="12">
-                <ItemsControl ItemsSource="{Binding ContextControl.PatchPlanActions}">
+                <ItemsControl ItemsSource="{Binding ContextControl.PatchPlanFiles}">
                   <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:PatchPlanActionViewModel}">
-                      <Grid ColumnDefinitions="34,34,*" ColumnSpacing="5" Margin="0,0,0,3">
-                        <TextBlock Text="{Binding AddedLabel}" Classes="history-meta plus" TextAlignment="Right" FontWeight="Black" />
-                        <TextBlock Grid.Column="1" Text="{Binding RemovedLabel}" Classes="history-meta minus" TextAlignment="Right" FontWeight="Black" />
-                        <TextBlock Grid.Column="2" Text="{Binding Summary}" Classes="cc-log-message" TextTrimming="CharacterEllipsis" />
-                      </Grid>
+                    <DataTemplate DataType="{x:Type vm:PatchPlanFileViewModel}">
+                      <Button
+                          Classes="cc-patch-file-row"
+                          ToolTip.Tip="{Binding ToolTipText}"
+                          Command="{Binding DataContext.ContextControl.OpenPatchPlanFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                          <TextBlock Text="{Binding FileName}" Classes="cc-patch-file-title" />
+                          <TextBlock Grid.Column="1" Text="{Binding AddedLabel}" Classes="cc-patch-token add" />
+                          <TextBlock Grid.Column="2" Text="{Binding RemovedLabel}" Classes="cc-patch-token remove" />
+                          <TextBlock Grid.Column="3" Text="|" Classes="cc-patch-token" />
+                          <TextBlock Grid.Column="4" Text="{Binding LocLabel}" Classes="cc-patch-token loc" />
+                          <TextBlock Grid.Column="5" Text="|" Classes="cc-patch-token" />
+                          <TextBlock Grid.Column="6" Text="{Binding Version}" Classes="cc-patch-token version" />
+                        </Grid>
+                      </Button>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

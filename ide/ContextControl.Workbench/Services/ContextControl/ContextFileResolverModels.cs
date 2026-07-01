@@ -48,3 +48,48 @@ public sealed record ContextFileResolveResult(
         ? string.Join(Environment.NewLine, RequestLines.Append("END"))
         : "";
 }
+
+public sealed record ContextDirManifest(
+    bool IsV2,
+    string Lod,
+    string Scope,
+    IReadOnlyList<ContextDirManifestFile> Files,
+    IReadOnlyList<ContextDirManifestRoot> Roots,
+    IReadOnlyList<ContextDirManifestFamily> Families)
+{
+    public static ContextDirManifest Empty { get; } = new(false, "", "", [], [], []);
+}
+
+public sealed record ContextDirManifestFile(
+    string Path,
+    string Tier,
+    string Kind,
+    string Role,
+    string Exports);
+
+public sealed record ContextDirManifestRoot(
+    string Path,
+    string Role,
+    int Files);
+
+public sealed record ContextDirManifestFamily(
+    string Path,
+    string Role,
+    string Exports);
+
+public sealed record ContextRequestLineParseResult(
+    IReadOnlyList<string> RequestLines,
+    IReadOnlyList<string> ExtraLines,
+    bool EndsWithEnd);
+
+public sealed record ContextPhase1ValidationResult(
+    bool IsValid,
+    string Kind,
+    IReadOnlyList<string> RequestLines,
+    string Error,
+    IReadOnlyList<string> Candidates)
+{
+    public string ExpandScope => Kind.Equals("expand", StringComparison.OrdinalIgnoreCase) && RequestLines.Count == 1
+        ? RequestLines[0]["EXPAND:".Length..].Trim()
+        : "";
+}

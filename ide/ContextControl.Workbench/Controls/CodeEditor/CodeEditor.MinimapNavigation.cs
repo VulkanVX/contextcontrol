@@ -119,7 +119,7 @@ public sealed partial class CodeEditor
             return;
         }
 
-        ScrollToEditorOffset(_verticalOffset - e.Delta.Y * EditorLineHeight * 3);
+        ScrollToEditorOffset(_verticalOffset - e.Delta.Y * EffectiveEditorLineHeight * 3);
         e.Handled = true;
     }
 

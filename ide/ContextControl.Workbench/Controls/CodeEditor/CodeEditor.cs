@@ -19,7 +19,8 @@ public sealed partial class CodeEditor : UserControl
 {
     private const double EditorTopPadding = 10;
     private const double EditorBottomPadding = 14;
-    private const double EditorLineHeight = 16;
+    private const double DefaultEditorFontSize = 12;
+    private const double DefaultEditorLineHeight = 16;
     private const double MinimapWidth = 46;
     private const double ScrollbarReserve = 12;
     private const double MinimapIdleOpacity = 0.76;
@@ -51,6 +52,9 @@ public sealed partial class CodeEditor : UserControl
 
     public static readonly StyledProperty<string> CodeFontFamilyProperty =
         AvaloniaProperty.Register<CodeEditor, string>(nameof(CodeFontFamily), "avares://ContextControl.Workbench/Assets/Fonts#Cascadia Code, Consolas");
+
+    public static readonly StyledProperty<double> EditorFontSizeProperty =
+        AvaloniaProperty.Register<CodeEditor, double>(nameof(EditorFontSize), DefaultEditorFontSize);
 
     public static readonly StyledProperty<string> SkinKeyProperty =
         AvaloniaProperty.Register<CodeEditor, string>(nameof(SkinKey), "default");
@@ -154,8 +158,8 @@ public sealed partial class CodeEditor : UserControl
             Width = ScrollbarReserve,
             MinWidth = ScrollbarReserve,
             Minimum = 0,
-            SmallChange = EditorLineHeight,
-            LargeChange = EditorLineHeight * 8,
+            SmallChange = EffectiveEditorLineHeight,
+            LargeChange = EffectiveEditorLineHeight * 8,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Stretch,
             Margin = new Thickness(0, 0, 0, ScrollbarReserve),
@@ -221,6 +225,7 @@ public sealed partial class CodeEditor : UserControl
         AddHandler(KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
         Content = _root;
 
+        ApplyEditorFontSize();
         ApplyDocument();
         ApplyEditorVisualSettings();
         ApplyChrome();
