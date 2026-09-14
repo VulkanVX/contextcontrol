@@ -34,6 +34,7 @@ public sealed class WebView2Host : NativeControlHost
     public ulong StartedNavigationId { get; private set; }
     public ulong CompletedNavigationId { get; private set; }
     public bool LastNavigationSucceeded { get; private set; }
+    public int LastHttpStatusCode { get; private set; }
     public string? InitializationError { get; private set; }
     public Task<string> ExecuteScriptAsync(string script) => _webView?.ExecuteScriptAsync(script)
         ?? throw new InvalidOperationException("The embedded browser is still starting.");
@@ -206,6 +207,7 @@ public sealed class WebView2Host : NativeControlHost
         {
             CompletedNavigationId = args.NavigationId;
             LastNavigationSucceeded = args.IsSuccess;
+            LastHttpStatusCode = args.HttpStatusCode;
             if (args.NavigationId == StartedNavigationId) IsNavigating = false;
             Dispatcher.UIThread.Post(() => RaiseNavigationCompleted(args.IsSuccess));
         };

@@ -71,6 +71,16 @@ public sealed class GoogleBrowserTestApp : Application
                 if (!body.Contains("Readable public article") || body.Contains("HIDDEN_MARKER") || body.Contains("SCRIPT_MARKER") || body.Contains("NAV_MARKER"))
                     throw new InvalidOperationException("Page reader must include visible article text and exclude hidden/navigation/script text.");
                 Console.WriteLine("Native WebView2 extraction passed: two Google-style result cards and visible article text.");
+                core.NavigateToString("""
+                    <!doctype html><html><head><title>Reddit</title></head><body id="blocked-fixture"><main>
+                    <h1>You've been blocked by network security</h1>
+                    <p>To continue, log in to your Reddit account or use your developer token. If you think you've been blocked by mistake, contact support.</p>
+                    </main></body></html>
+                    """);
+                while (await core.ExecuteScriptAsync("!!document.getElementById('blocked-fixture')") != "true") await Task.Delay(100, deadline.Token);
+                var blockedJson = await browser.ExecuteScriptAsync(GoogleResearchScripts.PageText);
+                try { GooglePageReader.Parse(blockedJson); throw new Exception("The reader accepted the Reddit block screen as article text."); }
+                catch (GooglePageUnavailableException) { Console.WriteLine("Native WebView2 block-screen detection passed."); }
                 fixture.Close();
                 if (!string.IsNullOrWhiteSpace(Model))
                 {

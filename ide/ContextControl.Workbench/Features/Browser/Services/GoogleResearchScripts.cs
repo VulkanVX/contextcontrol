@@ -46,7 +46,10 @@ public static class GoogleResearchScripts
             const text = node.textContent.replace(/\s+/g, ' ').trim();
             if (text) { parts.push(text); length += text.length + 1; }
           }
-          return { url: location.href, title: document.title, text: parts.join('\n').slice(0,24000) };
+          const gate = document.querySelector('[role="dialog"][aria-modal="true"],dialog[open]');
+          return { url: location.href, title: document.title, text: parts.join('\n').slice(0,24000),
+            heading: document.querySelector('h1')?.innerText?.slice(0,500) || '',
+            gateText: gate?.innerText?.slice(0,1600) || '', hasArticle: !!document.querySelector('article,shreddit-post') };
         })()
         """;
 }

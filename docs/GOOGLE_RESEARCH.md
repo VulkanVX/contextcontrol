@@ -4,7 +4,7 @@ Turn on **Google auto** in the Local chat composer or **Settings → Prompt Wind
 
 Ask normally: “Search for Avalonia's official documentation” or “What is the current state of …?” ContextControl asks the selected local model whether research is needed. The model writes a Google query, receives up to six result titles, URLs and snippets, then chooses up to three numbered links to read. ContextControl retrieves visible page text and returns excerpts to that same model for its final answer. Source buttons below the answer open the original pages and remain in chat history.
 
-The request's progress row and Chat Monitor show planning, searching, choosing pages, reading and answering. The normal Stop button cancels the complete request, including time spent waiting for another chat's browser operation. Browser operations are serialized, and each result is checked against its own query or requested URL.
+The request's progress row and Chat Monitor show planning, searching, choosing pages, reading and answering. Blocked or failed pages are marked unavailable, and the model gets one opportunity to choose alternatives from untried results. Research makes at most five distinct page attempts to collect up to three readable pages. The normal Stop button cancels the complete request, including time spent waiting for another chat's browser operation. Browser operations are serialized, and each result is checked against its own query or requested URL.
 
 ## Browser and privacy
 
@@ -18,7 +18,7 @@ The separate browser profile is stored in `%LOCALAPPDATA%\ContextControl\GoogleR
 
 - Small models may produce imperfect queries, selections or citations. Invalid planner JSON falls back to the user's explicit/current-information query; invalid selections fall back to the first two valid results.
 - Google may change its page layout, require verification, or return no readable results. In that case ContextControl reports the failure instead of silently answering as if research succeeded.
-- Page reading is limited to visible HTML text. PDFs, sign-in pages, blocked pages and redirects that do not match the selected source may be unavailable. The final prompt clearly distinguishes page excerpts from search snippets.
+- Page reading is limited to visible HTML text. PDFs, sign-in pages, blocked pages and redirects that do not match the selected source may be unavailable. HTTP failures and recognizable block screens are rejected as evidence; access restrictions are not bypassed. The final prompt clearly distinguishes page excerpts from search snippets and discloses when a requested source was unavailable.
 - Excerpts are bounded by the selected context window. Large project capsules may require a larger local context setting or a shorter prompt. Search and page selection add local model generation time before the final answer.
 - This supplies evidence to a model; it does not guarantee that every statement or citation in its answer is correct.
 

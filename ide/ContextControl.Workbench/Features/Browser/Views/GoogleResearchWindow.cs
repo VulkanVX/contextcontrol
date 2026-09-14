@@ -109,14 +109,16 @@ public sealed class GoogleResearchWindow : Window
             {
                 token.ThrowIfCancellationRequested();
                 ThrowIfUnavailable();
+                if (HasFinishedNavigation(previousNavigation))
+                {
+                    GooglePageReader.ThrowIfHttpError(_browser.Source, _browser.LastHttpStatusCode);
+                    if (!_browser.LastNavigationSucceeded) throw new GooglePageUnavailableException(_browser.Source, "Navigation to this source failed.");
+                }
                 if (HasCompletedNavigation(previousNavigation))
                 {
-                    using var document = JsonDocument.Parse(await _browser.ExecuteScriptAsync(GoogleResearchScripts.PageText).WaitAsync(TimeSpan.FromSeconds(5), token));
-                    var page = document.RootElement;
-                    var url = page.GetProperty("url").GetString();
-                    var text = page.GetProperty("text").GetString() ?? "";
+                    var page = GooglePageReader.Parse(await _browser.ExecuteScriptAsync(GoogleResearchScripts.PageText).WaitAsync(TimeSpan.FromSeconds(5), token));
                     // Do not accidentally return a previous page or a redirect to a login/consent provider.
-                    if (MatchesSourcePage(source.Url, url) && text.Length >= 120) return new GooglePageContent(url!, text);
+                    if (MatchesSourcePage(source.Url, page.Url) && page.Text.Length >= 120) return page;
                 }
                 await Task.Delay(400, token);
             }
@@ -137,8 +139,10 @@ public sealed class GoogleResearchWindow : Window
             && expected.Query == found.Query;
     }
 
-    private bool HasCompletedNavigation(ulong previous) => _browser.IsReady && !_browser.IsNavigating
-        && _browser.StartedNavigationId != previous && _browser.StartedNavigationId == _browser.CompletedNavigationId && _browser.LastNavigationSucceeded;
+    private bool HasFinishedNavigation(ulong previous) => _browser.IsReady && !_browser.IsNavigating
+        && _browser.StartedNavigationId != previous && _browser.StartedNavigationId == _browser.CompletedNavigationId;
+
+    private bool HasCompletedNavigation(ulong previous) => HasFinishedNavigation(previous) && _browser.LastNavigationSucceeded;
 
     private void RequestBrowserAttention()
     {

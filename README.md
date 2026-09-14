@@ -66,7 +66,7 @@ With **Google auto** enabled, any installed Ollama chat model can decide to sear
 
 For example: “Search Google for the official Avalonia documentation.” Research progress appears alongside your chat. Complete any Google consent or verification in the browser window when needed.
 
-See [Google research](docs/GOOGLE_RESEARCH.md) and [v0.4.1 release notes](docs/releases/v0.4.1.md).
+Blocked pages are marked unavailable and the model can choose other results. See [Google research](docs/GOOGLE_RESEARCH.md) and [v0.4.2 release notes](docs/releases/v0.4.2.md).
 
 ## What Is Bundled
 
