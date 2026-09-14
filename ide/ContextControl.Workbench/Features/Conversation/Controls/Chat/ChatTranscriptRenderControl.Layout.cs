@@ -30,7 +30,15 @@ public sealed partial class ChatTranscriptRenderControl
         var bodyCard = ResolveMessageBodyCard(message, width, availableCardWidth, card);
         var contentLeft = bodyCard.X + CardPaddingX;
         var contentWidth = Math.Max(1.0, bodyCard.Width - CardPaddingX * 2.0);
-        var y = CardPaddingY;
+        var transitionHeight = 0.0;
+        if (message.HasModelTransition)
+        {
+            var transitionWidth = ResolveConversationColumnWidth(availableCardWidth);
+            var transitionX = (width - transitionWidth) / 2;
+            transitionHeight = AddRichParagraph(layout, [new(message.ModelTransitionLabel)], transitionX + CardPaddingX,
+                4, Math.Max(1, transitionWidth - CardPaddingX * 2), ChatMetaFontSize) + 6;
+        }
+        var y = CardPaddingY + transitionHeight;
 
         BuildHeader(layout, message, card, y, contentWidth);
         y += HeaderHeight;
@@ -39,8 +47,8 @@ public sealed partial class ChatTranscriptRenderControl
         var isFullyCollapsed = collapseProgress >= 0.999 && !_collapseAnimations.ContainsKey(message);
         if (isFullyCollapsed)
         {
-            layout.CardRect = new Rect(card.X, 0, card.Width, collapsedHeight);
-            layout.Height = collapsedHeight + MessageGap;
+            layout.CardRect = new Rect(card.X, transitionHeight, card.Width, collapsedHeight);
+            layout.Height = transitionHeight + collapsedHeight + MessageGap;
             return layout;
         }
 
@@ -92,7 +100,7 @@ public sealed partial class ChatTranscriptRenderControl
         {
             var namedEntries = ContextControl.Workbench.Services.GoogleEntryPhotoService.EntryNames(message.VisibleText)
                 .Select(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName).ToHashSet();
-            foreach (var photo in message.AttachedFiles.Where(file => !string.IsNullOrWhiteSpace(file.EntryTitle) && !string.IsNullOrWhiteSpace(file.PreviewPath)))
+            foreach (var photo in message.AttachedFiles.Where(file => !file.IsSubjectPhoto && !string.IsNullOrWhiteSpace(file.EntryTitle) && !string.IsNullOrWhiteSpace(file.PreviewPath)))
             {
                 if (!namedEntries.Add(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName(photo.EntryTitle!))) continue;
                 y = BuildInformationCard(layout, new ContextControl.Workbench.Services.ChatMarkdownBlock("card",
@@ -112,10 +120,10 @@ public sealed partial class ChatTranscriptRenderControl
             y = BuildDiagnostic(layout, message, contentLeft, y, contentWidth);
         }
 
-        var expandedHeight = Math.Max(34.0, y + CardPaddingY);
+        var expandedHeight = Math.Max(34.0, y + CardPaddingY - transitionHeight);
         var cardHeight = expandedHeight + ((collapsedHeight - expandedHeight) * collapseProgress);
-        layout.CardRect = new Rect(card.X, 0, card.Width, Math.Max(collapsedHeight, cardHeight));
-        layout.Height = layout.CardRect.Height + MessageGap;
+        layout.CardRect = new Rect(card.X, transitionHeight, card.Width, Math.Max(collapsedHeight, cardHeight));
+        layout.Height = transitionHeight + layout.CardRect.Height + MessageGap;
         return layout;
     }
 
@@ -313,7 +321,7 @@ public sealed partial class ChatTranscriptRenderControl
 
     private void BuildHeader(MessageLayout layout, LocalLlmChatMessageViewModel message, Rect card, double y, double contentWidth)
     {
-        var headerRect = new Rect(card.X, 0, card.Width, HeaderHeight);
+        var headerRect = new Rect(card.X, y - CardPaddingY, card.Width, HeaderHeight);
         var centerY = headerRect.Y + headerRect.Height * 0.5;
         var right = card.Right - CardPaddingX;
         var codeFont = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));

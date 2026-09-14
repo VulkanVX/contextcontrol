@@ -177,7 +177,8 @@ public sealed class ChatHistoryService
         {
             Role = TrimText(message.Role, 24),
             Text = TrimLargeMessage(message.Text),
-            ModelId = TrimText(message.ModelId, 96),
+            ModelId = TrimText(message.ModelId, 512),
+            PreviousModelId = TrimText(message.PreviousModelId, 512),
             Phase = TrimText(message.Phase, 48),
             CapsuleSummary = TrimText(message.CapsuleSummary, 160),
             DiagnosticPrompt = TrimLargeMessage(message.DiagnosticPrompt),
@@ -191,6 +192,8 @@ public sealed class ChatHistoryService
                     Path = TrimText(attachment.Path, attachment.Kind == "web" ? 1600 : 520),
                     PreviewPath = TrimText(attachment.PreviewPath, 520),
                     EntryTitle = TrimText(attachment.EntryTitle, 160),
+                    PhotoCaption = TrimText(attachment.PhotoCaption, 180), PhotoSection = TrimText(attachment.PhotoSection, 180),
+                    PhotoKind = TrimText(attachment.PhotoKind, 32), IsSubjectPhoto = attachment.IsSubjectPhoto,
                     Kind = TrimText(attachment.Kind, 32),
                     IncludeInPrompt = attachment.IncludeInPrompt
                 })
@@ -216,6 +219,8 @@ public sealed class ChatHistoryService
             Path = TrimText(attachment.Path, 520),
             PreviewPath = TrimText(attachment.PreviewPath, 520),
             EntryTitle = TrimText(attachment.EntryTitle, 160),
+            PhotoCaption = TrimText(attachment.PhotoCaption, 180), PhotoSection = TrimText(attachment.PhotoSection, 180),
+            PhotoKind = TrimText(attachment.PhotoKind, 32), IsSubjectPhoto = attachment.IsSubjectPhoto,
             Kind = TrimText(attachment.Kind, 32),
             IncludeInPrompt = attachment.IncludeInPrompt
         };
@@ -486,6 +491,7 @@ public sealed class ChatHistoryMessageData
     public string Role { get; set; } = "";
     public string Text { get; set; } = "";
     public string ModelId { get; set; } = "";
+    public string PreviousModelId { get; set; } = "";
     public string Phase { get; set; } = "";
     public string CapsuleSummary { get; set; } = "";
     public string DiagnosticPrompt { get; set; } = "";
@@ -496,6 +502,10 @@ public sealed class ChatHistoryMessageData
 
 public sealed class ChatHistoryAttachmentData
 {
+    public string PhotoCaption { get; set; } = "";
+    public string PhotoSection { get; set; } = "";
+    public string PhotoKind { get; set; } = "";
+    public bool IsSubjectPhoto { get; set; }
     public string PreviewPath { get; set; } = "";
     public string EntryTitle { get; set; } = "";
     public string Label { get; set; } = "";

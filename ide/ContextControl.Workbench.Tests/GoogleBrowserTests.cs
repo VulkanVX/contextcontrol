@@ -10,7 +10,7 @@ using Microsoft.Web.WebView2.Core;
 
 internal static class GoogleBrowserTests
 {
-    public static void Run(string? model, bool pizza = false, bool photo = false, bool knowledge = false)
+    public static void Run(string? model, bool pizza = false, bool photo = false, bool knowledge = false, string media = "")
     {
         if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("This opt-in browser check requires Windows.");
         Exception? failure = null;
@@ -20,6 +20,7 @@ internal static class GoogleBrowserTests
             GoogleBrowserTestApp.Pizza = pizza;
             GoogleBrowserTestApp.Photo = photo;
             GoogleBrowserTestApp.Knowledge = knowledge;
+            GoogleBrowserTestApp.Media = media;
             GoogleBrowserTestApp.Failed = ex => failure = ex;
             try { AppBuilder.Configure<GoogleBrowserTestApp>().UsePlatformDetect().WithInterFont().StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown); }
             catch (Exception ex) { failure = ex; }
@@ -37,6 +38,7 @@ public sealed class GoogleBrowserTestApp : Application
     internal static bool Pizza;
     internal static bool Photo;
     internal static bool Knowledge;
+    internal static string Media = "";
     internal static Action<Exception>? Failed;
     public override void Initialize() => Styles.Add(new FluentTheme());
 
@@ -65,8 +67,9 @@ public sealed class GoogleBrowserTestApp : Application
                     <!doctype html><html><head><meta property="og:image" content="https://example.com/hero.jpg"></head><body id="fixture">
                     <main><div class="MjjYud"><a href="https://docs.avaloniaui.net/docs/overview"><h3>Avalonia documentation</h3></a><img src="data:image/png;base64,AAAA" width="120" height="80"><p>Official documentation for desktop applications.</p></div>
                     <div class="MjjYud"><a href="https://avaloniaui.net/blog"><h3>Release notes</h3></a><p>The newest release announcements.</p></div>
+                    <a href="https://translate.google.com/example"><h3>Išversti ŠĢ Puslapī</h3></a>
                     <a href="javascript:void(0)"><h3>Invalid result</h3></a>
-                    <article>Readable public article text with facts. <span hidden>HIDDEN_MARKER</span><script type="text/plain">SCRIPT_MARKER</script><nav>NAV_MARKER</nav></article></main>
+                    <article>Readable public article text with facts. <h2>Riverglades</h2><aside><figure><img src="https://example.com/riverglades.jpg" width="320" height="180" alt="Riverglades landscape"><figcaption>Riverglades in World of Warcraft Forever</figcaption></figure></aside><div class="newsletter-promo"><img src="https://example.com/subscribe.jpg" width="320" height="180" alt="Subscribe to our newsletters!"></div><span hidden>HIDDEN_MARKER</span><script type="text/plain">SCRIPT_MARKER</script><nav>NAV_MARKER</nav></article></main>
                     </body></html>
                     """);
                 while (await core.ExecuteScriptAsync("!!document.getElementById('fixture')") != "true") await Task.Delay(100, deadline.Token);
@@ -76,7 +79,11 @@ public sealed class GoogleBrowserTestApp : Application
                 if (cards[0].GetProperty("imageUrl").GetString() != "data:image/png;base64,AAAA" || cards[1].GetProperty("imageUrl").GetString() != "")
                     throw new InvalidOperationException("Search thumbnails must belong to their own result, never a neighboring card.");
                 using var page = JsonDocument.Parse(await browser.ExecuteScriptAsync(GoogleResearchScripts.PageText));
+                if (page.RootElement.GetProperty("images").EnumerateArray().Any(item => item.GetProperty("url").GetString()!.Contains("subscribe")))
+                    throw new InvalidOperationException("Page photo extraction must exclude newsletter promotions.");
                 if (page.RootElement.GetProperty("imageUrl").GetString() != "https://example.com/hero.jpg") throw new InvalidOperationException("The page reader must extract the source's preview image metadata.");
+                if (!page.RootElement.GetProperty("images").EnumerateArray().Any(item => item.GetProperty("section").GetString() == "Riverglades" && item.GetProperty("caption").GetString()!.Contains("World of Warcraft")))
+                    throw new InvalidOperationException("Article image captions and section ownership were not extracted.");
                 var body = page.RootElement.GetProperty("text").GetString()!;
                 if (!body.Contains("Readable public article") || body.Contains("HIDDEN_MARKER") || body.Contains("SCRIPT_MARKER") || body.Contains("NAV_MARKER"))
                     throw new InvalidOperationException("Page reader must include visible article text and exclude hidden/navigation/script text.");
@@ -106,6 +113,11 @@ public sealed class GoogleBrowserTestApp : Application
                     if (Knowledge)
                     {
                         await CheckKnowledgeRecoveryAsync(local, researchBrowser, Ask, deadline.Token);
+                        return;
+                    }
+                    if (Media.Length > 0)
+                    {
+                        await CheckMediaAsync(local, researchBrowser, Ask, deadline.Token);
                         return;
                     }
                     var question = Photo ? "Show me a photo of Nvidia 5090"
@@ -189,5 +201,33 @@ public sealed class GoogleBrowserTestApp : Application
         }, token);
         if (photos.Count == 0) throw new InvalidOperationException("Recovery did not produce a matched subject photo.");
         Console.WriteLine($"Live knowledge recovery passed: {research.Search!.Sources.Count} results, {research.Pages.Count(page => page.FullPageRead)} pages read, {photos.Count} photos, one final generation.");
+    }
+
+    private static async Task CheckMediaAsync(LocalLlmService local, IGoogleResearchBrowser browser,
+        Func<string, CancellationToken, Task<string>> ask, CancellationToken token)
+    {
+        var question = Media == "tallinn" ? "Search for the best bars in Tallinn. Recommend three actual named venues with citations and photos."
+            : "What is WoW Forever? Explain the update and show me photos of it.";
+        var research = await GoogleResearchService.ResearchAsync(question, ask, browser, Console.WriteLine, token);
+        foreach (var (source, index) in research.Search!.Sources.Select((source, index) => (source, index)))
+            Console.WriteLine($"SOURCE {index + 1}: {source.Title} ({source.Url}); page images: {research.Pages.FirstOrDefault(page => page.SourceNumber == index + 1)?.Images?.Count ?? 0}");
+        var prompt = GoogleSearchContext.AugmentPrompt(question, research, 8192);
+        Task<LocalLlmChatResult> Generate(string text, CancellationToken cancellation) => local.SendChatAsync(new LocalLlmRequest(Model!, text, "research-test", [], 8192, Think: false, MaxOutputTokens: 1000), null, null, cancellation);
+        var answer = await GoogleEvidenceText.ReviewAsync(await Generate(prompt, token), prompt, Generate, token);
+        if (!answer.Succeeded || string.IsNullOrWhiteSpace(answer.Message) || GoogleEvidenceText.HasInterfaceEntry(answer.Message)) throw new InvalidOperationException("No usable researched answer.");
+        Console.WriteLine("FINAL ANSWER: " + answer.Message);
+        var photos = new List<GoogleEntryPhoto>();
+        await GoogleEntryPhotoService.LoadAsync(answer.Message, research, browser, photo =>
+        {
+            photos.Add(photo); Console.WriteLine("MATCHED PHOTO: " + JsonSerializer.Serialize(photo));
+        }, token, status: Console.WriteLine);
+        var minimum = 2;
+        if (photos.Count < minimum) throw new InvalidOperationException($"Expected at least {minimum} distinct matched photos, got {photos.Count}.");
+        if (Media == "tallinn" && photos.Select(photo => photo.EntryTitle).Distinct().Count() < 2) throw new InvalidOperationException("Venue photos did not cover distinct bars.");
+        var proof = Path.Combine(".tmp", "media-" + Media + ".json");
+        answer = answer with { Message = GoogleEvidenceText.WithoutPhotoCapabilityClaims(answer.Message!) };
+        Directory.CreateDirectory(".tmp");
+        await File.WriteAllTextAsync(proof, JsonSerializer.Serialize(new { Question = question, Answer = answer.Message, Photos = photos }, new JsonSerializerOptions { WriteIndented = true }), token);
+        Console.WriteLine($"Live {Media} research/media passed: {photos.Count} matched photos. Proof: {Path.GetFullPath(proof)}");
     }
 }

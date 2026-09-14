@@ -55,6 +55,7 @@ internal static class UiExperienceTests
         Snapshot(settingsWindow, 1080, 700, Path.Combine(output, "settings-200.png"));
         settingsWindow.Close();
         MainWindowFlow(workbench, output);
+        Presentation(context, root, output);
         ThinkingScroll(output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;
@@ -65,6 +66,67 @@ internal static class UiExperienceTests
         Check(restored.UiFontSize == 17.5 && !restored.ChatMonitorEnabled && restored.ChatMonitorX == -500 && !restored.ChatProgressPanelEnabled,
             "Latest scale, monitor visibility and negative-screen position must survive restart.");
         Console.WriteLine($"UI experience regression passed: {_checks} checks. Render artifacts: {output}");
+    }
+
+    private static void Presentation(ContextControlViewModel context, string root, string output)
+    {
+        var session = ChatSessionViewModel.CreateNew();
+        var first = new LocalLlmChatMessageViewModel("user", "Tell me about this game.", "granite3.3:2b", "raw");
+        session.Append(first);
+        session.Append(new LocalLlmChatMessageViewModel("assistant", "A first answer.", first.ModelId, "raw"));
+        Check(!first.HasModelTransition, "The first prompt must not invent a previous model.");
+        var count = context.ChatMessages.Count;
+        var selected = context.SelectedLocalModel;
+        context.SelectedLocalModel = new LocalLlmModelViewModel(LocalLlmService.Catalog.First(model => model.Id.StartsWith("qwen3.5:", StringComparison.Ordinal)));
+        Check(context.ChatMessages.Count == count, "Changing the model selection alone must not add a chat marker.");
+        context.SelectedLocalModel = selected;
+        var changed = new LocalLlmChatMessageViewModel("user", "Continue with the new model.", "qwen3.5:4b", "raw");
+        session.Append(changed);
+        Check(changed.PreviousModelId == first.ModelId && changed.ModelTransitionLabel.Contains('→'), "Only the next submitted prompt records A to B.");
+        var same = new LocalLlmChatMessageViewModel("user", "Keep going.", changed.ModelId, "raw"); session.Append(same);
+        Check(!same.HasModelTransition, "Repeated prompts with the same model must not repeat the marker.");
+        var history = new ChatHistoryService(Path.Combine(root, "presentation"));
+        history.Save(new ChatHistoryDocument { Sessions = [session.ToData()] }, root, "chat", mirrorDefaultScope: false);
+        var restored = new ChatSessionViewModel(history.Load(root).Sessions.Single()).CreateMessageAt(2);
+        Check(restored.PreviousModelId == first.ModelId, "Model transitions must survive saved history.");
+        var seed = LocalLlmService.Catalog.First(model => model.Id.StartsWith("qwen3.5:", StringComparison.Ordinal));
+        var reasoning = new LocalLlmModelViewModel(seed);
+        Check(reasoning.ReasoningIconKey == "reasoning" && reasoning.ReasoningDescription.Contains("expected"), "Known families show expected reasoning without claiming a live observation.");
+        var plain = new LocalLlmModelViewModel(seed with { Id = "plain-test-model", DisplayName = "Plain model" });
+        Check(plain.ReasoningIconKey == "reasoning-unknown", "Unknown models must not be declared incapable of reasoning.");
+        plain.ApplyOllamaCapabilities(new HashSet<string> { "completion" });
+        Check(plain.ReasoningIconKey == "reasoning-off" && plain.ReasoningDescription.Contains("can still solve"), "An absent trace capability is separate from reasoning ability.");
+        plain.MarkThinkingDetected();
+        Check(plain.ReasoningIconKey == "reasoning" && plain.ReasoningDescription.Contains("observed"), "Actual trace output must update the badge.");
+        foreach (var icon in new[] { "code", "chat", "graph", "browser", "llms", "dependencies", "stack", "skillbook", "scanner", "reasoning", "reasoning-off", "reasoning-unknown" })
+            Check(WorkspaceIcon.HasIcon(icon), "Every workspace and reasoning state has a font-independent icon.");
+        Check(ChatTranscriptRenderControl.MediaSectionScore("Mount Hyjal", "", "WoW Forever", "Mount Hyjal and its stories") > 0
+            && ChatTranscriptRenderControl.MediaSectionScore("Mount Hyjal", "", "WoW Forever", "Other locations") == 0, "Place section photos beside related text, never an unrelated section.");
+        var pictures = new List<ContextControlAttachmentViewModel>();
+        foreach (var (section, i) in new[] { ("Overview", 0), ("Riverglades", 1), ("Mount Hyjal", 2) })
+        {
+            var path = Path.Combine(root, $"article-{i}.png"); File.WriteAllBytes(path, GooglePhotoPreviewTests.Photo(640 + i, 360));
+            pictures.Add(new("Official article", "https://example.com/wow-forever", "web", path, "WoW Forever")
+                { IsSubjectPhoto = true, PhotoCaption = section, PhotoSection = section, PhotoKind = "Article image", IncludeInPrompt = false });
+        }
+        var article = new LocalLlmChatMessageViewModel("assistant", "World of Warcraft: Forever revisits original Azeroth. [1]\n\n## Riverglades\n\nAn expanded region with new places to explore. [1]\n\n## Mount Hyjal\n\nA familiar location with new stories to discover. [1]", "qwen3.5:4b", "raw", attachments: pictures);
+        foreach (var width in new[] { 960, 420 })
+        {
+            var transcript = new ChatTranscriptRenderControl { ChatFontSize = 16, Items = [first, changed, article] };
+            var layout = Call(transcript, "BuildMessageLayout", article, (double)width - 32)!;
+            var images = Read<System.Collections.IEnumerable>(layout, "Attachments").Cast<object>().Where(item => Read<bool>(item, "IsImagePreview")).ToArray();
+            Check(images.Length == 3 && images.All(item => Read<Rect>(item, "Rect").Right <= width), "All article images must render and fit wide and narrow viewports.");
+            var transition = Call(transcript, "BuildMessageLayout", changed, (double)width - 32)!;
+            var firstText = Read<System.Collections.IEnumerable>(transition, "TextBlocks").Cast<object>().First();
+            Check(Read<Rect>(Read<object>(firstText, "TextBlock"), "Rect").Bottom < Read<Rect>(transition, "CardRect").Y, "The model change sits between messages, outside the new user bubble.");
+            Check(Read<Rect>(transition, "HeaderRect").Y == Read<Rect>(transition, "CardRect").Y, "A model marker must shift the user header and its actions into the new bubble.");
+            var window = new Window { Content = new Border { Background = new SolidColorBrush(Color.Parse("#151922")), Child = new ScrollViewer { Content = transcript } } };
+            WorkbenchThemeResources.Apply(window, "studio"); Snapshot(window, width, 1500, Path.Combine(output, $"article-model-change-{width}.png")); window.Close();
+        }
+        session.Append(article);
+        history.Save(new ChatHistoryDocument { Sessions = [session.ToData()] }, root, "chat", mirrorDefaultScope: false);
+        var savedPhoto = history.Load(root).Sessions.Single().Messages.Last().Attachments.First();
+        Check(savedPhoto.IsSubjectPhoto && savedPhoto.PhotoCaption == "Overview" && savedPhoto.PhotoKind == "Article image", "Photo captions, section identity and article layout must survive history.");
     }
 
     private static void Typography(string output)
@@ -355,15 +417,19 @@ internal static class UiExperienceTests
         Check(Equals(google.Content, "Google off") && !context.IsGoogleSearchEnabled, "Clicking the composer research switch must update its real binding.");
         context.IsGoogleSearchEnabled = true;
         var reasoningMessage = new LocalLlmChatMessageViewModel("assistant", "", "qwen3.5:4b", "raw") { IsAwaitingAnswer = true, LiveStage = "Thinking" };
-        reasoningMessage.AppendLiveThinking("I will compare the entries, check the source dates, and match each photo to its named place.\n\nThe answer should preserve source links and distinguish ratings from review counts.");
+        reasoningMessage.AppendLiveThinking("## Check the sources\n\nI will compare **actual venue names** and match each photo to its named place.\n\n- Preserve source links\n- Distinguish ratings from review counts\n\n```text\ncode_keeps_underscores **literally**\n```");
         Call(context, "AppendChatMessageToSession", session, reasoningMessage);
         context.ToggleThinkingCommand.Execute(reasoningMessage);
         Snapshot(main, 1360, 840, Path.Combine(output, "reasoning-split.png"));
         Check(context.IsReasoningPaneOpen && ReferenceEquals(context.SelectedReasoningMessage, reasoningMessage), "Message reasoning button must open and select that exact reply.");
-        Check(main.GetVisualDescendants().OfType<SelectableTextBlock>().Any(block => block.IsEffectivelyVisible && block.Text == reasoningMessage.ThinkingText), "Real reasoning pane must bind the model's text.");
+        var reasoningBlock = main.GetVisualDescendants().OfType<ReasoningTextBlock>().Single(block => block.IsEffectivelyVisible);
+        Check(reasoningBlock.RenderedPlainText.Contains("actual venue names") && !reasoningBlock.RenderedPlainText.Contains("##") && !reasoningBlock.RenderedPlainText.Contains("**actual"), "The real reasoning pane must render Markdown instead of raw delimiters.");
+        Check(reasoningBlock.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Any(run => run.Text == "actual venue names" && run.FontWeight == FontWeight.Bold), "Reasoning emphasis must be typographic, not merely stripped.");
+        Check(reasoningBlock.RenderedPlainText.Contains("code_keeps_underscores **literally**"), "Code fences must retain literal code symbols.");
+        Check(!reasoningMessage.ThinkingPreview.Contains("##") && !reasoningMessage.ThinkingPreview.Contains("**actual"), "The compact reasoning strip must also hide Markdown formatting delimiters.");
         reasoningMessage.AppendLiveThinking("\nThis newest chunk must be visible immediately.");
         Dispatcher.UIThread.RunJobs();
-        Check(main.GetVisualDescendants().OfType<SelectableTextBlock>().Any(block => block.Text?.EndsWith("immediately.") == true), "Reasoning must stream without a second typing animation.");
+        Check(reasoningBlock.RenderedPlainText.EndsWith("immediately."), "Reasoning must stream without a second typing animation.");
         reasoningMessage.UpdateContent("Here is the completed answer.");
         Check(reasoningMessage.HasThinking && reasoningMessage.RawText.Contains("newest chunk"), "Final or failed response text must preserve the streamed reasoning in saved history.");
         context.IsReasoningPaneOpen = false;

@@ -4,7 +4,7 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.5.0 adds a split reasoning pane, stable scrolling during thinking, whole-second progress, standalone photo lookup, 544 catalog entries and chat connections beyond Ollama. See the [release notes](docs/releases/v0.5.0.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.5.1 improves Google evidence and related photo placement, formats streamed reasoning, and adds model-change markers and reasoning capability icons. It includes the split reasoning pane, 544 catalog entries and chat connections beyond Ollama from 0.5.0. See the [release notes](docs/releases/v0.5.1.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
 
 ## Install On Windows
 

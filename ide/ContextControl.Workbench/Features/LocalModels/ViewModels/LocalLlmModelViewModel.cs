@@ -138,6 +138,15 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         && ModelBaseLabel is not ("Embedding" or "Reranker");
     public bool SupportsNativeThinkingRequest => !_thinkingUnsupported && (_supportsNativeThinkingById || _hasNativeThinkingCapability);
     public bool SupportsThinking => SupportsNativeThinkingRequest || _supportsThinkingOutputById || _hasDetectedThinking;
+    private bool _hasCapabilityReport;
+    public string ReasoningIconKey => !CanUseInLocalChat ? "reasoning-off" : SupportsThinking ? "reasoning"
+        : _hasCapabilityReport || _thinkingUnsupported ? "reasoning-off" : "reasoning-unknown";
+    public string ReasoningDescription => !CanUseInLocalChat ? "Separate chat reasoning does not apply to this model type."
+        : _hasDetectedThinking ? "Reasoning trace observed: this model has returned visible thinking."
+        : _hasNativeThinkingCapability ? "Reasoning supported: the runtime advertises a thinking channel. Enable Thinking to request it."
+        : SupportsThinking ? "Reasoning expected for this model family; this runtime has not yet returned a trace. Availability depends on its template and Thinking setting."
+        : _hasCapabilityReport || _thinkingUnsupported ? "No separate reasoning trace advertised by this runtime. The model can still solve reasoning tasks in its answer."
+        : "Reasoning trace unknown. The model/runtime has not advertised it, and no trace has been observed. This does not measure answer quality.";
     public string ThinkingLabel => SupportsNativeThinkingRequest ? "API thinking" : SupportsThinking ? "Thinking output" : "No think tag";
     public string ModelBaseLabel => _modelBaseLabel;
     public string ModelBaseDetail => _modelBaseDetail;
@@ -297,10 +306,12 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
 
     public void ApplyOllamaCapabilities(IReadOnlySet<string>? capabilities)
     {
+        var reportChanged = _hasCapabilityReport != (capabilities is not null);
+        _hasCapabilityReport = capabilities is not null;
         var hasNativeThinking = capabilities?.Any(capability =>
             capability.Equals("thinking", StringComparison.OrdinalIgnoreCase)
             || capability.Equals("think", StringComparison.OrdinalIgnoreCase)) == true;
-        if (_hasNativeThinkingCapability == hasNativeThinking)
+        if (_hasNativeThinkingCapability == hasNativeThinking && !reportChanged)
         {
             return;
         }
@@ -332,6 +343,8 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         OnPropertyChanged(nameof(SupportsThinking));
         OnPropertyChanged(nameof(ThinkingLabel));
         OnPropertyChanged(nameof(DisplayNameWithThinking));
+        OnPropertyChanged(nameof(ReasoningIconKey));
+        OnPropertyChanged(nameof(ReasoningDescription));
     }
 
     public void ApplyState(

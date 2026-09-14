@@ -221,8 +221,9 @@ public sealed partial class LocalLlmCatalogRenderControl
             ? new Rect(rect.Right - factsWidth, rect.Y, factsWidth, 32.0)
             : default;
         var titleRight = factsWidth > 0.0 ? factsRect.X - 8.0 : rect.Right;
-        var titleWidth = Math.Max(0.0, titleRight - titleX);
-        var title = GetFormattedText(Clean(model.DisplayNameWithThinking, 90), Resource("TextPrimaryBrush", TextPrimaryFallbackBrush), uiFontFamily, FontWeight.ExtraBold, FontStyle.Normal, 11.0 + scale * 1.4);
+        WorkspaceIcon.Draw(context, model.ReasoningIconKey, new Rect(titleRight - 15, rect.Y - 1, 14, 14), Resource("AccentBrush", AccentFallbackBrush));
+        var titleWidth = Math.Max(0.0, titleRight - titleX - 20);
+        var title = GetFormattedText(Clean(model.DisplayName, 90), Resource("TextPrimaryBrush", TextPrimaryFallbackBrush), uiFontFamily, FontWeight.ExtraBold, FontStyle.Normal, 11.0 + scale * 1.4);
         DrawClippedText(context, title, new Rect(titleX, rect.Y - 1.0, titleWidth, 14.0), new Point(titleX, rect.Y - 1.0));
 
         var id = GetFormattedText(Clean(model.Id, 120), Resource("TextMutedBrush", TextMutedFallbackBrush), codeFontFamily, FontWeight.Bold, FontStyle.Normal, 7.3 + scale * 0.7);

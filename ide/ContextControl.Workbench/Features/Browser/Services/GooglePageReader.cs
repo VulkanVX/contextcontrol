@@ -43,7 +43,18 @@ public static partial class GooglePageReader
                 || title.StartsWith("Attention Required!", StringComparison.OrdinalIgnoreCase))))
             throw new GooglePageUnavailableException(url, "This source displayed an access block, sign-in requirement, or verification screen. Its article text was not read.");
         var image = Read(page, "imageUrl");
-        return new GooglePageContent(url, text, GooglePhotoPreviewService.IsImageLocation(image) ? image : null);
+        var images = new List<GooglePageImage>();
+        if (page.TryGetProperty("images", out var candidates) && candidates.ValueKind == JsonValueKind.Array)
+            foreach (var candidate in candidates.EnumerateArray().Take(24))
+            {
+                var imageUrl = Read(candidate, "url");
+                if (!GooglePhotoPreviewService.IsImageLocation(imageUrl)) continue;
+                static string Bounded(string value) => value.Length <= 180 ? value : value[..180];
+                var kind = Read(candidate, "kind");
+                images.Add(new(imageUrl, Bounded(Read(candidate, "caption")), Bounded(Read(candidate, "section")), kind is "Logo" or "Video preview" ? kind : "Article image"));
+            }
+        return new GooglePageContent(url, text, GooglePhotoPreviewService.IsImageLocation(image) ? image : null,
+            images.DistinctBy(item => item.Url).ToArray(), title);
     }
 
     [GeneratedRegex(@"\b(blocked by network security|blocked due to a network policy|your request has been blocked|access denied|verify (?:that )?you are (?:a )?human|checking (?:your )?browser|log in to (?:your reddit account|continue)|sign in to continue)\b", RegexOptions.IgnoreCase)]

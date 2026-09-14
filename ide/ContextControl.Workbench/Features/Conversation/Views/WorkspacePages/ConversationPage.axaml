@@ -163,7 +163,7 @@
                               <StackPanel Spacing="8">
                                 <TextBlock Text="{Binding ReasoningHeader}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding ReasoningContext}" TextWrapping="Wrap" Classes="muted" />
-                                <SelectableTextBlock Text="{Binding ThinkingText}" TextWrapping="Wrap" FontWeight="Normal" FontFamily="{DynamicResource UiFontFamily}" FontSize="{Binding DataContext.ChatWindowFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                <controls:ReasoningTextBlock Markdown="{Binding ThinkingText}" TextWrapping="Wrap" FontWeight="Normal" FontFamily="{DynamicResource UiFontFamily}" CodeFontFamily="{DynamicResource CodeFontFamily}" FontSize="{Binding DataContext.ChatWindowFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                               </StackPanel>
                             </Border>
                           </DataTemplate>

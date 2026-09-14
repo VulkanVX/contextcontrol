@@ -333,7 +333,10 @@
                           MaxDropDownHeight="180">
                         <ComboBox.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:LocalLlmModelViewModel}">
-                            <TextBlock Text="{Binding DisplayNameWithThinking}" TextTrimming="CharacterEllipsis" />
+                            <Grid ColumnDefinitions="16,*" ColumnSpacing="5" ToolTip.Tip="{Binding ReasoningDescription}">
+                              <controls:WorkspaceIcon IconKey="{Binding ReasoningIconKey}" Width="14" Height="14" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                            </Grid>
                           </DataTemplate>
                         </ComboBox.ItemTemplate>
                       </ComboBox>

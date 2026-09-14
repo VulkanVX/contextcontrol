@@ -84,6 +84,11 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     public DateTime CreatedUtc { get; }
     public string Time { get; }
     public string ModelId { get; }
+    public string PreviousModelId { get; set; } = "";
+    public bool HasModelTransition => IsUser && PreviousModelId.Length > 0 && PreviousModelId != ModelId;
+    public string ModelTransitionLabel => $"Model changed · {TransitionName(PreviousModelId)} → {TransitionName(ModelId)}";
+    private static string TransitionName(string id) => LocalLlmService.Catalog.FirstOrDefault(model => model.Id == id)?.DisplayName
+        ?? (id.StartsWith("runtime:", StringComparison.Ordinal) && id.Split(':', 3) is { Length: 3 } parts ? Uri.UnescapeDataString(parts[2]) : id);
     public string Phase { get; }
     public string CapsuleSummary => _capsuleSummary;
     public LocalLlmUsageStats? Stats => _stats;
@@ -99,12 +104,21 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     public string ReasoningHeader => $"{ModelLabel} · {Time}";
     private string _reasoningContext = "";
     public string ReasoningContext { get => _reasoningContext; set => SetProperty(ref _reasoningContext, value); }
+    private string _previewMarkdown = "", _previewPlain = "";
     public string ThinkingPreview
     {
         get
         {
-            var tail = _thinkingText.Length > 300 ? _thinkingText[^300..] : _thinkingText;
-            return Regex.Replace(tail, @"\s+", " ").Trim();
+            var tail = _thinkingText.Length > 800 ? _thinkingText[^800..] : _thinkingText;
+            if (_previewMarkdown != tail)
+            {
+                static IEnumerable<string> TextOf(IReadOnlyList<ChatMarkdownBlock> blocks) => blocks.SelectMany(block =>
+                    new[] { block.PlainText }.Concat(block.Children is { } children ? TextOf(children) : []));
+                _previewMarkdown = tail;
+                var plain = Regex.Replace(string.Join(" ", TextOf(ChatMarkdown.Parse(tail))), @"\s+", " ").Trim();
+                _previewPlain = plain.Length > 300 ? plain[^300..] : plain;
+            }
+            return _previewPlain;
         }
     }
     public ObservableCollection<LocalLlmChatPartViewModel> Parts { get; }

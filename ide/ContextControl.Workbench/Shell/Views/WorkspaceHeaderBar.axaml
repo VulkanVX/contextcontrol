@@ -25,9 +25,13 @@
                       <Button
                           Classes="workspace-mode-button"
                           Classes.active="{Binding IsActive}"
-                          Content="{Binding Name}"
                           Command="{Binding DataContext.SwitchWorkspaceModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                          CommandParameter="{Binding}" />
+                          CommandParameter="{Binding}">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <controls:WorkspaceIcon IconKey="{Binding Key}" Width="14" Height="14" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

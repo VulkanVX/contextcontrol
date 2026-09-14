@@ -256,6 +256,11 @@ public sealed class ChatSessionViewModel : ObservableObject
 
     public void Append(LocalLlmChatMessageViewModel message)
     {
+        if (message.IsUser && !string.IsNullOrWhiteSpace(message.ModelId))
+        {
+            var previous = _messages.LastOrDefault(item => item.Role == "user" && !string.IsNullOrWhiteSpace(item.ModelId));
+            if (previous is not null && previous.ModelId != message.ModelId) message.PreviousModelId = previous.ModelId;
+        }
         _messages.Add(ToData(message));
         UpdatedUtc = message.CreatedUtc;
         if (string.Equals(Title, "New chat", StringComparison.OrdinalIgnoreCase) && message.IsUser)
@@ -319,13 +324,14 @@ public sealed class ChatSessionViewModel : ObservableObject
             data.Stats,
             data.Attachments.Select(CreateAttachment).ToArray(),
             data.CreatedUtc == default ? DateTime.UtcNow : data.CreatedUtc,
-            data.DiagnosticPrompt);
+            data.DiagnosticPrompt) { PreviousModelId = data.PreviousModelId };
     }
 
     private static ContextControlAttachmentViewModel CreateAttachment(ChatHistoryAttachmentData data)
     {
         var attachment = new ContextControlAttachmentViewModel(data.Label, data.Path, data.Kind, data.PreviewPath, data.EntryTitle)
         {
+            PhotoCaption = data.PhotoCaption, PhotoSection = data.PhotoSection, PhotoKind = data.PhotoKind, IsSubjectPhoto = data.IsSubjectPhoto,
             IncludeInPrompt = data.IncludeInPrompt
         };
         return attachment;
@@ -338,6 +344,7 @@ public sealed class ChatSessionViewModel : ObservableObject
             Role = message.Role,
             Text = message.RawText,
             ModelId = message.ModelId,
+            PreviousModelId = message.PreviousModelId,
             Phase = message.Phase,
             CapsuleSummary = message.CapsuleSummary,
             DiagnosticPrompt = message.DiagnosticPrompt,
@@ -350,6 +357,7 @@ public sealed class ChatSessionViewModel : ObservableObject
                     Path = attachment.Path,
                     PreviewPath = attachment.PreviewPath,
                     EntryTitle = attachment.EntryTitle,
+                    PhotoCaption = attachment.PhotoCaption, PhotoSection = attachment.PhotoSection, PhotoKind = attachment.PhotoKind, IsSubjectPhoto = attachment.IsSubjectPhoto,
                     Kind = attachment.Kind,
                     IncludeInPrompt = attachment.IncludeInPrompt
                 }).ToList()

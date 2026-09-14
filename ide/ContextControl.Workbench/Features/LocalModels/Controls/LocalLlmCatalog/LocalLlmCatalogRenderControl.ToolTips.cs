@@ -94,7 +94,7 @@ public sealed partial class LocalLlmCatalogRenderControl
             ("OK", model.ComfortableContext),
             ("TPS", model.ExpectedSpeed),
             ("LIC", model.License),
-            ("THK", model.ThinkingLabel),
+            ("THK", model.ReasoningDescription),
             ("LOC", model.StorageLocationLabel),
             ("USE", model.PracticalUse)
         })

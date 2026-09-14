@@ -21,6 +21,26 @@ internal static class GoogleResearchTests
         _checks += await GooglePhotoPreviewTests.Run();
         _checks += await GoogleEntryPhotoTests.Run();
         _checks += await GoogleKnowledgeRecoveryTests.Run();
+        Check(GoogleEvidenceText.IsInterfaceLabel("Išversti ŠĢ Puslapī") && GoogleEvidenceText.IsInterfaceLabel("Translate this page"), "Search translation controls must not be place names, including the reported transcription.");
+        Check(!GoogleEvidenceText.IsInterfaceLabel("Depeche Mode Baar"), "A real venue name must survive the interface-label filter.");
+        const string badPlaces = "1. **Actual Bar**\n   - First place\n2. Išversti ŠĢ Puslapī\n   (variously transcribed)\n   - Depeche Mode decor\n3. **Another Bar**\n   - Third place";
+        Check(GoogleEvidenceText.HasInterfaceEntry(badPlaces), "Detect the reported invalid entry before completing the answer.");
+        var omitted = GoogleEvidenceText.OmitInterfaceEntries(badPlaces);
+        Check(!omitted.Contains("Išversti") && !omitted.Contains("Depeche Mode decor") && omitted.Contains("Actual Bar") && omitted.Contains("Another Bar"), "A failed correction must remove only the invalid entry and preserve other venues.");
+        var repairs = 0;
+        var badAnswer = new LocalLlmChatResult(true, "done", badPlaces);
+        var fixedAnswer = await GoogleEvidenceText.ReviewAsync(badAnswer, "Actual source evidence", (prompt, token) =>
+        { repairs++; Check(prompt.Contains("Actual source evidence"), "Repair must use the original source evidence."); return Task.FromResult(badAnswer with { Message = "1. **Depeche Mode Baar**\n   - Music themed bar [3]" }); }, default);
+        Check(repairs == 1 && fixedAnswer.Message!.Contains("Depeche Mode Baar"), "An invalid interface entry gets one evidence-based correction.");
+        repairs = 0;
+        var fallbackAnswer = await GoogleEvidenceText.ReviewAsync(badAnswer, "Evidence", (_, _) => { repairs++; return Task.FromResult(badAnswer); }, default);
+        Check(repairs == 1 && !GoogleEvidenceText.HasInterfaceEntry(fallbackAnswer.Message!), "A failed correction must omit the label without a retry loop.");
+        await GoogleEvidenceText.ReviewAsync(fixedAnswer, "Evidence", (_, _) => throw new Exception("Do not regenerate a valid answer."), default);
+        var mediaText = "The update introduces Riverglades. [1]\n\n(Note: As ContextControl, I can't display photos from these sources.)";
+        Check(GoogleEvidenceText.WithoutPhotoCapabilityClaims(mediaText) == "The update introduces Riverglades. [1]", "Host photo delivery removes the model's contradictory capability boilerplate.");
+        Check(GoogleEvidenceText.WithoutPhotoCapabilityClaims("The venue cannot provide photos of its private rooms. [1]") == "The venue cannot provide photos of its private rooms. [1]", "Photo reconciliation must preserve source limitations.");
+        const string mixedPhotoText = "Riverglades has new quests. [1] I cannot display images here.";
+        Check(GoogleEvidenceText.WithoutPhotoCapabilityClaims(mixedPhotoText) == mixedPhotoText, "Photo cleanup must not erase an answer paragraph that contains factual text.");
         var limitedPlanner = new LocalLlmChatResult(false, "output limit", "{\"open\":[2]}\nVerbose unfinished explanation", OutputLimited: true);
         Check(GoogleResearchService.ParseSelection(GoogleResearchService.PlannerText(limitedPlanner), 3).SequenceEqual([2]), "A capped planner may still supply a valid bounded selection.");
         Check(GoogleResearchService.ParseSelection(GoogleResearchService.PlannerText(limitedPlanner with { Message = "{\"open\":[" }), 3).SequenceEqual([1, 2]), "A truncated planner falls back to real result numbers instead of aborting research.");

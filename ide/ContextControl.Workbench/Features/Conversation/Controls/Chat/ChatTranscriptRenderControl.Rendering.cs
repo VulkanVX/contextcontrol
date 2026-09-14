@@ -36,6 +36,17 @@ public sealed partial class ChatTranscriptRenderControl
             context.DrawRectangle(background, new Pen(border, 1), card, 10, 10);
         }
 
+        if (message.HasModelTransition)
+        {
+            foreach (var text in layout.TextBlocks.Where(text => text.TextBlock.Rect.Bottom <= layout.CardRect.Y))
+            {
+                DrawTextSelection(context, text.TextBlock, index, text.BlockIndex, rowTop, viewportTop, viewportBottom);
+                DrawTextBlock(context, text.TextBlock, rowTop, viewportTop, viewportBottom);
+                var rect = OffsetY(text.TextBlock.Rect, rowTop);
+                context.DrawLine(new Pen(Resource("ChatSnippetBorderBrush", CommandBorderFallbackBrush), 1),
+                    new Point(rect.X, card.Y - 3), new Point(rect.Right, card.Y - 3));
+            }
+        }
         using var clip = context.PushClip(card);
         DrawHeader(context, layout, message, rowTop);
 

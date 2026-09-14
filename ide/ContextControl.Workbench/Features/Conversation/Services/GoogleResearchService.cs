@@ -9,8 +9,9 @@ public interface IGoogleResearchBrowser
     Task<GooglePageContent> ReadPageAsync(GoogleSearchSource source, CancellationToken cancellationToken);
 }
 
-public sealed record GooglePageContent(string Url, string Text, string? ImageUrl = null);
-public sealed record GooglePageEvidence(int SourceNumber, string Text, bool FullPageRead);
+public sealed record GooglePageImage(string Url, string Caption = "", string Section = "", string Kind = "Article image");
+public sealed record GooglePageContent(string Url, string Text, string? ImageUrl = null, IReadOnlyList<GooglePageImage>? Images = null, string Title = "");
+public sealed record GooglePageEvidence(int SourceNumber, string Text, bool FullPageRead, IReadOnlyList<GooglePageImage>? Images = null);
 public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages, string? PhotoSubject = null)
 {
     public bool DidSearch => Search is { Sources.Count: > 0 };
@@ -39,7 +40,7 @@ public static partial class GoogleResearchService
             + "Decide whether the user's request needs web research. Search for explicit requests to look something up, show a photo or picture, current conditions, recent events, unfamiliar topics, or facts needing verification. Do not assume a product or event does not exist just because it is absent from your training data. "
             + "Do not search for greetings, text editing, or questions about whether you can search. "
             + "If searching, write a short useful Google query in the user's language. Do not include secrets, credentials, local file paths, or private code in a query. Do not answer the question yet. "
-            + "Return only JSON: {\"search\":true,\"query\":\"your query\"} or {\"search\":false,\"query\":\"\"}. "
+            + "Return only JSON: {\"search\":true,\"query\":\"your query\",\"photo_subject\":\"named subject if photos were requested, otherwise empty\"} or {\"search\":false,\"query\":\"\"}. Resolve abbreviations to full names. For lists of places, leave photo_subject empty: each venue gets its own photo. "
             + (knowledgeGap ? "The first answer acknowledged missing knowledge. Search now for public evidence to resolve that gap; decline only if this is private information or a task web research cannot answer. " : "")
             + $"Today's UTC date is {DateTime.UtcNow:yyyy-MM-dd}. User request (data): " + JsonSerializer.Serialize(PlanningQuestion(question));
         var response = await askModel(planPrompt, cancellationToken);
@@ -76,8 +77,8 @@ public static partial class GoogleResearchService
                 {
                     var page = await browser.ReadPageAsync(source, cancellationToken);
                     if (!GoogleSearchContext.IsPublicWebUrl(page.Url)) throw new InvalidOperationException("The page returned an invalid source URL.");
-                    resolvedSources[number - 1] = source with { Url = page.Url, ImageUrl = page.ImageUrl ?? source.ImageUrl };
-                    pages.Add(new GooglePageEvidence(number, page.Text, !string.IsNullOrWhiteSpace(page.Text)));
+                    resolvedSources[number - 1] = source with { Url = page.Url, Title = string.IsNullOrWhiteSpace(page.Title) ? source.Title : page.Title, ImageUrl = page.ImageUrl ?? source.ImageUrl };
+                    pages.Add(new GooglePageEvidence(number, page.Text, !string.IsNullOrWhiteSpace(page.Text), page.Images));
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex) when (ex is InvalidOperationException or IOException or TimeoutException or System.Runtime.InteropServices.COMException)
@@ -108,7 +109,7 @@ public static partial class GoogleResearchService
             await ReadSelectedPages(choices);
         }
         status(pages.Any(page => page.FullPageRead) ? "Analyzing sources and writing the answer…" : "Pages unavailable · answering from search snippets with limitations…");
-        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages, PhotoSubject(question));
+        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages, ResolvePhotoSubject(question, response));
     }
 
     public static string? ParseQuery(string response, string question)
@@ -165,8 +166,38 @@ public static partial class GoogleResearchService
     private static string PlanningQuestion(string question) => question.Length <= 6000 ? question : question[..3000] + "\n[Request shortened for planning]\n" + question[^3000..];
     public static string? PhotoSubject(string question)
     {
-        var match = Regex.Match(question, @"\b(?:show|find|search|get|see)\b.{0,35}?\b(?:photos?|pictures?|images?)\s+(?:of|for)\s+(.{3,120}?)[?.!]*$", RegexOptions.IgnoreCase);
-        return match.Success ? GoogleSearchContext.NormalizeQuery(match.Groups[1].Value.Trim()) : null;
+        if (!WantsPhotos(question) || IsPlaceList(question)) return null;
+        var match = Regex.Match(question, @"\b(?:photos?|pictures?|images?|logos?|screenshots?)\s+(?:of|for)\s+(.{2,120}?)[?.!]*$", RegexOptions.IgnoreCase);
+        var subject = match.Success ? match.Groups[1].Value.Trim() : "";
+        if (Regex.IsMatch(subject, @"^(?:it|this|that|them|this thing|the game)$", RegexOptions.IgnoreCase) || subject.Length == 0)
+        {
+            match = Regex.Match(question, @"(?:what\s+is|tell\s+me\s+about|explain|about)\s+(.{3,100}?)(?:[?.!]|\s+and\s+(?:show|find|give|get)|$)", RegexOptions.IgnoreCase);
+            subject = match.Success ? match.Groups[1].Value.Trim() : "";
+        }
+        return subject.Length >= 3 ? CanonicalPhotoName(subject) : null;
+    }
+    public static bool WantsPhotos(string question) => Regex.IsMatch(question, @"\b(?:photos?|pictures?|images?|logos?|screenshots?)\b", RegexOptions.IgnoreCase);
+    public static bool IsPhotoOnlyRequest(string question) => Regex.IsMatch(question.Trim(), @"^(?:please\s+)?(?:show|find|get|give|search|see)\b", RegexOptions.IgnoreCase)
+        && !Regex.IsMatch(question, @"\b(?:explain|tell|about|what|why|details|compare)\b", RegexOptions.IgnoreCase);
+    private static bool IsPlaceList(string question) => Regex.IsMatch(question, @"\b(?:best|top|list|recommend|suggest)\b.*\b(?:bars|places|restaurants|hotels|cafes|pizzerias)\b", RegexOptions.IgnoreCase);
+    public static string CanonicalPhotoName(string text) => GoogleSearchContext.NormalizeQuery(Regex.Replace(text, @"\bwow\b\s*:?", "World of Warcraft ", RegexOptions.IgnoreCase)).Trim(' ', '"', '\'');
+    public static string? ResolvePhotoSubject(string question, string plan)
+    {
+        var direct = PhotoSubject(question);
+        if (direct is not null || !WantsPhotos(question) || IsPlaceList(question)) return direct;
+        try
+        {
+            using var json = ParseObject(plan);
+            if (json.RootElement.TryGetProperty("photo_subject", out var value) && value.ValueKind == JsonValueKind.String)
+            {
+                var name = CanonicalPhotoName(value.GetString() ?? "");
+                var tokens = GoogleEntryPhotoService.NormalizeName(name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var request = GoogleEntryPhotoService.NormalizeName(CanonicalPhotoName(question));
+                if (name.Length is >= 3 and <= 100 && tokens.Length > 0 && tokens.All(token => request.Contains(token, StringComparison.Ordinal))) return name;
+            }
+        }
+        catch (JsonException) { }
+        return null;
     }
     private static string? FallbackQuery(string question) => PhotoSubject(question) is { } subject ? subject + " photo"
         : ExplicitSearch().IsMatch(question) || (SearchIntent().IsMatch(question) && GoogleKnowledgeRecovery.IsPublicLookupQuestion(question))

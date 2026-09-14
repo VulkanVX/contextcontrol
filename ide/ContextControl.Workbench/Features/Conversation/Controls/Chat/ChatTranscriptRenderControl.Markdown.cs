@@ -19,6 +19,9 @@ public sealed partial class ChatTranscriptRenderControl
     private double BuildMarkdown(MessageLayout layout, LocalLlmChatPartViewModel part, double x, double y, double width)
     {
         var blocks = _markdownCache.GetValue(part, static item => new(ChatMarkdown.Parse(item.Text))).Blocks;
+        var photos = layout.Message.AttachedFiles.Where(photo => photo.IsSubjectPhoto && TryGetImageBitmap(photo.PreviewPath) is not null).Take(3).ToArray();
+        if (photos.Length > 0 && ReferenceEquals(layout.Message.Parts.FirstOrDefault(item => item.IsText), part))
+            return BuildResearchArticle(layout, blocks, photos, x, y, width);
         return BuildMarkdownBlocks(layout, blocks, x, y, width);
     }
 
@@ -154,7 +157,7 @@ public sealed partial class ChatTranscriptRenderControl
     private ContextControlAttachmentViewModel? FindEntryPhoto(ChatMarkdownBlock block, LocalLlmChatMessageViewModel message, bool allowCitedSource = true)
     {
         var entry = GoogleEntryPhotoService.NormalizeName(block.PlainText);
-        var matched = message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !string.IsNullOrWhiteSpace(source.EntryTitle)
+        var matched = message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && !string.IsNullOrWhiteSpace(source.EntryTitle)
             && GoogleEntryPhotoService.NormalizeName(source.EntryTitle) == entry && TryGetImageBitmap(source.PreviewPath) is not null);
         if (matched is not null) return matched;
         if (!allowCitedSource) return null;
@@ -163,7 +166,7 @@ public sealed partial class ChatTranscriptRenderControl
         var name = Name(block.PlainText);
         if (name.Length < 8) return null;
         var body = Details(block);
-        return message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && Name(source.Label).Contains(name, StringComparison.Ordinal)
+        return message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && Name(source.Label).Contains(name, StringComparison.Ordinal)
             && source.Label.StartsWith('[') && source.Label.IndexOf(']') is var end && end > 0 && body.Contains(source.Label[..(end + 1)], StringComparison.Ordinal)
             && TryGetImageBitmap(source.PreviewPath) is not null);
     }

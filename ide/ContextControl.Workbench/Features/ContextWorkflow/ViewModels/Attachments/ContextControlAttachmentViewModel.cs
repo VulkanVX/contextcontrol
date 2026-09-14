@@ -22,6 +22,10 @@ public sealed class ContextControlAttachmentViewModel(string label, string path,
 
     public string PreviewPath { get; } = previewPath ?? "";
     public string EntryTitle { get; } = entryTitle ?? "";
+    public string PhotoCaption { get; init; } = "";
+    public string PhotoSection { get; init; } = "";
+    public string PhotoKind { get; init; } = "";
+    public bool IsSubjectPhoto { get; init; }
     public string ImagePreviewPath => Kind == "web" ? PreviewPath : Path;
 
     public string Label

@@ -13,6 +13,7 @@ using static SmokeTestHelpers;
 if (args.Contains("--runtime-regression")) { await LocalRuntimeTests.Run(); return; }
 if (args.Contains("--google-photo-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", photo: true); return; }
 if (args.Contains("--google-knowledge-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", knowledge: true); return; }
+if (args.Contains("--google-media-smoke")) { var at = Array.IndexOf(args, "--google-media-smoke"); GoogleBrowserTests.Run("granite3.3:2b", media: args.Length > at + 1 ? args[at + 1] : "wow"); return; }
 if (args.Contains("--runtime-install")) { await LocalRuntimeTests.Install(args[Array.IndexOf(args, "--runtime-install") + 1]); return; }
 if (args.Contains("--runtime-live")) { var at = Array.IndexOf(args, "--runtime-live"); await LocalRuntimeTests.Live(args[at + 1], args.Length > at + 2 ? args[at + 2] : ""); return; }
 

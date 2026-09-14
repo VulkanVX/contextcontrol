@@ -70,7 +70,7 @@ public static partial class GoogleSearchContext
                 var link = ReadText(item, "url", 1600);
                 var title = ReadText(item, "title", 160);
                 var snippet = ReadText(item, "snippet", 700);
-                if (title.Length == 0 || !IsPublicWebUrl(link) || !seen.Add(link)) continue;
+                if (title.Length == 0 || GoogleEvidenceText.IsInterfaceLabel(title) || !IsPublicWebUrl(link) || !seen.Add(link)) continue;
                 var image = ReadText(item, "imageUrl", GooglePhotoPreviewService.MaxInlineImageLength);
                 sources.Add(new GoogleSearchSource(title, link, snippet, GooglePhotoPreviewService.IsImageLocation(image) ? image : null));
                 if (sources.Count == MaxSources) break;
@@ -92,9 +92,10 @@ public static partial class GoogleSearchContext
         if (budget < 1500) throw new InvalidOperationException("The prompt leaves too little room for web sources. Increase the local model context size or shorten the prompt, then retry.");
         var builder = new StringBuilder();
         builder.AppendLine($"ContextControl searched Google on {DateTime.UtcNow:yyyy-MM-dd} UTC; {research.Pages.Count(page => page.FullPageRead)} selected pages were readable. Answer the user's request using the evidence below.");
-        if (research.PhotoSubject is not null)
+        if (research.PhotoSubject is not null || GoogleResearchService.WantsPhotos(userPrompt))
             builder.AppendLine("ContextControl will attempt to attach a matching source photo after your text response. Briefly describe the subject using the evidence. Do not claim a photo is already attached or that you cannot show images. Do not invent image license or reuse rights.");
         builder.AppendLine("Cite supporting sources with [1], [2], etc. Page excerpts may be shortened; a snippet-only source was NOT read. State uncertainty or missing evidence. Do not claim live facts that the evidence does not establish.");
+        builder.AppendLine("Use actual named places and products from source text. Search-interface controls such as Translate this page, Išversti šį puslapį, and Tulkot šo lapu are not venue names or evidence. Omit an entry whose real name cannot be established. Place citations beside claims; ContextControl supplies the source links, so a repeated References section is unnecessary.");
         builder.AppendLine("Use readable Markdown suited to the information. For place, product or review lists, use numbered entries with a bold name on its own line, followed by indented detail lines and supporting citations within that entry. Include useful fields such as location, price or review summary only when supported. Attribute ratings to their source and include review count/date when available; never invent a rating, address, opening status or review. Use Markdown tables for concise comparisons when helpful.");
         if (research.Pages.Any(page => !page.FullPageRead))
             builder.AppendLine("Some selected sources were unavailable. If the user requested one of those sources, clearly say it could not be read. If no pages were readable, explicitly say this answer relies on Google snippets only.");
@@ -109,7 +110,9 @@ public static partial class GoogleSearchContext
             {
                 ["source"] = i + 1, ["title"] = source.Title, ["url"] = source.Url, ["snippet"] = Clip(source.Snippet, 200),
                 ["evidence"] = page?.FullPageRead == true ? "page excerpt" : "search snippet only", ["pageText"] = "",
-                ["limitation"] = page is { FullPageRead: false } ? Clip(page.Text, 150) : ""
+                ["limitation"] = page is { FullPageRead: false } ? Clip(page.Text, 150) : "",
+                ["sourceImageCaptions"] = (page?.Images ?? []).Where(image => GoogleEntryPhotoService.IsUsablePhoto(image, research.PhotoSubject ?? "", research.PhotoSubject is not null)).Take(3)
+                    .Select(image => Clip(string.IsNullOrWhiteSpace(image.Caption) ? image.Section : image.Caption, 100)).Where(caption => caption.Length > 0).ToArray()
             });
         }
         var remaining = budget - JsonSerializer.Serialize(entries).Length;
@@ -126,10 +129,15 @@ public static partial class GoogleSearchContext
         builder.AppendLine("END WEB EVIDENCE");
         builder.AppendLine("USER REQUEST:");
         builder.Append(userPrompt);
-        if (research.PhotoSubject is not null)
+        if (research.PhotoSubject is not null && GoogleResearchService.IsPhotoOnlyRequest(userPrompt))
         {
             builder.AppendLine();
             builder.AppendLine("CONTEXTCONTROL RESPONSE FORMAT: Write only a short factual caption identifying the requested subject, using the evidence and numbered source citations. ContextControl itself retrieves and displays the source photo after your caption. Leave image-display capability, image-search instructions and licensing claims out of the caption.");
+        }
+        else if (research.PhotoSubject is not null || GoogleResearchService.WantsPhotos(userPrompt))
+        {
+            builder.AppendLine();
+            builder.AppendLine("CONTEXTCONTROL RESPONSE FORMAT: Answer the text question with citations. ContextControl handles the requested photos separately. Omit Image Availability sections, image-search advice and claims that images cannot be shown. Do not invent descriptions of unseen images. Source image captions are publisher metadata, not your visual observations.");
         }
         return builder.ToString();
     }
@@ -154,7 +162,7 @@ public static partial class GoogleSearchContext
     private static string ReadText(JsonElement item, string name, int maxLength)
     {
         var text = item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
-        text = Whitespace().Replace(text, " ").Trim();
+        text = Whitespace().Replace(GoogleEvidenceText.CleanSnippet(text), " ").Trim();
         return text.Length <= maxLength ? text : text[..maxLength];
     }
 

@@ -66,13 +66,13 @@ public sealed partial class ContextControlViewModel
         return prepared;
     }
 
-    private Task<LocalLlmChatResult> RecoverGoogleKnowledgeAsync(string question, LocalLlmRequest originalRequest,
+    private async Task<LocalLlmChatResult> RecoverGoogleKnowledgeAsync(string question, LocalLlmRequest originalRequest,
         LocalLlmChatResult result, bool enabled, ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
         ChatRequestProgressViewModel progress, IProgress<LocalLlmGenerationProgress> downstream,
         IProgress<string> terminal, CancellationToken cancellationToken)
     {
         var alreadySearched = _messageResearch.TryGetValue(assistant, out var research) && research.DidSearch;
-        return GoogleKnowledgeRecovery.RecoverAsync(question, result, enabled, alreadySearched, async token =>
+        var recovered = await GoogleKnowledgeRecovery.RecoverAsync(question, result, enabled, alreadySearched, async token =>
         {
             terminal.Report("The answer reported missing knowledge; checking Google for public sources.");
             assistant.UpdateContent(result.Message ?? "");
@@ -89,6 +89,16 @@ public sealed partial class ContextControlViewModel
             return await _localLlmService.SendChatAsync(originalRequest with { Prompt = prepared, Think = false },
                 CreateLiveAssistantProgress(assistant, downstream), terminal, token);
         }, cancellationToken);
+        if (!recovered.Succeeded || !GoogleEvidenceText.HasInterfaceEntry(recovered.Message ?? "")
+            || !_messageResearch.TryGetValue(assistant, out var sources)) return recovered;
+        progress.Status = "Checking place names against sources…";
+        assistant.IsAwaitingAnswer = true;
+        assistant.LiveStage = "Checking";
+        terminal.Report("A search-interface label was mistaken for a place name; correcting the answer from source evidence.");
+        var repairPrompt = GoogleSearchContext.AugmentPrompt(originalRequest.Prompt, sources, originalRequest.ContextWindowTokens ?? 4096);
+        return await GoogleEvidenceText.ReviewAsync(recovered, repairPrompt, (prompt, token) =>
+            _localLlmService.SendChatAsync(originalRequest with { Prompt = prompt, Think = false, MaxOutputTokens = 1536 },
+                CreateLiveAssistantProgress(assistant, downstream), terminal, token), cancellationToken);
     }
 
     private async Task AttachGoogleEntryPhotosAsync(ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
@@ -103,10 +113,16 @@ public sealed partial class ContextControlViewModel
         {
             photoCount++;
             assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel(photo.SourceTitle, photo.SourceUrl, "web", photo.PreviewPath, photo.EntryTitle)
-                { IncludeInPrompt = false });
+                { IncludeInPrompt = false, PhotoCaption = photo.Caption, PhotoSection = photo.Section, PhotoKind = photo.Kind, IsSubjectPhoto = photo.IsSubjectPhoto });
             RefreshLiveAssistantMessage(session, assistant);
-        }, cancellationToken);
+        }, cancellationToken, status: value => progress.Status = value);
         AppendTerminalOutput($"Photo lookup: {photoCount} matching source photo(s) attached.");
+        var reconciled = GoogleEvidenceText.WithoutPhotoCapabilityClaims(assistant.RawText);
+        if (reconciled != assistant.RawText)
+        {
+            assistant.UpdateContent(reconciled);
+            RefreshLiveAssistantMessage(session, assistant);
+        }
         if (photoCount == 0 && research.PhotoSubject is not null && !cancellationToken.IsCancellationRequested)
         {
             assistant.UpdateContent(assistant.RawText + "\n\n*A matching photo could not be retrieved from the available sources.*");

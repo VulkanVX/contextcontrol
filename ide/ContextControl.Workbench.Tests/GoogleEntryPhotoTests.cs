@@ -45,10 +45,33 @@ internal static class GoogleEntryPhotoTests
         await GoogleEntryPhotoService.LoadAsync("A prose answer without a list.", new GoogleResearchResult(new GoogleSearchResult("Nvidia 5090 photo", GoogleSearchContext.SearchUrl("Nvidia 5090 photo"),
             [Source("NVIDIA GeForce RTX 5090", image)]), [], "Nvidia 5090"), browser, singlePhoto.Add, default, cache);
         Check(singlePhoto.Count == 1 && singlePhoto[0].EntryTitle == "Nvidia 5090", "A standalone photo request does not require a generated list or table.");
+        browser.Queries.Clear();
         await GoogleEntryPhotoService.LoadAsync(numbered, research, browser, found.Add, default, cache);
         Check(found.Count == 1 && found[0].EntryTitle == "Garden Café", "Attach the correct named photo and avoid reusing an identical image for another entry.");
-        Check(browser.Queries.Count == 2 && browser.Queries[0].Contains("\"Garden Café\"") && !browser.Queries[0].Contains("[1]"), "Search just the displayed name with the original search query.");
+        Check(browser.Queries.Count is >= 2 and <= 4 && browser.Queries[0].Contains("\"Garden Café\"") && !browser.Queries[0].Contains("[1]"), "Use bounded named-venue queries and retry an unusable photo without sending the answer.");
         Check(found.All(photo => File.Exists(photo.PreviewPath)), "Only attach decoded and cached photos.");
+        Check(GoogleResearchService.PhotoSubject("What is wow forever? Show me photos of it") == "World of Warcraft forever", "Resolve the photo pronoun to the named topic in the same request.");
+        Check(GoogleEntryPhotoService.IsEntrySource("WoW Forever", Source("World of Warcraft: Forever Found Photos Panel Recap"), ["WoW Forever"], true), "WoW abbreviations must match the official full title.");
+        Check(GoogleEntryPhotoService.MentionsName("World of Warcraft Forever", "Warcraft Forever logo"), "Recognize the shorter official Warcraft title.");
+        Check(GoogleEntryPhotoService.IsUsablePhoto(new("https://example.com/wow-forever-logo.png", "Warcraft Forever logo", Kind: "Logo"), "WoW Forever", true), "A subject-specific logo is a valid explicit image result.");
+        Check(!GoogleEntryPhotoService.IsUsablePhoto(new("https://example.com/logo.png", "Blizzard logo", Kind: "Logo"), "WoW Forever", true), "Do not replace the requested game's image with the publisher's generic logo.");
+        foreach (var caption in new[] { "Drop the Ads. Keep the Loot.", "Subscribe to our Newsletters!", "Sponsored advertisement" })
+            Check(!GoogleEntryPhotoService.IsUsablePhoto(new("https://example.com/promo.jpg", caption), "WoW Forever", true), "Publisher promotions must not become subject photos.");
+        Check(!GoogleEntryPhotoService.IsUsablePhoto(new("https://example.com/garden-cafe-logo.png", "Garden Cafe logo", Kind: "Logo"), "Garden Cafe", false), "Place photo cards must still avoid logos.");
+        Check(GoogleResearchService.PhotoSubject("Recommend the best bars in Tallinn and show photos") is null, "A venue list must keep one photo lookup per named venue.");
+        Check(!GoogleResearchService.IsPhotoOnlyRequest("What is WoW Forever and show photos of it"), "A combined explanation/photo request must not be reduced to a caption.");
+        var secondImage = "data:image/png;base64," + Convert.ToBase64String(GooglePhotoPreviewTests.Photo(width: 321));
+        var gallery = new GoogleResearchResult(new GoogleSearchResult("bars Tallinn", "https://www.google.com/search?q=bars", [Source("Best bars in Tallinn")]),
+            [new(1, "Garden Cafe and Monstro", true, [new(image, "Garden Cafe interior", "Garden Cafe"), new(secondImage, "Monstro seating", "Monstro")])]);
+        var galleryPhotos = new List<GoogleEntryPhoto>();
+        var noNetwork = new FixtureBrowser(_ => throw new Exception("Named photos from an already-read page must not re-search."));
+        await GoogleEntryPhotoService.LoadAsync(numbered, gallery, noNetwork, galleryPhotos.Add, default, cache);
+        Check(galleryPhotos.Count == 2 && galleryPhotos.Select(photo => photo.EntryTitle).SequenceEqual(entries), "A multi-place article can supply each venue's own section-labelled image.");
+        var gameGallery = gallery with { PhotoSubject = "WoW Forever", Search = gallery.Search! with { Sources = [Source("World of Warcraft: Forever")] },
+            Pages = [new(1, "Game article", true, [new(image, "Riverglades", "Riverglades"), new(secondImage, "Mount Hyjal", "Mount Hyjal")])] };
+        var gamePhotos = new List<GoogleEntryPhoto>();
+        await GoogleEntryPhotoService.LoadAsync("Explanation", gameGallery, browser, gamePhotos.Add, default, cache);
+        Check(gamePhotos.Count == 2 && gamePhotos.All(photo => photo.IsSubjectPhoto) && gamePhotos[1].Section == "Mount Hyjal", "An explicit subject can retain several distinct captioned article images.");
 
         using var stop = new CancellationTokenSource();
         stop.Cancel();
