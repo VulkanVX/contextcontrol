@@ -8,6 +8,12 @@ Code Editor, Prompt Window and Chat/ImageGen text sizes set their sizes within t
 
 Scale changes settle after a short pause in slider movement. They do not recreate the theme palette. Appearance settings are saved after changes settle and flushed on exit. Studio adds coordinated dark surfaces and accents across the editor, tree, graph, chat and settings. Existing themes, skins and appearance preferences remain selectable.
 
+## Chat formatting and information cards
+
+Assistant messages use a CommonMark parser in the virtualized chat renderer. Bold, italics, strikethrough, headings, nested lists, quotes, task lists, inline code and tables render with their intended styles. HTML entities such as `&#x20;` decode correctly outside code. Markdown links and known research citations open their source pages. Selecting and copying text copies what is displayed; message-level copy retains the original response. User messages and code snippets retain literal text.
+
+Numbered entries with a bold title and supporting details become information cards, useful for place and review lists. Ratings, addresses, prices and review summaries are presented only when supplied by the response; the interface does not create missing values. A cited photo is placed inside a card only when the source title identifies the entry. Tables wrap their cell contents and use labelled rows in narrow windows. Existing saved assistant messages gain formatting when reopened.
+
 ## Floating Chat Monitor
 
 The monitor stays above other windows while ContextControl is running. Turn it on or off in **Settings → Prompt Window**; its header × hides it. Drag the header to reposition it. Its saved position is brought back onto an available screen when necessary.

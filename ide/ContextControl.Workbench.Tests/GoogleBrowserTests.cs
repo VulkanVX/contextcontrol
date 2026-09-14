@@ -56,8 +56,8 @@ public sealed class GoogleBrowserTestApp : Application
                 }
                 var core = (CoreWebView2)typeof(WebView2Host).GetField("_webView", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(browser)!;
                 core.NavigateToString("""
-                    <!doctype html><html><body id="fixture">
-                    <main><div class="MjjYud"><a href="https://docs.avaloniaui.net/docs/overview"><h3>Avalonia documentation</h3></a><p>Official documentation for desktop applications.</p></div>
+                    <!doctype html><html><head><meta property="og:image" content="https://example.com/hero.jpg"></head><body id="fixture">
+                    <main><div class="MjjYud"><a href="https://docs.avaloniaui.net/docs/overview"><h3>Avalonia documentation</h3></a><img src="data:image/png;base64,AAAA" width="120" height="80"><p>Official documentation for desktop applications.</p></div>
                     <div class="MjjYud"><a href="https://avaloniaui.net/blog"><h3>Release notes</h3></a><p>The newest release announcements.</p></div>
                     <a href="javascript:void(0)"><h3>Invalid result</h3></a>
                     <article>Readable public article text with facts. <span hidden>HIDDEN_MARKER</span><script type="text/plain">SCRIPT_MARKER</script><nav>NAV_MARKER</nav></article></main>
@@ -66,11 +66,15 @@ public sealed class GoogleBrowserTestApp : Application
                 while (await core.ExecuteScriptAsync("!!document.getElementById('fixture')") != "true") await Task.Delay(100, deadline.Token);
                 using var results = JsonDocument.Parse(await browser.ExecuteScriptAsync(GoogleResearchScripts.SearchResults));
                 if (results.RootElement.GetProperty("results").GetArrayLength() != 2) throw new InvalidOperationException("Google result DOM extraction did not retain exactly two valid fixture links.");
+                var cards = results.RootElement.GetProperty("results");
+                if (cards[0].GetProperty("imageUrl").GetString() != "data:image/png;base64,AAAA" || cards[1].GetProperty("imageUrl").GetString() != "")
+                    throw new InvalidOperationException("Search thumbnails must belong to their own result, never a neighboring card.");
                 using var page = JsonDocument.Parse(await browser.ExecuteScriptAsync(GoogleResearchScripts.PageText));
+                if (page.RootElement.GetProperty("imageUrl").GetString() != "https://example.com/hero.jpg") throw new InvalidOperationException("The page reader must extract the source's preview image metadata.");
                 var body = page.RootElement.GetProperty("text").GetString()!;
                 if (!body.Contains("Readable public article") || body.Contains("HIDDEN_MARKER") || body.Contains("SCRIPT_MARKER") || body.Contains("NAV_MARKER"))
                     throw new InvalidOperationException("Page reader must include visible article text and exclude hidden/navigation/script text.");
-                Console.WriteLine("Native WebView2 extraction passed: two Google-style result cards and visible article text.");
+                Console.WriteLine("Native WebView2 extraction passed: result links, per-source thumbnails, page photo metadata, and visible article text.");
                 core.NavigateToString("""
                     <!doctype html><html><head><title>Reddit</title></head><body id="blocked-fixture"><main>
                     <h1>You've been blocked by network security</h1>
@@ -108,6 +112,10 @@ public sealed class GoogleBrowserTestApp : Application
                     var research = await researchTask;
                     if (!research.DidSearch || !research.Pages.Any(page => page.FullPageRead)) throw new InvalidOperationException("Live research must search and read at least one real page.");
                     foreach (var source in research.Search!.Sources) Console.WriteLine("SOURCE: " + source.Url);
+                    var previews = await GooglePhotoPreviewService.Shared.LoadManyAsync(research.Search.Sources, deadline.Token);
+                    var photoCount = previews.Count(File.Exists);
+                    if (photoCount == 0) throw new InvalidOperationException("Live research did not produce any cached source photo previews.");
+                    Console.WriteLine($"Live source photo previews passed: {photoCount} decoded and cached images.");
                     var response = await local.SendChatAsync(new LocalLlmRequest(Model, GoogleSearchContext.AugmentPrompt(question, research, 8192), "research-test", [], 8192, MaxOutputTokens: 600), null, null, deadline.Token);
                     if (!response.Succeeded || string.IsNullOrWhiteSpace(response.Message)) throw new InvalidOperationException(response.Status);
                     Console.WriteLine("FINAL ANSWER: " + response.Message);

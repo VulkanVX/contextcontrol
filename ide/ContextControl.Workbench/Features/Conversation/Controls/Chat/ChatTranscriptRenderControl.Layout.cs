@@ -56,6 +56,11 @@ public sealed partial class ChatTranscriptRenderControl
         {
             if (part.IsText)
             {
+                if (!message.IsUser)
+                {
+                    y = BuildMarkdown(layout, part, contentLeft, y, contentWidth);
+                    continue;
+                }
                 var text = GetNormalizedPartText(part);
                 if (string.IsNullOrWhiteSpace(text))
                 {
@@ -205,6 +210,8 @@ public sealed partial class ChatTranscriptRenderControl
 
         foreach (var attachment in message.AttachedFiles)
         {
+            if (attachment.Kind == "web" && !string.IsNullOrWhiteSpace(attachment.PreviewPath))
+                desired = Math.Max(desired, Math.Min(maxContentWidth, 480.0));
             desired = Math.Max(desired, IsInlineImageAttachment(attachment) ? Math.Min(maxContentWidth, 360.0) : 160.0);
         }
 
@@ -363,6 +370,24 @@ public sealed partial class ChatTranscriptRenderControl
         var bottom = y;
         foreach (var attachment in message.AttachedFiles)
         {
+            if (attachment.Kind == "web" && !layout.EmbeddedWebPhotos.Contains(attachment.Path) && TryGetImageBitmap(attachment.PreviewPath) is not null)
+            {
+                var cardWidth = Math.Min(232.0, contentWidth);
+                if (left > x && left + cardWidth > maxRight)
+                {
+                    left = x;
+                    rowY = bottom + AttachmentGap;
+                }
+                var photo = new Rect(left, rowY, cardWidth, 140.0);
+                var caption = new Rect(left, photo.Bottom, cardWidth, rowHeight);
+                layout.Attachments.Add(new AttachmentLayout(photo, attachment.DisplayTitle, attachment, true));
+                layout.Attachments.Add(new AttachmentLayout(caption, CleanOneLine(attachment.DisplayTitle, 80), attachment, false));
+                layout.Hits.Add(new HitRegion(photo, ChatTranscriptHitKind.OpenImagePreview, attachment.PreviewPath));
+                layout.Hits.Add(new HitRegion(caption, ChatTranscriptHitKind.OpenAttachment, attachment.Path));
+                left += cardWidth + AttachmentGap;
+                bottom = Math.Max(bottom, caption.Bottom);
+                continue;
+            }
             if (IsInlineImageAttachment(attachment))
             {
                 if (left > x)

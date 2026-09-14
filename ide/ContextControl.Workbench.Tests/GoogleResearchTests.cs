@@ -18,6 +18,7 @@ internal static class GoogleResearchTests
     public static async Task Run()
     {
         _checks += await GoogleBlockedSourceTests.Run();
+        _checks += await GooglePhotoPreviewTests.Run();
         Check(GoogleResearchService.ParseQuery("{\"search\":false}", "hello") is null, "Greetings must not search.");
         Check(GoogleResearchService.ParseQuery("{\"search\":true,\"query\":\"Google capabilities\"}", "Can you use google?") is null, "Capability questions must not become searches.");
         Check(GoogleResearchService.ParseQuery("```json\n{\"search\":true,\"query\":\"  Avalonia   release  \"}\n```", "latest version") == "Avalonia release", "Use the model's normalized query.");
@@ -99,7 +100,7 @@ internal static class GoogleResearchTests
         vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
         vm.SwitchPromptToCodexCommand.Execute(null);
         Check(!vm.CanUseGoogleSearch && notifications.Contains(nameof(vm.CanUseGoogleSearch)), "Non-local prompt modes must hide the Google control.");
-        var sourceAttachment = new ContextControlAttachmentViewModel("[1] Official source", "https://example.com/" + new string('a', 650), "web");
+        var sourceAttachment = new ContextControlAttachmentViewModel("[1] Official source", "https://example.com/" + new string('a', 650), "web", Path.Combine(root, "preview.jpg"));
         var assistant = new LocalLlmChatMessageViewModel("assistant", "Verified answer [1].");
         var attachmentChanged = false;
         assistant.PropertyChanged += (_, e) => attachmentChanged |= e.PropertyName == nameof(assistant.HasAttachments);
@@ -111,6 +112,7 @@ internal static class GoogleResearchTests
         history.Save(new ChatHistoryDocument { Sessions = [session.ToData()] }, root, "chat", mirrorDefaultScope: false);
         var restored = new ChatSessionViewModel(history.Load(root).Sessions.Single()).CreateMessageAt(0);
         Check(restored.AttachedFiles.Single().Path == sourceAttachment.Path && restored.AttachedFiles.Single().Kind == "web", "Exact source links must survive history persistence, including long URLs.");
+        Check(restored.AttachedFiles.Single().PreviewPath == sourceAttachment.PreviewPath, "Source photo paths must survive saving and reopening chat history.");
         vm.ChatMonitor.Dispose();
         Console.WriteLine($"Google research regression passed: {_checks} checks.");
     }

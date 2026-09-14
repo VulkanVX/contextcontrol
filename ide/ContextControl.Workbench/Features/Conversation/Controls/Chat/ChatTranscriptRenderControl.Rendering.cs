@@ -39,6 +39,21 @@ public sealed partial class ChatTranscriptRenderControl
         using var clip = context.PushClip(card);
         DrawHeader(context, layout, message, rowTop);
 
+        foreach (var decoration in layout.MarkdownDecorations)
+        {
+            var rect = OffsetY(decoration.Rect, rowTop);
+            if (rect.Bottom < viewportTop || rect.Top > viewportBottom) continue;
+            var border = Resource("ChatSnippetBorderBrush", CommandBorderFallbackBrush);
+            if (decoration.Kind == "rule") context.DrawLine(new Pen(border, 1), rect.TopLeft, rect.TopRight);
+            else
+            {
+                var background = decoration.Kind is "card" or "tableHeader" ? Resource("ChatSnippetShellBrush", EditorSurfaceFallbackBrush)
+                    : Resource("ChatSnippetBodyBrush", CommandBackgroundFallbackBrush);
+                context.DrawRectangle(background, new Pen(border, 1), rect, decoration.Kind == "card" ? 8 : 2, decoration.Kind == "card" ? 8 : 2);
+                if (decoration.Kind == "quote") context.DrawLine(new Pen(Resource("AccentBrush", AccentBorderFallbackBrush), 3), rect.TopLeft, rect.BottomLeft);
+            }
+        }
+
         foreach (var attachment in layout.Attachments)
         {
             DrawAttachment(context, attachment, rowTop);
@@ -180,7 +195,7 @@ public sealed partial class ChatTranscriptRenderControl
 
         var font = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
         var text = GetFormattedText(attachment.Label, Resource("ChatMetaBrush", TextMutedFallbackBrush), font, FontWeight.Bold, FontStyle.Normal,
-            attachment.Attachment.Kind == "web" ? Math.Max(9.0, ChatMetaFontSize) : 9.0);
+            attachment.Attachment.Kind == "web" ? Math.Max(9.0, ChatMetaFontSize) : 9.0, Math.Max(1, rect.Width - 12));
         DrawClippedText(context, text, new Rect(rect.X + 6.0, rect.Y, Math.Max(0.0, rect.Width - 12.0), rect.Height), new Point(rect.X + 6.0, CenterTextY(rect, text)));
     }
 
@@ -200,7 +215,7 @@ public sealed partial class ChatTranscriptRenderControl
             rect.Y + ImagePreviewInset,
             Math.Max(0.0, rect.Width - ImagePreviewInset * 2.0),
             Math.Max(0.0, rect.Height - ImagePreviewInset * 2.0));
-        var bitmap = TryGetImageBitmap(attachment.Attachment.Path);
+        var bitmap = TryGetImageBitmap(attachment.Attachment.ImagePreviewPath);
         if (bitmap is null || imageBounds.Width <= 0.0 || imageBounds.Height <= 0.0)
         {
             var font = ResolveFontFamily(UiFontFamily, Resource("UiFontFamily", DefaultUiFontFamily));
@@ -715,6 +730,14 @@ public sealed partial class ChatTranscriptRenderControl
             return;
         }
 
+        if (block.Rich is { } rich)
+        {
+            using var richClip = context.PushClip(rect);
+            for (var lineIndex = firstLine; lineIndex <= lastLine; lineIndex++)
+                rich.Layout.TextLines[lineIndex].Draw(context, new Point(rect.X, rect.Y + lineIndex * block.LineHeight));
+            return;
+        }
+
         using (context.PushClip(rect))
         {
             for (var lineIndex = firstLine; lineIndex <= lastLine; lineIndex++)
@@ -780,6 +803,13 @@ public sealed partial class ChatTranscriptRenderControl
                     : line.Length;
                 if (endColumn <= startColumn)
                 {
+                    continue;
+                }
+
+                if (block.Rich is { } rich)
+                {
+                    foreach (var selection in rich.Layout.HitTestTextRange(rich.LineStarts[lineIndex] + startColumn, endColumn - startColumn))
+                        context.DrawRectangle(TextSelectionFallbackBrush, null, new Rect(rect.X + selection.X, rect.Y + selection.Y - scrollOffset, selection.Width, selection.Height), 2, 2);
                     continue;
                 }
 

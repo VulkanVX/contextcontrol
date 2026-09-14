@@ -9,7 +9,7 @@ public interface IGoogleResearchBrowser
     Task<GooglePageContent> ReadPageAsync(GoogleSearchSource source, CancellationToken cancellationToken);
 }
 
-public sealed record GooglePageContent(string Url, string Text);
+public sealed record GooglePageContent(string Url, string Text, string? ImageUrl = null);
 public sealed record GooglePageEvidence(int SourceNumber, string Text, bool FullPageRead);
 public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages)
 {
@@ -65,7 +65,7 @@ public static partial class GoogleResearchService
                 {
                     var page = await browser.ReadPageAsync(source, cancellationToken);
                     if (!GoogleSearchContext.IsPublicWebUrl(page.Url)) throw new InvalidOperationException("The page returned an invalid source URL.");
-                    resolvedSources[number - 1] = source with { Url = page.Url };
+                    resolvedSources[number - 1] = source with { Url = page.Url, ImageUrl = page.ImageUrl ?? source.ImageUrl };
                     pages.Add(new GooglePageEvidence(number, page.Text, !string.IsNullOrWhiteSpace(page.Text)));
                 }
                 catch (OperationCanceledException) { throw; }

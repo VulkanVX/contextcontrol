@@ -322,7 +322,7 @@ public sealed class ChatSessionViewModel : ObservableObject
 
     private static ContextControlAttachmentViewModel CreateAttachment(ChatHistoryAttachmentData data)
     {
-        var attachment = new ContextControlAttachmentViewModel(data.Label, data.Path, data.Kind)
+        var attachment = new ContextControlAttachmentViewModel(data.Label, data.Path, data.Kind, data.PreviewPath)
         {
             IncludeInPrompt = data.IncludeInPrompt
         };
@@ -346,6 +346,7 @@ public sealed class ChatSessionViewModel : ObservableObject
                 {
                     Label = attachment.Label,
                     Path = attachment.Path,
+                    PreviewPath = attachment.PreviewPath,
                     Kind = attachment.Kind,
                     IncludeInPrompt = attachment.IncludeInPrompt
                 }).ToList()

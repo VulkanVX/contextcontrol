@@ -595,6 +595,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
 
     private void DetachItems()
     {
+        ClearRichLayouts();
         if (_itemsCollectionChanged is not null)
         {
             _itemsCollectionChanged.CollectionChanged -= OnItemsCollectionChanged;
@@ -846,7 +847,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
         }
 
         _hoveredHit = null;
-        _layoutCache.Remove(index);
+        RemoveRichLayout(index);
         if (_rowHeights.Remove(index))
         {
             _heightDeltas.SetDelta(index, 0.0);
@@ -873,7 +874,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
     {
         _layoutWidth = Math.Max(1.0, width);
         _itemCount = Math.Max(0, count);
-        _layoutCache.Clear();
+        ClearRichLayouts();
         _rowHeights.Clear();
         _heightDeltas.Reset(_itemCount);
         _hoveredHit = null;
@@ -890,7 +891,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
         }
 
         _layoutWidth = Math.Max(1.0, width);
-        _layoutCache.Clear();
+        ClearRichLayouts();
         _hoveredHit = null;
         ClearTextSelection();
     }
@@ -1387,7 +1388,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
 
     private void InvalidateRowLayout(int index, bool keepMeasuredHeight = false)
     {
-        _layoutCache.Remove(index);
+        RemoveRichLayout(index);
         if (keepMeasuredHeight)
         {
             return;

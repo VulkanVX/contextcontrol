@@ -197,6 +197,7 @@ Get-ChildItem -LiteralPath $publishDir -Force | Where-Object {
 
 $packageDir = Join-Path $repoRoot 'packaging\package'
 Copy-Item -LiteralPath (Join-Path $packageDir 'INSTALL.md') -Destination $stageDir -Force
+Copy-Item -LiteralPath (Join-Path $packageDir 'Markdig-LICENSE.txt') -Destination $stageDir -Force
 Copy-Item -LiteralPath (Join-Path $packageDir 'Install-ContextControl.ps1') -Destination $stageDir -Force
 Copy-Item -LiteralPath (Join-Path $packageDir 'Start-ContextControl.cmd') -Destination $stageDir -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot 'packaging\release-settings.template.json') -Destination (Join-Path $stageDir '.ccWorkbench.settings.json') -Force

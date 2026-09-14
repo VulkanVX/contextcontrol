@@ -294,7 +294,8 @@ public sealed partial class ChatTranscriptRenderControl
         FontFamily fontFamily,
         FontWeight weight,
         FontStyle style,
-        double fontSize)
+        double fontSize,
+        double maxWidth = double.PositiveInfinity)
     {
         var key = new TextCacheKey(
             text,
@@ -302,7 +303,8 @@ public sealed partial class ChatTranscriptRenderControl
             fontFamily.ToString(),
             weight,
             style,
-            fontSize);
+            fontSize,
+            maxWidth);
         if (_textCache.TryGetValue(key, out var formatted))
         {
             return formatted;
@@ -320,6 +322,12 @@ public sealed partial class ChatTranscriptRenderControl
             new Typeface(fontFamily, style, weight),
             fontSize,
             brush);
+        if (double.IsFinite(maxWidth))
+        {
+            formatted.MaxTextWidth = Math.Max(1, maxWidth);
+            formatted.MaxLineCount = 1;
+            formatted.Trimming = TextTrimming.CharacterEllipsis;
+        }
         _textCache[key] = formatted;
         return formatted;
     }
@@ -723,7 +731,8 @@ public sealed partial class ChatTranscriptRenderControl
         string FontFamily,
         FontWeight Weight,
         FontStyle Style,
-        double FontSize);
+        double FontSize,
+        double MaxWidth);
 
     private readonly record struct WrapCacheKey(
         string Text,
@@ -772,6 +781,8 @@ public sealed partial class ChatTranscriptRenderControl
         public ThinkingLayout? Thinking { get; set; }
         public DiagnosticLayout? Diagnostic { get; set; }
         public List<HitRegion> Hits { get; } = [];
+        public List<MarkdownDecoration> MarkdownDecorations { get; } = [];
+        public HashSet<string> EmbeddedWebPhotos { get; } = new(StringComparer.Ordinal);
     }
 
     private sealed record TextBlockLayout(
@@ -782,7 +793,8 @@ public sealed partial class ChatTranscriptRenderControl
         FontWeight Weight,
         FontStyle Style,
         bool UseCodeFont,
-        IBrush Brush);
+        IBrush Brush,
+        RichTextLayout? Rich = null);
 
     private sealed record SelectableTextBlockLayout(int BlockIndex, TextBlockLayout TextBlock);
 

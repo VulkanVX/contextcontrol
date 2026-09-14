@@ -43,6 +43,8 @@ internal static class UiExperienceTests
         var context = workbench.ContextControl;
         Typography(output);
         Headers(output);
+        PhotoPreviews(root, output);
+        MarkdownFormatting(root, output);
         Monitor(context, workbench, root, output);
         var settingsWindow = new ThemeSettingsWindow { DataContext = workbench };
         settingsWindow.ApplyTheme("studio", uiFontSize: 11);
@@ -119,6 +121,143 @@ internal static class UiExperienceTests
             window.Close();
         }
         Check(previousHeader > 30, "Largest chat text requires a genuinely taller header.");
+    }
+
+    private static void PhotoPreviews(string root, string output)
+    {
+        var photoPath = Path.Combine(root, "source-photo.png");
+        File.WriteAllBytes(photoPath, GooglePhotoPreviewTests.Photo());
+        var sources = new[]
+        {
+            new ContextControlAttachmentViewModel("[1] Photo source · open page", "https://example.com/article", "web", photoPath),
+            new ContextControlAttachmentViewModel("[2] Another source", "https://example.org/article", "web", photoPath),
+            new ContextControlAttachmentViewModel("[3] Text-only source", "https://example.net/article", "web"),
+            new ContextControlAttachmentViewModel("[4] Unavailable photo", "https://example.edu/article", "web", Path.Combine(root, "missing.jpg"))
+        };
+        foreach (var (width, size) in new[] { (780, 11d), (380, 22d) })
+        {
+            var message = new LocalLlmChatMessageViewModel("assistant", "Source photos now appear below the answer. Click a photo to enlarge it, or its title to open the source. [1] [2]", attachments: sources);
+            var transcript = new ChatTranscriptRenderControl { ChatFontSize = size, Items = [message] };
+            var layout = Call(transcript, "BuildMessageLayout", message, (double)width - 40)!;
+            var attachments = Read<System.Collections.IEnumerable>(layout, "Attachments").Cast<object>().ToArray();
+            Check(attachments.Count(item => Read<bool>(item, "IsImagePreview")) == 2, "Available web photos must render; missing previews must retain a plain source chip.");
+            var card = Read<Rect>(layout, "CardRect");
+            foreach (var item in attachments)
+            {
+                var rect = Read<Rect>(item, "Rect");
+                Check(rect.Right <= card.Right && rect.Bottom <= Read<double>(layout, "Height"), "Photo cards must fit narrow chat widths and measured message height.");
+            }
+            var hits = Read<System.Collections.IEnumerable>(layout, "Hits").Cast<object>().ToArray();
+            var photoHit = hits.First(hit => Read<ChatTranscriptHitKind>(hit, "Kind") == ChatTranscriptHitKind.OpenImagePreview);
+            Check(Read<object>(photoHit, "Parameter").Equals(photoPath), "Photo click targets must open the cached image.");
+            Check(hits.Where(hit => Read<ChatTranscriptHitKind>(hit, "Kind") == ChatTranscriptHitKind.OpenAttachment).Select(hit => Read<object>(hit, "Parameter")).Distinct().Count() == 4,
+                "Every photo and plain source must retain a separate page link.");
+            Check(hits.Any(hit => Read<ChatTranscriptHitKind>(hit, "Kind") == ChatTranscriptHitKind.OpenAttachment && Read<object>(hit, "Parameter").Equals(sources[0].Path)),
+                "The source URL must remain separate from the local photo cache path.");
+            var window = new Window { Content = new Border { Background = new SolidColorBrush(Color.Parse("#151922")), Child = new ScrollViewer { Content = transcript } } };
+            WorkbenchThemeResources.Apply(window, "studio", chatAppearanceKey: "adaptive");
+            Snapshot(window, width, 820, Path.Combine(output, $"web-photos-{width}.png"));
+            if (width == 780)
+            {
+                Call(transcript, "ExecuteHit", photoHit);
+                var viewer = window.OwnedWindows.Single();
+                Check(viewer.IsVisible && viewer.GetVisualDescendants().OfType<Image>().Any(image => image.Source is Bitmap), "Clicking a source photo must open the actual full image viewer.");
+                Snapshot(viewer, 900, 600, Path.Combine(output, "web-photo-expanded.png"));
+                viewer.Close();
+            }
+            window.Close();
+        }
+    }
+
+    private static void MarkdownFormatting(string root, string output)
+    {
+        const string answer = """
+            ## Places and reviews
+
+            A **bold** name, *italic* note, ~~old detail~~ and `literal **code**` all keep their intended style. Encoded&#x20;space &amp; ampersand.
+
+            3. **Maurizio's Italian Food**
+               - **Cuisine:** Italian · pizza and pasta
+               - **Reviews:** Fixture review summary for layout testing. [1]
+               - **Location:** Example address; verify with the [official source](https://example.com/maurizio).
+            4. **Example Garden Café**
+               - **Reviews:** A second fixture entry. Rating unavailable. [2]
+
+            > Source ratings and current opening hours need verification.
+
+            | Place | Cuisine | Review information |
+            | --- | --- | --- |
+            | **Maurizio's** | Italian | Check the source [1] |
+            | Garden Café | Café | Rating unavailable [2] |
+
+            - [x] Read the source
+            - [ ] Verify opening hours
+            """;
+        var blocks = ChatMarkdown.Parse(answer);
+        var all = Flatten(blocks).ToArray();
+        Check(all.Count(block => block.Kind == "card") == 2 && all.First(block => block.Kind == "card").Marker == "3.", "Numbered place entries must become information cards without losing their original rank.");
+        Check(all.SelectMany(block => block.Runs).Any(run => run.Bold && run.Text.Contains("Maurizio's Italian Food")), "The reported restaurant name must be bold, not visible Markdown delimiters.");
+        Check(all.SelectMany(block => block.Runs).Any(run => run.Code && run.Text == "literal **code**"), "Inline code must retain literal Markdown syntax.");
+        Check(all.SelectMany(block => block.Runs).Any(run => run.Italic) && all.SelectMany(block => block.Runs).Any(run => run.Strike), "Italic and strikethrough formatting must remain distinct.");
+        Check(string.Concat(all.Select(block => block.PlainText)).Contains("Encoded space & ampersand."), "HTML entities must decode into visible characters, including the reported hex space.");
+        Check(ChatMarkdown.Parse(@"\*\*literal\*\*").Single().PlainText == "**literal**", "Intentionally escaped Markdown stays literal.");
+        Check(ChatMarkdown.Parse("[unsafe](javascript:alert(1))").SelectMany(block => block.Runs).All(run => run.Url is null), "Formatting must never create executable script links.");
+        Check(ChatMarkdown.Parse("**streaming").Single().PlainText.Contains("streaming"), "Incomplete streamed Markdown must retain its text.");
+        var photo = Path.Combine(root, "place-fixture.png");
+        File.WriteAllBytes(photo, GooglePhotoPreviewTests.Photo());
+        var message = new LocalLlmChatMessageViewModel("assistant", answer, attachments:
+        [
+            new("[1] Maurizio's Italian Food · official source", "https://example.com/maurizio", "web", photo),
+            new("[2] General review roundup", "https://example.org/reviews", "web", photo)
+        ]);
+        foreach (var (width, size) in new[] { (960, 15d), (420, 22d) })
+        {
+            var transcript = new ChatTranscriptRenderControl { ChatFontSize = size, Items = [message], OpenAttachmentCommand = new RelayCommand<string>(_ => { }) };
+            var layout = Call(transcript, "BuildMessageLayout", message, (double)width - 40)!;
+            var embedded = Read<HashSet<string>>(layout, "EmbeddedWebPhotos");
+            Check(embedded.SetEquals(["https://example.com/maurizio"]), "Only a cited source whose title identifies the place may supply its card photo; a generic roundup must not be misattributed.");
+            var textBlocks = Read<System.Collections.IEnumerable>(layout, "TextBlocks").Cast<object>().Select(value => Read<object>(value, "TextBlock")).ToArray();
+            Check(textBlocks.All(value => Read<object>(value, "Rich") is not null), "Assistant prose must use the active rich-text renderer.");
+            var rich = textBlocks.Select(value => Read<object>(value, "Rich")).ToArray();
+            var visible = string.Join("\n", rich.Select(value => Read<string>(value, "PlainText")));
+            Check(visible.Contains("Maurizio's Italian Food") && !visible.Contains("**Maurizio") && !visible.Contains("&#x20;"), "Rendered text must not leak Markdown or entity syntax.");
+            var decorations = Read<System.Collections.IEnumerable>(layout, "MarkdownDecorations").Cast<object>().ToArray();
+            Check(decorations.Count(value => Read<string>(value, "Kind") == "card") == 2, "The active transcript must render two information cards.");
+            Check(decorations.Any(value => Read<string>(value, "Kind") == "tableHeader") == (width == 960),
+                "Comparison tables must switch to labelled rows when chat font size makes columns too narrow.");
+            Check(decorations.All(value => Read<Rect>(value, "Rect").Right <= width), "Cards and tables must fit the viewport at large fonts.");
+            var window = new Window { Content = new Border { Background = new SolidColorBrush(Color.Parse("#151922")), Child = new ScrollViewer { Content = transcript } } };
+            WorkbenchThemeResources.Apply(window, "studio", chatAppearanceKey: "adaptive");
+            Snapshot(window, width, width == 960 ? 1600 : 2200, Path.Combine(output, $"structured-reviews-{width}.png"));
+            // Hit-testing and copying use the shaped text, so bold and links do not shift the selection.
+            var actualLayout = Call(transcript, "GetOrBuildLayout", 0)!;
+            var selectable = Read<System.Collections.IEnumerable>(actualLayout, "TextBlocks").Cast<object>().ElementAt(1);
+            var firstBlock = Read<object>(selectable, "TextBlock");
+            var rect = Read<Rect>(firstBlock, "Rect");
+            var hitMethod = transcript.GetType().GetMethod("TryGetTextPosition", Private)!;
+            object?[] args = [new Point(rect.X + 8, rect.Y + 5), null];
+            Check((bool)hitMethod.Invoke(transcript, args)!, "Formatted body text must remain selectable.");
+            var shaped = Read<object>(firstBlock, "Rich");
+            var copyText = Read<string>(shaped, "PlainText");
+            var boldStart = copyText.IndexOf("bold", StringComparison.Ordinal);
+            var positionType = transcript.GetType().GetNestedType("TextPosition", BindingFlags.NonPublic)!;
+            var blockIndex = Read<int>(selectable, "BlockIndex");
+            typeof(ChatTranscriptRenderControl).GetField("_selectionAnchor", Private)!.SetValue(transcript, Activator.CreateInstance(positionType, [0, blockIndex, 0, boldStart]));
+            typeof(ChatTranscriptRenderControl).GetField("_selectionActive", Private)!.SetValue(transcript, Activator.CreateInstance(positionType, [0, blockIndex, 0, boldStart + 4]));
+            Check((string)Call(transcript, "BuildSelectedText")! == "bold", "Copying selected bold text must use the rendered text, without delimiters.");
+            var actualHits = Read<System.Collections.IEnumerable>(actualLayout, "Hits").Cast<object>().ToArray();
+            Check(actualHits.Count(hit => Read<ChatTranscriptHitKind>(hit, "Kind") == ChatTranscriptHitKind.OpenAttachment && Read<object>(hit, "Parameter").Equals("https://example.com/maurizio")) >= 3,
+                "Inline citations as well as explicit Markdown links must open the cited source.");
+            window.Close();
+        }
+        static IEnumerable<ChatMarkdownBlock> Flatten(IEnumerable<ChatMarkdownBlock> source)
+        {
+            foreach (var block in source)
+            {
+                yield return block;
+                foreach (var child in Flatten(block.Children ?? [])) yield return child;
+            }
+        }
     }
 
     private static void Monitor(ContextControlViewModel context, WorkbenchViewModel workbench, string root, string output)

@@ -23,8 +23,15 @@ public static class GoogleResearchScripts
             if (!['http:', 'https:'].includes(url.protocol) || (/^(.+\.)?google\.[a-z.]+$/.test(url.hostname) && !googleRedirect) || seen.has(url.href)) continue;
             seen.add(url.href);
             let block = h.closest('.MjjYud, .g, [data-sokoban-container]') || a.parentElement;
+            const resultBlock = block;
             for (let i = 0; i < 3 && block && block.innerText.length < 120; i++) block = block.parentElement;
-            results.push({ title: h.innerText.trim().slice(0,160), url: url.href, snippet: (block?.innerText || '').trim().slice(0,700) });
+            const photo = Array.from(resultBlock?.querySelectorAll('img') || []).find(img => {
+              const rect = img.getBoundingClientRect();
+              return rect.width >= 80 && rect.height >= 50 && getComputedStyle(img).visibility !== 'hidden';
+            });
+            const imageUrl = photo?.currentSrc || photo?.src || '';
+            results.push({ title: h.innerText.trim().slice(0,160), url: url.href, snippet: (block?.innerText || '').trim().slice(0,700),
+              imageUrl: imageUrl.length <= 524288 ? imageUrl : '' });
             if (results.length === 6) break;
           }
           return { url: location.href, results };
@@ -47,7 +54,26 @@ public static class GoogleResearchScripts
             if (text) { parts.push(text); length += text.length + 1; }
           }
           const gate = document.querySelector('[role="dialog"][aria-modal="true"],dialog[open]');
+          const candidates = [
+            document.querySelector('meta[property="og:image:secure_url"]')?.content,
+            document.querySelector('meta[property="og:image"]')?.content,
+            document.querySelector('meta[name="twitter:image"],meta[property="twitter:image"]')?.content,
+            ...Array.from(root.querySelectorAll('img')).filter(img => {
+              const rect = img.getBoundingClientRect();
+              return rect.width >= 180 && rect.height >= 100 && !img.closest('nav,header,footer,[hidden],[aria-hidden="true"]')
+                && getComputedStyle(img).visibility !== 'hidden';
+            }).sort((a,b) => b.width * b.height - a.width * a.height).map(img => img.currentSrc || img.src)
+          ];
+          let imageUrl = '';
+          for (const value of candidates) {
+            if (!value || value.length > 524288) continue;
+            try {
+              const image = new URL(value, document.baseURI);
+              if (['http:', 'https:'].includes(image.protocol) || /^data:image\/(png|jpeg|webp|gif);base64,/i.test(value)) { imageUrl = image.href; break; }
+            } catch { }
+          }
           return { url: location.href, title: document.title, text: parts.join('\n').slice(0,24000),
+            imageUrl,
             heading: document.querySelector('h1')?.innerText?.slice(0,500) || '',
             gateText: gate?.innerText?.slice(0,1600) || '', hasArticle: !!document.querySelector('article,shreddit-post') };
         })()

@@ -55,6 +55,11 @@ public sealed partial class ChatTranscriptRenderControl
             var lineIndex = Math.Clamp((int)Math.Floor((point.Y - rect.Y + scrollOffset) / block.LineHeight), 0, block.Lines.Count - 1);
             var line = block.Lines[lineIndex];
             var column = CalculateColumnAtX(block, line, Math.Max(0.0, point.X - rect.X));
+            if (block.Rich is { } rich)
+            {
+                var character = rich.Layout.TextLines[lineIndex].GetCharacterHitFromDistance(Math.Max(0, point.X - rect.X));
+                column = Math.Clamp(character.FirstCharacterIndex + character.TrailingLength - rich.LineStarts[lineIndex], 0, line.Length);
+            }
             position = new TextPosition(rowIndex, selectable.BlockIndex, lineIndex, column);
             return true;
         }

@@ -6,6 +6,14 @@ Ask normally: “Search for Avalonia's official documentation” or “What is t
 
 The request's progress row and Chat Monitor show planning, searching, choosing pages, reading and answering. Blocked or failed pages are marked unavailable, and the model gets one opportunity to choose alternatives from untried results. Research makes at most five distinct page attempts to collect up to three readable pages. The normal Stop button cancels the complete request, including time spent waiting for another chat's browser operation. Browser operations are serialized, and each result is checked against its own query or requested URL.
 
+## Source photo previews
+
+When a Google result includes a thumbnail, or a readable page supplies a preview image, its source appears as a compact photo card below the answer. Click the photo to open the larger image viewer; press **Escape** or **×** to close it. Click the caption to open the source page. Cards wrap to fit the chat width, and captions follow the chat font setting.
+
+Previews are optional: blocked, missing, unsupported or oversized images leave a normal source link. Loading all photos has a six-second budget, and downloads and resizing run outside the UI thread. Photos are downscaled to at most 1280 pixels on the longest edge. The cache at `%LOCALAPPDATA%\ContextControl\WebPhotos` keeps up to 256 images, pruning older entries around 120 MB. Preview paths are saved in chat history; if an old cached image is removed, its source link remains available. Existing answers created before this feature retain their links; new research answers can include photos.
+
+These are source illustrations for the user. Image bytes are not added to the model's text context, and this feature does not give a text-only model visual understanding. Ordinary public image requests use no browser cookies or sign-in credentials. A failed image request is not retried through an access-block workaround.
+
 ## Browser and privacy
 
 Google research uses the Windows WebView2 browser; no search API key or cloud model is required. If WebView2 is missing, use the runtime option in the ContextControl installer. The ordinary Google window opens when a search starts. Complete Google's consent or verification there if requested; ContextControl waits for the actual results page. Closing the window stops the current browser operation. **Stop research** cancels the active request. The window may be minimized while research runs.

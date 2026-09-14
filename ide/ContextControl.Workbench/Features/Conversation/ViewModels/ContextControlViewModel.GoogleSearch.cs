@@ -52,10 +52,13 @@ public sealed partial class ContextControlViewModel
         var prepared = GoogleSearchContext.AugmentPrompt(prompt, result, contextTokens);
         if (result.Search is { } search)
         {
+            UpdateStatus("Loading source photo previews…");
+            var previews = await GooglePhotoPreviewService.Shared.LoadManyAsync(search.Sources, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             for (var i = 0; i < search.Sources.Count; i++)
             {
                 var source = search.Sources[i];
-                assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel($"[{i + 1}] {source.Title}", source.Url, "web"));
+                assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel($"[{i + 1}] {source.Title}", source.Url, "web", previews[i]));
             }
         }
         RefreshLiveAssistantMessage(session, assistant);

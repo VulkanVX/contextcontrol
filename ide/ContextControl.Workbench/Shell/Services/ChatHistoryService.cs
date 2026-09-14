@@ -189,6 +189,7 @@ public sealed class ChatHistoryService
                 {
                     Label = TrimText(attachment.Label, 120),
                     Path = TrimText(attachment.Path, attachment.Kind == "web" ? 1600 : 520),
+                    PreviewPath = TrimText(attachment.PreviewPath, 520),
                     Kind = TrimText(attachment.Kind, 32),
                     IncludeInPrompt = attachment.IncludeInPrompt
                 })
@@ -212,6 +213,7 @@ public sealed class ChatHistoryService
         {
             Label = TrimText(attachment.Label, 120),
             Path = TrimText(attachment.Path, 520),
+            PreviewPath = TrimText(attachment.PreviewPath, 520),
             Kind = TrimText(attachment.Kind, 32),
             IncludeInPrompt = attachment.IncludeInPrompt
         };
@@ -492,6 +494,7 @@ public sealed class ChatHistoryMessageData
 
 public sealed class ChatHistoryAttachmentData
 {
+    public string PreviewPath { get; set; } = "";
     public string Label { get; set; } = "";
     public string Path { get; set; } = "";
     public string Kind { get; set; } = "";

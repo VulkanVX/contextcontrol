@@ -42,7 +42,8 @@ public static partial class GooglePageReader
                 || title.Equals("Access denied", StringComparison.OrdinalIgnoreCase)
                 || title.StartsWith("Attention Required!", StringComparison.OrdinalIgnoreCase))))
             throw new GooglePageUnavailableException(url, "This source displayed an access block, sign-in requirement, or verification screen. Its article text was not read.");
-        return new GooglePageContent(url, text);
+        var image = Read(page, "imageUrl");
+        return new GooglePageContent(url, text, GooglePhotoPreviewService.IsImageLocation(image) ? image : null);
     }
 
     [GeneratedRegex(@"\b(blocked by network security|blocked due to a network policy|your request has been blocked|access denied|verify (?:that )?you are (?:a )?human|checking (?:your )?browser|log in to (?:your reddit account|continue)|sign in to continue)\b", RegexOptions.IgnoreCase)]
