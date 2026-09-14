@@ -167,7 +167,7 @@ public sealed class SyntaxPreviewControl : Control
                 : themeKey.ToLowerInvariant();
             var palette = normalizedTheme switch
             {
-                "dark" or "nocturne" or "onyx" or "smoke" or "carbon" or "obsidian" or "ash" or "graphene" or "ruby" or "amethyst" or "ember" or "cobalt" or "contrast" => CreateDark(),
+                "studio" or "dark" or "nocturne" or "onyx" or "smoke" or "carbon" or "obsidian" or "ash" or "graphene" or "ruby" or "amethyst" or "ember" or "cobalt" or "contrast" => CreateDark(),
                 "matrix" => CreateMatrix(),
                 _ => CreateEmpty()
             };
@@ -432,6 +432,7 @@ public sealed class SyntaxPreviewControl : Control
                 "opal" => "opal-adaptive",
                 "mist" => "mist-adaptive",
                 "limestone" => "limestone-adaptive",
+                "studio" => "nocturne-adaptive",
                 "dark" => "graphite-adaptive",
                 "nocturne" => "nocturne-adaptive",
                 "onyx" => "onyx-adaptive",

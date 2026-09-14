@@ -1,5 +1,5 @@
 {
-  "ThemeKey": "smoke",
+  "ThemeKey": "studio",
   "SkinKey": "default",
   "SyntaxThemeKey": "one-dark",
   "CodeFontKey": "space-mono",
@@ -44,5 +44,11 @@
   "ProjectFilesTopLocMode": false,
   "ShowBrowserRoutingPane": false,
   "ShowProjectGraphTreePane": false,
-  "ProjectGraphGenerationColors": "#31A634,#CF3E31,#3E3FD0,#918473,#B53DA8,#E4E01F,#36F9D5,#FF9913"
+  "ProjectGraphGenerationColors": "#31A634,#CF3E31,#3E3FD0,#918473,#B53DA8,#E4E01F,#36F9D5,#FF9913",
+  "ChatAppearanceKey": "adaptive",
+  "ChatMonitorEnabled": true,
+  "UiFontSize": 11,
+  "CodeEditorFontSize": 12,
+  "PromptWindowFontSize": 12,
+  "ChatWindowFontSize": 11
 }

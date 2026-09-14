@@ -167,6 +167,9 @@ Remove-FileIfExists -Path $installerShaPath
 
 if (-not $SkipTests) {
     dotnet run --project $testProject --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw "Workbench smoke tests failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --ui-experience-regression (Join-Path $releaseRoot "ui-review")
+    if ($LASTEXITCODE -ne 0) { throw "UI experience regression failed ($LASTEXITCODE)." }
 }
 
 dotnet publish $project `
@@ -181,6 +184,7 @@ dotnet publish $project `
     -p:AssemblyVersion=$assemblyVersion `
     -p:FileVersion=$assemblyVersion `
     -p:InformationalVersion=$displayVersion
+if ($LASTEXITCODE -ne 0) { throw "Workbench publish failed ($LASTEXITCODE)." }
 
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 Get-ChildItem -LiteralPath $publishDir -Force | Where-Object {
@@ -270,6 +274,7 @@ if (-not $SkipInstallerExe) {
         -p:FileVersion=$assemblyVersion `
         -p:InformationalVersion=$displayVersion `
         "-p:SetupPayloadZip=$payloadForSetup"
+    if ($LASTEXITCODE -ne 0) { throw "Installer publish failed ($LASTEXITCODE)." }
 
     $setupExePath = Join-Path $setupPublishDir 'ContextControl.Setup.exe'
     if (-not (Test-Path -LiteralPath $setupExePath)) {

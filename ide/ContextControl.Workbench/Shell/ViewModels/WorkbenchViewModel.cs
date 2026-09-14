@@ -132,11 +132,12 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         Dictionary<string, FileHistoryViewModel> historyByPath,
         ProjectFileRules? fileRules = null,
         bool treeStatePrepared = false,
-        WorkbenchSettings? workbenchSettings = null)
+        WorkbenchSettings? workbenchSettings = null,
+        bool refreshProviders = true)
     {
         _uiContext = SynchronizationContext.Current;
         _workbenchSettings = workbenchSettings ?? WorkbenchSettings.Load();
-        ContextControl = new ContextControlViewModel(_workbenchSettings);
+        ContextControl = new ContextControlViewModel(_workbenchSettings, refreshProviders);
         ContextControl.SetProjectFileOpener(OpenContextControlPatchTarget);
         ContextControl.SetPromptModeWorkspaceRequester(SwitchToChatFromPromptMode);
         ContextControl.PropertyChanged += (_, e) =>
@@ -173,6 +174,7 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         ProjectGraphGenerationColors = [];
         Themes =
         [
+            new ThemeOptionViewModel("studio", "Studio", "calm ink surfaces with clear typography and periwinkle accents", null, "Dark", "Modern"),
             new ThemeOptionViewModel("empty", "Porcelain", "neutral light workbench with quiet blue-green state accents", null, "Light", "Experimental"),
             new ThemeOptionViewModel("alabaster", "Alabaster", "warm low-glare light palette with brass and teal accents for long sessions", null, "Light", "Professional"),
             new ThemeOptionViewModel("pearl", "Pearl", "cool soft-gray light theme with polished steel-blue accents", null, "Light", "Professional"),
@@ -369,7 +371,7 @@ public sealed partial class WorkbenchViewModel : ObservableObject, IDisposable
         // FileSystemWatcher plus the tracker's own background poll handles changes.
         // A UI-thread full-scan timer made medium projects feel frozen.
         _externalScanTimer = new Timer(_ => PostToUi(ScanExternalChangesNow), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        _ = CheckForUpdatesOnStartupAsync();
+        if (refreshProviders) _ = CheckForUpdatesOnStartupAsync();
     }
 
     public ObservableCollection<ProjectTabViewModel> Projects { get; }

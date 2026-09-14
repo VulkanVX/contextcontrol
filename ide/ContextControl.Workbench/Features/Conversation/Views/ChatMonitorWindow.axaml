@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+        x:Class="ContextControl.Workbench.Views.ChatMonitorWindow"
+        Title="Chat Monitor" Width="460" MaxHeight="900" SizeToContent="Height" CanResize="False"
+        SystemDecorations="None" ShowInTaskbar="False" Topmost="True"
+        Background="Transparent" TransparencyLevelHint="Transparent">
+  <Border Classes="monitor-shell">
+    <Grid RowDefinitions="Auto,*">
+      <Border Classes="monitor-titlebar" PointerPressed="OnDragHeader">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+          <Path Data="M 1,4 L 1,12 M 5,1 L 5,15 M 9,5 L 9,11" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.6" Width="12" Height="16" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <TextBlock Text="Chat Monitor" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock x:Name="MonitorCount" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Grid.Column="2" Classes="monitor-icon" Click="OnHideMonitor" ToolTip.Tip="Hide monitor · enable again in Settings → Prompt Window">
+            <Path Data="M 2,2 L 10,10 M 10,2 L 2,10" Classes="monitor-icon-path" />
+          </Button>
+        </Grid>
+      </Border>
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+      <TextBlock x:Name="EmptyState" Text="Start a chat to follow it here." Classes="monitor-empty" />
+      <TextBlock x:Name="MonitorNotice" Classes="monitor-empty" IsVisible="False" TextWrapping="Wrap" />
+      <ScrollViewer MaxHeight="336" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding ContextControl.ChatMonitor.Entries}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="monitor-row" Classes.active="{Binding IsActive}">
+                <Grid ColumnDefinitions="*,26,26,26" ColumnSpacing="3">
+                  <controls:ActivityLineControl Text="{Binding DisplayLine}" IsActive="{Binding IsActive}" ToolTip.Tip="{Binding Details}"
+                       FontFamily="{DynamicResource UiFontFamily}" Foreground="{DynamicResource TextPrimaryBrush}" Accent="{DynamicResource AccentBrush}" />
+                  <Button Grid.Column="1" Classes="monitor-icon" Click="OnOpenChat" ToolTip.Tip="Open this chat in ContextControl">
+                    <Path Data="M 3,2 L 11,2 L 11,10 M 11,2 L 2,11 M 1,5 L 1,13 L 9,13" Classes="monitor-icon-path" />
+                  </Button>
+                  <Button Grid.Column="2" Classes="monitor-icon" Click="OnReply" ToolTip.Tip="Quick reply · supports file drops">
+                    <Path Data="M 6,2 L 1,7 L 6,12 M 1,7 L 8,7 C 12,7 13,9 13,13" Classes="monitor-icon-path" />
+                  </Button>
+                  <Button Grid.Column="3" Classes="monitor-icon" Click="OnRemoveChat" ToolTip.Tip="Remove from monitor · keep chat history">
+                    <Path Data="M 3,3 L 11,11 M 11,3 L 3,11" Classes="monitor-icon-path" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Border x:Name="ReplyPanel" Classes="monitor-reply" IsVisible="False" DragDrop.AllowDrop="True">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="ReplyTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Classes="monitor-icon" Click="OnCloseReply" ToolTip.Tip="Collapse reply · draft is kept">
+              <Path Data="M 2,9 L 7,4 L 12,9" Classes="monitor-icon-path" />
+            </Button>
+          </Grid>
+          <TextBox x:Name="ReplyInput" Text="{Binding ContextControl.PromptText, Mode=TwoWay}" AcceptsReturn="True"
+                   TextWrapping="Wrap" MinHeight="64" MaxHeight="148" Watermark="Reply… or drop files here" KeyDown="OnReplyKeyDown"
+                   FontFamily="{DynamicResource UiFontFamily}" FontSize="12" />
+          <ScrollViewer MaxHeight="88" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding ContextControl.Attachments}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Classes="monitor-attachment" Content="{Binding DisplayTitle}" ToolTip.Tip="Click to remove attachment" Click="OnRemoveAttachment" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          </ScrollViewer>
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <Button Classes="monitor-icon" Click="OnAttachFiles" ToolTip.Tip="Attach files">
+              <Path Data="M 4,9 L 9,4 C 12,1 16,5 13,8 L 6,15 C 2,19 -3,13 1,9 L 8,2" Classes="monitor-icon-path" />
+            </Button>
+            <TextBlock Grid.Column="1" Text="Ctrl+Enter to send" Classes="monitor-hint" VerticalAlignment="Center" />
+            <Button x:Name="ReplySendButton" Grid.Column="2" Content="Send" Classes="monitor-send" Click="OnSendReply" IsEnabled="False" />
+          </Grid>
+          <TextBlock x:Name="ReplyNotice" Classes="monitor-hint" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>

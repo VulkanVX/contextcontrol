@@ -10,6 +10,12 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--ui-experience-regression"))
+{
+    UiExperienceTests.Run(args.SkipWhile(arg => arg != "--ui-experience-regression").Skip(1).FirstOrDefault());
+    return;
+}
+
 if (args.Any(arg => arg.Equals("--chat-renderer-regression", StringComparison.OrdinalIgnoreCase)))
 {
     RunChatRendererRegression();

@@ -48,6 +48,7 @@ public static partial class WorkbenchThemeResources
         {
             return themeKey?.ToLowerInvariant() switch
             {
+                "studio" => Studio,
                 "dark" => Dark,
                 "nocturne" => Nocturne,
                 "onyx" => Onyx,
@@ -72,6 +73,19 @@ public static partial class WorkbenchThemeResources
                 _ => Empty
             };
         }
+
+        private static ThemePalette Studio => Dark with
+        {
+            AppBackground = "#101218", PanelBackground = "#191C25", PanelBorder = "#303440",
+            HeaderBackground = "#20242F", TitleBarBackground = "#14171F", TitleBarBorder = "#303440",
+            TextPrimary = "#EDF0F7", TextMuted = "#A1A9BD", CommandBackground = "#242938",
+            CommandBorder = "#434B63", CommandPrimaryBackground = "#344466", Accent = "#A9B8FF",
+            AccentBorder = "#788EE5", ProjectTileBackground = "#202530", ProjectTileActive = "#303D5B",
+            DirectoryHighlight = "#273149", CurrentRow = "#26324B", CurrentRowBorder = "#6F85D4",
+            EditorSurface = "#151922", HistoryHover = "#282F40", HistoryActive = "#303D5B",
+            SettingsSurface = "#1C202B", DropdownBackground = "#202530", DropdownBorder = "#434B63",
+            DropdownHover = "#2D3549", DropdownSelected = "#35466A"
+        };
 
         private static readonly ThemePalette Empty = new(
             true,

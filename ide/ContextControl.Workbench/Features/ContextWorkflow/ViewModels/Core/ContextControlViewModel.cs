@@ -215,7 +215,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
         ChatSessionViewModel Session,
         LocalLlmChatMessageViewModel LiveAssistant);
 
-    public ContextControlViewModel(WorkbenchSettings settings)
+    public ContextControlViewModel(WorkbenchSettings settings, bool refreshProviders = true)
     {
         _settings = settings;
         _processService = new ContextControlProcessService(settings.ContextControlRoot);
@@ -229,6 +229,8 @@ public sealed partial class ContextControlViewModel : ObservableObject
         _semanticMapBuilder = new ContextSemanticMapBuilder();
         _fileResolver = new ContextFileResolverService();
         _chatHistoryService = new ChatHistoryService(settings.ContextControlRoot);
+        ChatMonitor = new ChatMonitorService(settings.ContextControlRoot);
+        ChatRequestProgressItems.CollectionChanged += (_, _) => RefreshSelectedChatActivity();
         _promptDraftSaveTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(700)
@@ -504,8 +506,11 @@ public sealed partial class ContextControlViewModel : ObservableObject
 
         Log("info", $"Context root: {_processService.ContextRoot}");
         LoadChatHistory();
-        _ = RefreshCodexStatusAsync();
-        _ = RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
+        if (refreshProviders)
+        {
+            _ = RefreshCodexStatusAsync();
+            _ = RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
+        }
     }
 
     public ObservableCollection<string> RouteOptions { get; }
@@ -619,6 +624,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
             if (SetProperty(ref _selectedChatSession, value))
             {
                 OnPropertyChanged(nameof(ChatWorkspaceSubtitle));
+                RefreshSelectedChatActivity();
             }
         }
     }

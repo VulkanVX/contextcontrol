@@ -108,6 +108,7 @@ public sealed partial class MainWindow : Window
         RefreshProjectInfoHeader();
         ScheduleUiPolish();
         FitToWorkingArea();
+        UpdateChatMonitor();
     }
 
     protected override void OnDataContextChanged(EventArgs e)

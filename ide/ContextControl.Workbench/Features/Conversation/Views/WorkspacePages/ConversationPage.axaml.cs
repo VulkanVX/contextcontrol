@@ -117,6 +117,18 @@ public sealed partial class ConversationPage : UserControl
         };
         menu.Items.Add(rename);
 
+        var monitor = new MenuItem
+        {
+            Header = ContextControl?.IsChatMonitored(session) == true ? "Remove from Chat Monitor" : "Add to Chat Monitor"
+        };
+        monitor.Classes.Add("project-tree-context-item");
+        monitor.Click += (_, _) =>
+        {
+            CloseChatSessionContextMenu();
+            ContextControl?.ToggleChatMonitorSession(session);
+        };
+        menu.Items.Add(monitor);
+
         _chatSessionContextMenu = menu;
         _isChatSessionContextMenuOpen = true;
         menu.Open(target);

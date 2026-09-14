@@ -245,9 +245,9 @@
             </Grid>
 
             <Border Grid.Row="1" Classes="rule-card" Padding="6,4">
-              <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
-                <Grid RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
-                  <TextBlock Classes="field-label" Text="UI size" />
+              <WrapPanel>
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="2" Width="170" Margin="4,2,10,2">
+                  <TextBlock Classes="field-label" Text="Interface scale" ToolTip.Tip="Scales text and controls throughout the app. 11 is 100%." />
                   <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
                     <Slider
                         Minimum="8"
@@ -258,7 +258,7 @@
                     <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding UiFontSize, StringFormat='{}{0:0.#}'}" />
                   </Grid>
                 </Grid>
-                <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="2" Width="170" Margin="4,2,10,2">
                   <TextBlock Classes="field-label" Text="Code Editor size" />
                   <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
                     <Slider
@@ -270,7 +270,7 @@
                     <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding CodeEditorFontSize, StringFormat='{}{0:0.#}'}" />
                   </Grid>
                 </Grid>
-                <Grid Grid.Column="2" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                <Grid Grid.Column="2" RowDefinitions="Auto,Auto" RowSpacing="2" Width="170" Margin="4,2,10,2">
                   <TextBlock Classes="field-label" Text="Prompt Window size" />
                   <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
                     <Slider
@@ -282,7 +282,7 @@
                     <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding PromptWindowFontSize, StringFormat='{}{0:0.#}'}" />
                   </Grid>
                 </Grid>
-                <Grid Grid.Column="3" RowDefinitions="Auto,Auto" RowSpacing="2" MinWidth="168">
+                <Grid Grid.Column="3" RowDefinitions="Auto,Auto" RowSpacing="2" Width="170" Margin="4,2,10,2">
                   <TextBlock Classes="field-label" Text="Chat/ImageGen size" />
                   <Grid Grid.Row="1" ColumnDefinitions="*,34" ColumnSpacing="6">
                     <Slider
@@ -294,7 +294,7 @@
                     <TextBlock Grid.Column="1" Classes="appearance-param-label" Text="{Binding ChatWindowFontSize, StringFormat='{}{0:0.#}'}" />
                   </Grid>
                 </Grid>
-              </Grid>
+              </WrapPanel>
             </Border>
 
             <Border Grid.Row="2" Classes="rule-card" Padding="6,5">

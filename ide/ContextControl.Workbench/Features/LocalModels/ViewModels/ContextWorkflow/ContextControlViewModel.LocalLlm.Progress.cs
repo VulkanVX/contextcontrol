@@ -59,6 +59,8 @@ public sealed partial class ContextControlViewModel
         IsPromptOpen = true;
         session.IsGenerating = true;
         var item = new ChatRequestProgressViewModel(session.Id, $"{phase} with {modelName}", isCancellable);
+        _generationSessions[item] = session;
+        TrackChatSession(session).AddRequest(item);
         ChatRequestProgressItems.Add(item);
 
         return (item, new Progress<LocalLlmGenerationProgress>(progress =>
@@ -85,11 +87,14 @@ public sealed partial class ContextControlViewModel
     {
         item.StopElapsedTimer();
         ChatRequestProgressItems.Remove(item);
+        if (_generationSessions.Remove(item, out var owner))
+            owner.IsGenerating = _generationSessions.Values.Contains(owner);
+        ChatMonitor.CompleteRequest(item);
         var session = ChatSessions.FirstOrDefault(chat =>
             string.Equals(chat.Id, item.SessionId, StringComparison.OrdinalIgnoreCase));
         if (session is not null)
         {
-            session.IsGenerating = false;
+            session.IsGenerating = ChatRequestProgressItems.Any(request => request.SessionId == session.Id);
         }
     }
 

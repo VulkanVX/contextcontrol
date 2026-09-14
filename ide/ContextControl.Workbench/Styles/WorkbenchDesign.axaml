@@ -6,5 +6,6 @@
   <StyleInclude Source="avares://ContextControl.Workbench/Styles/WorkbenchDesign/Settings.axaml" />
   <StyleInclude Source="avares://ContextControl.Workbench/Styles/WorkbenchDesign/ScannerAndLocalLlm.axaml" />
   <StyleInclude Source="avares://ContextControl.Workbench/Styles/WorkbenchDesign/ContextControlDock.axaml" />
+  <StyleInclude Source="avares://ContextControl.Workbench/Styles/WorkbenchDesign/ModernWorkspace.axaml" />
   <StyleInclude Source="avares://ContextControl.Workbench/Styles/WorkbenchDesign/MatrixConsoleSkin.axaml" />
 </Styles>

@@ -8,12 +8,15 @@ using System.Windows.Input;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 using ContextControl.Workbench.Services;
 
 namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class WorkbenchViewModel
 {
+    private DispatcherTimer? _appearanceSaveTimer;
+
     public bool IsHistoryOpen
     {
         get => _isHistoryOpen;
@@ -355,6 +358,18 @@ public sealed partial class WorkbenchViewModel
         _workbenchSettings.ShowProjectGraphTreePane = IsProjectGraphTreePaneOpen;
         _workbenchSettings.ProjectGraphGenerationColors = ProjectGraphGenerationPalette;
 
+        if (_appearanceSaveTimer is null)
+        {
+            _appearanceSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+            _appearanceSaveTimer.Tick += (_, _) => FlushAppearanceSettings();
+        }
+        _appearanceSaveTimer.Stop();
+        _appearanceSaveTimer.Start();
+    }
+
+    public void FlushAppearanceSettings()
+    {
+        _appearanceSaveTimer?.Stop();
         try
         {
             _workbenchSettings.Save();
@@ -368,6 +383,9 @@ public sealed partial class WorkbenchViewModel
 
     public void Dispose()
     {
+        FlushAppearanceSettings();
+        ContextControl.FlushPendingChatDraft();
+        ContextControl.ChatMonitor.Dispose();
         _externalScanTimer.Dispose();
 
         foreach (var tracker in _trackersByProjectId.Values)

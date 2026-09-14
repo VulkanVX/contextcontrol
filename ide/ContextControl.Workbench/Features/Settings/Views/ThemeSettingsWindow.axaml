@@ -57,7 +57,8 @@
         </StackPanel>
       </Grid>
 
-      <Grid Grid.Row="1" ColumnDefinitions="152,*" ColumnSpacing="8">
+      <ScrollViewer x:Name="SettingsPagesScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+      <Grid ColumnDefinitions="152,*" ColumnSpacing="12" MinWidth="900" MinHeight="450" Width="{Binding Bounds.Width, ElementName=SettingsPagesScroll}">
         <Border Classes="side-rail">
           <StackPanel Spacing="6" HorizontalAlignment="Stretch">
             <Button
@@ -93,6 +94,7 @@
           <parts:FileRulesSettingsPage x:Name="FileRulesPage" IsVisible="False" />
         </Grid>
       </Grid>
+      </ScrollViewer>
     </Grid>
   </Border>
     <Border Classes="resize-edge resize-left" Grid.RowSpan="2" Width="8" HorizontalAlignment="Left" VerticalAlignment="Stretch" PointerPressed="OnResizeLeftPointerPressed" />

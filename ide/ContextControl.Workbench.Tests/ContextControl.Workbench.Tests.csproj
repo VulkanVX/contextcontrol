@@ -17,4 +17,8 @@
     <EmbeddedResource Remove=".tmp\**" />
     <None Remove=".tmp\**" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="11.3.12" />
+  </ItemGroup>
 </Project>

@@ -46,6 +46,20 @@ ContextControl currently ships updates as a full setup EXE. That means a new rel
 
 GitHub's automatic **Source code** downloads are source snapshots, not runnable app packages. Use them only if you want to build from source.
 
+## Interface and Chat Monitor
+
+Version 0.4 adds a consistent **Interface scale**, adaptive chat headers and timestamps, animated request feedback, and a floating **Chat Monitor**. The new **Studio** theme is the default for fresh installs; existing appearance preferences are preserved.
+
+- Adjust the entire interface in **View → Settings → Appearance → Interface scale**. The value 11 is 100%; 16.5 is 150%. Code, prompt and chat sizes remain available for adjusting their relative text sizes.
+- Enable or hide the floating window in **Settings → Prompt Window → Floating Chat Monitor**. Drag its title bar to move it.
+- New chats and chats you continue are added automatically. Each row shows live status and available token, speed and elapsed-time statistics. Hover for full details.
+- Use the **open** icon to bring the exact chat forward, **reply** to expand its shared draft, and **×** to remove only the monitor row. Right-click any chat in history to add or remove it.
+- Drop files onto the expanded reply panel or use its attachment button. **Ctrl+Enter** sends; **Escape** collapses the composer and keeps the draft. Switching to another chat closes the composer to keep replies attached to the correct conversation.
+
+The monitor follows chats in the running ContextControl instance, including while its main window is minimized. Saved rows and position survive restart; live request state does not. It does not observe unrelated Codex CLI sessions or other applications.
+
+See [the interface guide](docs/INTERFACE.md) and [v0.4.0 release notes](docs/releases/v0.4.0.md).
+
 ## What Is Bundled
 
 Bundled inside the installer:

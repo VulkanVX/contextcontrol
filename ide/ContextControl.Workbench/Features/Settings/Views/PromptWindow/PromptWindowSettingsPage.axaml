@@ -2,7 +2,7 @@
     x:Class="ContextControl.Workbench.Views.ThemeSettingsWindowParts.PromptWindowSettingsPage"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Grid RowDefinitions="Auto,*" RowSpacing="8" ClipToBounds="True">
+  <StackPanel Spacing="12">
     <Border Classes="rule-card" Padding="10,8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -20,5 +20,15 @@
             VerticalAlignment="Center" />
       </Grid>
     </Border>
-  </Grid>
+    <Border Classes="rule-card" Padding="14,12">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="5">
+          <TextBlock Classes="field-label" Text="Floating Chat Monitor" />
+          <TextBlock Classes="muted" Text="A compact, draggable window for your chats. See live status, open a conversation, or reply with files without bringing the full workbench forward." TextWrapping="Wrap" />
+          <TextBlock Classes="muted" Text="New chats and replies appear automatically. Right-click a chat in history to add or remove it. Removing a monitor row keeps the conversation." TextWrapping="Wrap" />
+        </StackPanel>
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsChatMonitorEnabled, Mode=TwoWay}" OnContent="On" OffContent="Off" VerticalAlignment="Top" />
+      </Grid>
+    </Border>
+  </StackPanel>
 </UserControl>

@@ -149,6 +149,9 @@ public sealed class WorkbenchSettings
     public bool ThemeAdaptVersionColor { get; set; }
     public bool ThemeAdaptBytesColor { get; set; }
     public double UiFontSize { get; set; }
+    public bool ChatMonitorEnabled { get; set; } = true;
+    public int? ChatMonitorX { get; set; }
+    public int? ChatMonitorY { get; set; }
     public double CodeEditorFontSize { get; set; }
     public double PromptWindowFontSize { get; set; }
     public double ChatWindowFontSize { get; set; }
@@ -184,9 +187,9 @@ public sealed class WorkbenchSettings
     public bool ShowProjectGraphTreePane { get; set; }
     public string ProjectGraphGenerationColors { get; set; }
 
-    public static WorkbenchSettings Load()
+    public static WorkbenchSettings Load(string? contextRoot = null)
     {
-        var contextControlRoot = ResolveContextControlRoot();
+        var contextControlRoot = contextRoot is null ? ResolveContextControlRoot() : Path.GetFullPath(contextRoot);
         var settingsPath = Path.Combine(contextControlRoot, ".ccWorkbench.settings.json");
         var data = new WorkbenchSettingsJson();
 
@@ -207,7 +210,7 @@ public sealed class WorkbenchSettings
             settingsPath,
             contextControlRoot,
             data.SkinKey ?? WorkbenchSkins.DefaultKey,
-            data.ThemeKey ?? "empty",
+            data.ThemeKey ?? "studio",
             data.SyntaxThemeKey ?? "adaptive",
             data.CodeFontKey ?? "cascadia-code",
             data.UiFontKey ?? "aptos",
@@ -229,7 +232,7 @@ public sealed class WorkbenchSettings
             data.CodeEditorFontSize ?? 12.0,
             data.PromptWindowFontSize ?? 12.0,
             data.ChatWindowFontSize ?? 10.0,
-            data.ChatAppearanceKey ?? "dark",
+            data.ChatAppearanceKey ?? "adaptive",
             data.SelectedAiRoute ?? "Browser: ChatGPT",
             data.SelectedLocalModel ?? "qwen2.5-coder:3b",
             data.SelectedImageModel ?? "segmind/tiny-sd",
@@ -259,7 +262,12 @@ public sealed class WorkbenchSettings
             data.ProjectFilesTopLocMode ?? false,
             data.ShowBrowserRoutingPane ?? true,
             data.ShowProjectGraphTreePane ?? true,
-            data.ProjectGraphGenerationColors ?? DefaultProjectGraphGenerationColors);
+            data.ProjectGraphGenerationColors ?? DefaultProjectGraphGenerationColors)
+        {
+            ChatMonitorEnabled = data.ChatMonitorEnabled ?? true,
+            ChatMonitorX = data.ChatMonitorX,
+            ChatMonitorY = data.ChatMonitorY
+        };
     }
 
     public void Save()
@@ -272,6 +280,9 @@ public sealed class WorkbenchSettings
 
         var data = new WorkbenchSettingsJson
         {
+            ChatMonitorEnabled = ChatMonitorEnabled,
+            ChatMonitorX = ChatMonitorX,
+            ChatMonitorY = ChatMonitorY,
             SkinKey = NormalizeSkinKey(SkinKey),
             ThemeKey = NormalizeKey(ThemeKey, "empty"),
             SyntaxThemeKey = NormalizeKey(SyntaxThemeKey, "adaptive"),
@@ -602,6 +613,9 @@ public sealed class WorkbenchSettings
         public bool? ThemeAdaptVersionColor { get; set; }
         public bool? ThemeAdaptBytesColor { get; set; }
         public double? UiFontSize { get; set; }
+        public bool? ChatMonitorEnabled { get; set; }
+        public int? ChatMonitorX { get; set; }
+        public int? ChatMonitorY { get; set; }
         public double? CodeEditorFontSize { get; set; }
         public double? PromptWindowFontSize { get; set; }
         public double? ChatWindowFontSize { get; set; }

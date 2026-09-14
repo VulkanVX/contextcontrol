@@ -239,11 +239,11 @@ public sealed partial class ChatTranscriptRenderControl
         FontFamily uiFontFamily,
         FontFamily codeFontFamily)
     {
-        var role = MeasureTextWidth(CleanOneLine(message.HeaderTitle, 48), uiFontFamily, FontWeight.Bold, FontStyle.Normal, 9.2);
+        var role = MeasureTextWidth(CleanOneLine(message.HeaderTitle, 48), uiFontFamily, FontWeight.Bold, FontStyle.Normal, ChatHeaderFontSize);
         var meta = string.IsNullOrWhiteSpace(message.MetaLabel)
             ? 0.0
             : Math.Min(MeasureTextWidth(CleanOneLine(message.MetaLabel, 120), uiFontFamily, FontWeight.SemiBold, FontStyle.Normal, ChatMetaFontSize), maxContentWidth * 0.45);
-        var time = MeasureTextWidth(message.Time, codeFontFamily, FontWeight.Bold, FontStyle.Normal, 8.8);
+        var time = MeasureTextWidth(message.Time, codeFontFamily, FontWeight.Normal, FontStyle.Normal, ChatTimestampFontSize);
         var actionWidth = string.IsNullOrWhiteSpace(message.PrimaryTextPart?.Text) ? 0.0 : 20.0;
         return Math.Min(maxContentWidth, role + (meta > 0.0 ? 9.0 + meta : 0.0) + actionWidth + time + 24.0);
     }
@@ -300,7 +300,8 @@ public sealed partial class ChatTranscriptRenderControl
         var headerRect = new Rect(card.X, 0, card.Width, HeaderHeight);
         var centerY = headerRect.Y + headerRect.Height * 0.5;
         var right = card.Right - CardPaddingX;
-        var timeWidth = 36.0;
+        var codeFont = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
+        var timeWidth = Math.Ceiling(MeasureTextWidth(message.Time, codeFont, FontWeight.Normal, FontStyle.Normal, ChatTimestampFontSize)) + 10;
         right -= timeWidth;
 
         if (message.PrimaryTextPart is { IsText: true } primaryTextPart
@@ -342,7 +343,7 @@ public sealed partial class ChatTranscriptRenderControl
 
         layout.HeaderRect = headerRect;
         layout.HeaderMetaClip = new Rect(left, headerRect.Y, Math.Max(0.0, right - left), headerRect.Height);
-        layout.TimeRect = new Rect(card.Right - CardPaddingX - timeWidth, centerY - 7.0, timeWidth, 14.0);
+        layout.TimeRect = new Rect(card.Right - CardPaddingX - timeWidth, headerRect.Y, timeWidth, headerRect.Height);
         layout.Hits.Add(new HitRegion(headerRect, ChatTranscriptHitKind.ToggleMessageCollapse, message));
     }
 

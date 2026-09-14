@@ -14,10 +14,11 @@
                 ClipToBounds="True"
                 MinHeight="0"
                 IsVisible="{Binding IsConversationMode}">
-              <Grid ColumnDefinitions="Auto,*" MinHeight="0" ClipToBounds="True">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="*,Auto" MinHeight="0" ClipToBounds="True">
                 <Grid
                     x:Name="ChatHistoryHoverShell"
                     Grid.Column="0"
+                    Grid.RowSpan="2"
                     Classes="chat-history-hover-shell"
                     Width="10"
                     HorizontalAlignment="Left"
@@ -143,6 +144,12 @@
                       ToggleThinkingCommand="{Binding ContextControl.ToggleThinkingCommand}"
                       ToggleDiagnosticCommand="{Binding ContextControl.ToggleDiagnosticCommand}" />
                 </ScrollViewer>
+                <Border Grid.Column="1" Grid.Row="1" Classes="chat-activity-strip" IsVisible="{Binding ContextControl.HasSelectedChatActivity}">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" DataContext="{Binding ContextControl.SelectedChatActivity}">
+                    <controls:ActivityLineControl Text="{Binding Status}" IsActive="{Binding IsIndeterminate}" FontFamily="{DynamicResource UiFontFamily}" Foreground="{DynamicResource TextMutedBrush}" Accent="{DynamicResource AccentBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ElapsedLabel}" Classes="history-meta" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
               </Grid>
             </Border>
 </UserControl>

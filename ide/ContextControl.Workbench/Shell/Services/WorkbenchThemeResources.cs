@@ -51,7 +51,7 @@ public static partial class WorkbenchThemeResources
 
         window.Resources["UiFontFamily"] = CreateFontFamily(uiFontFamily, DefaultUiFontFamily, "Segoe UI");
         window.Resources["CodeFontFamily"] = CreateFontFamily(codeFontFamily, DefaultCodeFontFamily, "Consolas");
-        window.Resources["UiFontSize"] = NormalizeFontSize(uiFontSize, 11.0);
+        WorkbenchTypography.Apply(window, uiFontSize ?? WorkbenchTypography.BaseUiSize);
         Set(window, "AppBackgroundBrush", palette.AppBackground);
         Set(window, "PanelBackgroundBrush", palette.PanelBackground);
         Set(window, "PanelBorderBrush", palette.PanelBorder);

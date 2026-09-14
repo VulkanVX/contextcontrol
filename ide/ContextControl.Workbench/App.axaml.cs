@@ -21,6 +21,7 @@ public sealed partial class App : Application
             {
                 DataContext = WorkbenchViewModel.Create()
             };
+            desktop.Exit += (_, _) => (desktop.MainWindow.DataContext as WorkbenchViewModel)?.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

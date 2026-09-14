@@ -52,14 +52,13 @@
         <Border Grid.Column="1" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True" Margin="0,0,1,0" MinHeight="0">
           <Grid MinHeight="0">
             <Grid.RowDefinitions>
-              <RowDefinition Height="22" />
-              <RowDefinition Height="40" />
+              <RowDefinition Height="Auto" />
               <RowDefinition Height="*" MinHeight="0" />
             </Grid.RowDefinitions>
-            <parts:WorkspaceHeaderBar Grid.Row="0" Grid.RowSpan="2" />
+            <parts:WorkspaceHeaderBar Grid.Row="0" />
 
             <controls:PromptDockHost
-                Grid.Row="2"
+                Grid.Row="1"
                 MinHeight="0"
                 ClipToBounds="True"
                 IsPromptOpen="{Binding ContextControl.IsPromptOpen}"

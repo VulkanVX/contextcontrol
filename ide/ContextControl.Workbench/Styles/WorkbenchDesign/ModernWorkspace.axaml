@@ -1,0 +1,127 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Button.workspace-mode-button">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="10,3" />
+    <Setter Property="Margin" Value="0,2,4,2" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Button.workspace-update">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="Button.cc-prompt-send">
+    <Setter Property="Background" Value="{DynamicResource CommandPrimaryBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Border.settings-panel">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="Border.side-rail">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="8" />
+  </Style>
+  <Style Selector="Button.settings-nav">
+    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBlock.settings-title">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Border.rule-card">
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Border.chat-activity-strip">
+    <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="Margin" Value="10,4,10,8" />
+  </Style>
+  <Style Selector="Border.monitor-shell">
+    <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="Padding" Value="4" />
+  </Style>
+  <Style Selector="Border.monitor-titlebar">
+    <Setter Property="Padding" Value="10,5,5,7" />
+    <Setter Property="Cursor" Value="SizeAll" />
+  </Style>
+  <Style Selector="Border.monitor-row">
+    <Setter Property="Padding" Value="8,5,4,5" />
+    <Setter Property="Margin" Value="2,1" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
+  </Style>
+  <Style Selector="Border.monitor-row.active">
+    <Setter Property="Background" Value="{DynamicResource HistoryActiveBrush}" />
+  </Style>
+  <Style Selector="Border.monitor-row:pointerover">
+    <Setter Property="Background" Value="{DynamicResource HistoryHoverBrush}" />
+  </Style>
+  <Style Selector="Button.monitor-icon">
+    <Setter Property="Width" Value="26" />
+    <Setter Property="Height" Value="26" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.monitor-icon:pointerover">
+    <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+  </Style>
+  <Style Selector="Path.monitor-icon-path">
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Width" Value="13" />
+    <Setter Property="Height" Value="13" />
+  </Style>
+  <Style Selector="Border.monitor-reply">
+    <Setter Property="Padding" Value="10" />
+    <Setter Property="Margin" Value="2,6,2,2" />
+    <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="TextBlock.monitor-hint">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+  <Style Selector="TextBlock.monitor-empty">
+    <Setter Property="Margin" Value="12,6,12,12" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+  <Style Selector="Button.monitor-attachment">
+    <Setter Property="Margin" Value="0,0,5,5" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="MaxWidth" Value="230" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="FontSize" Value="10" />
+  </Style>
+  <Style Selector="Button.monitor-send">
+    <Setter Property="Background" Value="{DynamicResource CommandPrimaryBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Padding" Value="16,6" />
+  </Style>
+</Styles>

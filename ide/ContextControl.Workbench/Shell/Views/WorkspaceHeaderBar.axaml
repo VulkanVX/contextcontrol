@@ -7,17 +7,17 @@
     xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
 >
-          <Grid RowDefinitions="22,40">
-            <Border Grid.Row="0" Classes="workspace-mode-bar" Padding="4,0">
-              <Grid ColumnDefinitions="*,Auto,Auto,*" ColumnSpacing="6">
+          <Grid RowDefinitions="Auto,40">
+            <Border Grid.Row="0" Classes="workspace-mode-bar" Padding="6,5">
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
                 <ItemsControl
-                    Grid.Column="1"
+                    Grid.Column="0"
                     ItemsSource="{Binding WorkspaceModes}"
-                    HorizontalAlignment="Center"
+                    HorizontalAlignment="Stretch"
                     VerticalAlignment="Center">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="3" />
+                      <WrapPanel />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
@@ -33,15 +33,15 @@
                 </ItemsControl>
 
                 <Button
-                    Grid.Column="2"
-                    Classes="header-mini"
+                    Grid.Column="1"
+                    Classes="header-mini workspace-update"
                     Content="{Binding UpdateButtonLabel}"
                     Command="{Binding CheckForUpdatesCommand}"
                     ToolTip.Tip="{Binding UpdateStatusLabel}"
                     VerticalAlignment="Center" />
 
                 <ScrollViewer
-                    Grid.Column="3"
+                    Grid.Row="1" Grid.ColumnSpan="2"
                     HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="Disabled"
                     controls:HoverScrollbarBehavior.IsEnabled="True"
@@ -187,8 +187,8 @@
                     Content="{Binding ContextControl.LocalLlmOwnershipFilterLabel}"
                     Command="{Binding ContextControl.CycleLocalLlmOwnershipFilterCommand}" />
                 <Button
-                    Grid.Column="2"
-                    Classes="header-mini"
+                    Grid.Column="1"
+                    Classes="header-mini workspace-update"
                     Classes.active="{Binding ContextControl.IsLlmInfoExpanded}"
                     Content="{Binding ContextControl.LlmInfoToggleLabel}"
                     Command="{Binding ContextControl.ToggleLlmInfoCommand}" />

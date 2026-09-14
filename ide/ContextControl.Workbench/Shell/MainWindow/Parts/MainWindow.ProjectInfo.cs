@@ -30,12 +30,25 @@ public sealed partial class MainWindow
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(WorkbenchViewModel.IsChatMonitorEnabled))
+        {
+            UpdateChatMonitor();
+            return;
+        }
+        if (e.PropertyName == nameof(WorkbenchViewModel.UiFontSize))
+        {
+            WorkbenchTypography.Schedule(this, ViewModel?.UiFontSize ?? WorkbenchTypography.BaseUiSize);
+            if (_themeSettingsWindow is not null)
+                WorkbenchTypography.Schedule(_themeSettingsWindow, ViewModel?.UiFontSize ?? WorkbenchTypography.BaseUiSize);
+            _chatMonitorWindow?.ScheduleScale();
+            return;
+        }
+
         if (e.PropertyName == nameof(WorkbenchViewModel.ThemeKey)
             || e.PropertyName == nameof(WorkbenchViewModel.UiFontFamily)
             || e.PropertyName == nameof(WorkbenchViewModel.UiFontColorModeKey)
             || e.PropertyName == nameof(WorkbenchViewModel.ChatAppearanceKey)
             || e.PropertyName == nameof(WorkbenchViewModel.CustomUiFontColorHex)
-            || e.PropertyName == nameof(WorkbenchViewModel.UiFontSize)
             || e.PropertyName == nameof(WorkbenchViewModel.CodeFontFamily)
             || e.PropertyName == nameof(WorkbenchViewModel.SkinKey)
             || e.PropertyName == nameof(WorkbenchViewModel.ThemeAdaptFileCountColor)
@@ -136,6 +149,7 @@ public sealed partial class MainWindow
             uiFontSize: uiFontSize);
         ProjectTreeView?.InvalidateVisual();
         _themeSettingsWindow?.ApplyTheme(key, uiFont, codeFont, skin, uiFontColorMode, customUiFontColor, uiFontSize, chatAppearance);
+        _chatMonitorWindow?.RefreshAppearance();
     }
 
     private void RefreshWindowTitle()

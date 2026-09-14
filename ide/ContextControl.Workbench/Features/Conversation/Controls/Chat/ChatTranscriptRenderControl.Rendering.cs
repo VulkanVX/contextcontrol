@@ -33,7 +33,7 @@ public sealed partial class ChatTranscriptRenderControl
         if (!IsFlatTranscriptMessage(message))
         {
             var (background, border) = ResolveMessageChrome(message);
-            context.DrawRectangle(background, new Pen(border, 1), card, 5, 5);
+            context.DrawRectangle(background, new Pen(border, 1), card, 10, 10);
         }
 
         using var clip = context.PushClip(card);
@@ -101,7 +101,7 @@ public sealed partial class ChatTranscriptRenderControl
         var owner = ResolveOwnerBrush(message);
         var muted = Resource("ChatMetaBrush", TextMutedFallbackBrush);
 
-        var role = GetFormattedText(CleanOneLine(message.HeaderTitle, 48), owner, uiFontFamily, FontWeight.Bold, FontStyle.Normal, 9.2);
+        var role = GetFormattedText(CleanOneLine(message.HeaderTitle, 48), owner, uiFontFamily, FontWeight.Bold, FontStyle.Normal, ChatHeaderFontSize);
         var meta = GetFormattedText(CleanOneLine(message.MetaLabel, 220), muted, uiFontFamily, FontWeight.SemiBold, FontStyle.Normal, ChatMetaFontSize);
         var clip = OffsetY(layout.HeaderMetaClip, rowTop);
         var headerRect = OffsetY(layout.HeaderRect, rowTop);
@@ -124,7 +124,7 @@ public sealed partial class ChatTranscriptRenderControl
             DrawToolPhaseIcon(context, OffsetY(layout.ToolIconRect, rowTop));
         }
 
-        DrawClippedText(context, role, new Rect(clip.X, baselineY, roleWidth, 12.0), new Point(clip.X, baselineY));
+        DrawClippedText(context, role, new Rect(clip.X, headerRect.Y, roleWidth, headerRect.Height), new Point(clip.X, baselineY));
 
         var metaX = clip.X + roleWidth + 9.0;
         if (metaX < clip.Right - 12.0)
@@ -133,11 +133,11 @@ public sealed partial class ChatTranscriptRenderControl
             DrawClippedText(
                 context,
                 meta,
-                new Rect(metaX, metaY, Math.Max(0.0, clip.Right - metaX), 12.0),
+                new Rect(metaX, headerRect.Y, Math.Max(0.0, clip.Right - metaX), headerRect.Height),
                 new Point(metaX, metaY));
         }
 
-        var time = GetFormattedText(message.Time, muted, codeFontFamily, FontWeight.Bold, FontStyle.Normal, 8.8);
+        var time = GetFormattedText(message.Time, muted, codeFontFamily, FontWeight.Normal, FontStyle.Normal, ChatTimestampFontSize);
         var timeRect = OffsetY(layout.TimeRect, rowTop);
         DrawClippedText(
             context,

@@ -33,7 +33,9 @@ public sealed partial class ContextControlViewModel
                      .OrderByDescending(session => session.UpdatedUtc)
                      .Select(session => new ChatSessionViewModel(session)))
         {
+            RegisterChatMonitorScope(session);
             ChatSessions.Add(session);
+            ChatMonitor.BindIfTracked(session, _chatHistoryScopeKey, _activeConversationKind);
         }
 
         if (ChatSessions.Count == 0)
@@ -136,6 +138,7 @@ public sealed partial class ContextControlViewModel
     private void CreateNewChatSession(bool save, bool resetWorkflow)
     {
         var session = ChatSessionViewModel.CreateNew();
+        RegisterChatMonitorScope(session);
         ChatSessions.Insert(0, session);
         OnPropertyChanged(nameof(HasChatSessions));
         OnPropertyChanged(nameof(ChatHistorySummary));
@@ -148,6 +151,7 @@ public sealed partial class ContextControlViewModel
 
         if (save)
         {
+            TrackChatSession(session);
             SaveChatHistory();
         }
     }
@@ -276,6 +280,8 @@ public sealed partial class ContextControlViewModel
             return;
         }
 
+        if (ChatMonitor.Find(session.Id, _chatHistoryScopeKey, _activeConversationKind) is { } monitored)
+            ChatMonitor.Remove(monitored);
         var wasSelected = ReferenceEquals(SelectedChatSession, session);
         var removedIndex = ChatSessions.IndexOf(session);
         ChatSessions.Remove(session);
@@ -378,6 +384,7 @@ public sealed partial class ContextControlViewModel
         }
 
         session.Append(message);
+        if (message.IsUser) TrackChatSession(session);
         MarkGeneratedResponseIfReady(session, message);
         if (ReferenceEquals(SelectedChatSession, session))
         {

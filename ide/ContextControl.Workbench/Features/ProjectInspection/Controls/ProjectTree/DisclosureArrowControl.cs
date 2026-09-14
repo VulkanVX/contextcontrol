@@ -97,6 +97,7 @@ public sealed class DisclosureArrowControl : Control
     private static bool IsDarkArrowTheme(string? themeKey)
     {
         return string.Equals(themeKey, "dark", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(themeKey, "studio", StringComparison.OrdinalIgnoreCase)
             || string.Equals(themeKey, "nocturne", StringComparison.OrdinalIgnoreCase)
             || string.Equals(themeKey, "onyx", StringComparison.OrdinalIgnoreCase)
             || string.Equals(themeKey, "smoke", StringComparison.OrdinalIgnoreCase)

@@ -105,7 +105,17 @@ public sealed partial class ChatTranscriptRenderControl : Control
     private const double MessageGap = 6.0;
     private const double CardPaddingX = 7.0;
     private const double CardPaddingY = 4.0;
-    private const double HeaderHeight = 18.0;
+    private double HeaderHeight
+    {
+        get
+        {
+            var uiFont = ResolveFontFamily(UiFontFamily, Resource("UiFontFamily", DefaultUiFontFamily));
+            var codeFont = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
+            var title = GetFormattedText("Ag", TextPrimaryFallbackBrush, uiFont, FontWeight.Bold, FontStyle.Normal, ChatHeaderFontSize);
+            var time = GetFormattedText("00:00", TextMutedFallbackBrush, codeFont, FontWeight.Normal, FontStyle.Normal, ChatTimestampFontSize);
+            return Math.Max(24, Math.Ceiling(Math.Max(title.Height, time.Height)) + 10);
+        }
+    }
     private const double ButtonHeight = 18.0;
     private const double AttachmentHeight = 18.0;
     private const double AttachmentGap = 5.0;
@@ -298,7 +308,9 @@ public sealed partial class ChatTranscriptRenderControl : Control
     private double ChatTextLineHeight => Math.Max(12.0, ChatTextFontSize * 1.42);
     private double ChatCodeFontSize => Math.Max(8.0, ChatTextFontSize + 0.5);
     private double ChatCodeLineHeight => Math.Max(12.0, ChatCodeFontSize * 1.43);
-    private double ChatMetaFontSize => Math.Max(7.0, ChatTextFontSize - 1.0);
+    private double ChatHeaderFontSize => Math.Max(8.0, ChatTextFontSize * 0.94);
+    private double ChatMetaFontSize => Math.Max(7.0, ChatTextFontSize * 0.86);
+    private double ChatTimestampFontSize => Math.Max(7.0, ChatTextFontSize * 0.80);
 
     private static bool IsFlatTranscriptMessage(LocalLlmChatMessageViewModel message)
     {

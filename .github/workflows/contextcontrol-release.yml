@@ -40,7 +40,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $tag = '${{ github.ref_name }}'
           $repo = '${{ github.repository }}'
-          $notes = 'Windows x64 release. Download ContextControl-win-x64-Setup.exe only. It is a single-file installer that contains the full app folder, lets you choose the install location and shortcuts, registers uninstall, and lets newer app builds update from GitHub releases.'
+          $notesPath = Join-Path $env:GITHUB_WORKSPACE "docs/releases/$tag.md"
+          $notes = if (Test-Path -LiteralPath $notesPath) { Get-Content -LiteralPath $notesPath -Raw } else { 'Windows x64 release. Download ContextControl-win-x64-Setup.exe for the full self-contained app.' }
           $apiBase = "https://api.github.com/repos/$repo"
           $headers = @{
             Authorization = "Bearer $env:GH_TOKEN"
