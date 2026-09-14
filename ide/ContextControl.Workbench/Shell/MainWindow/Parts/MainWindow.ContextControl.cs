@@ -500,8 +500,17 @@ public sealed partial class MainWindow
             }
         });
         viewModel.ContextControl.SetSnippetFileSaver(SaveSnippetAsFileAsync);
-        _googleResearchBrowser ??= new ContextControl.Workbench.Services.GoogleResearchBrowser();
+        BrowserSurface.BindPane(viewModel.BrowserPane);
+        _googleResearchBrowser ??= new ContextControl.Workbench.Services.WorkspaceResearchBrowser(viewModel.BrowserPane, BrowserSurface.GetHost, ShowResearchTab);
         viewModel.ContextControl.SetGoogleResearchBrowser(_googleResearchBrowser);
+        viewModel.ContextControl.SetResearchArticleOpener((title, html) => ShowResearchTab(viewModel.BrowserPane.OpenArticle(title, html)));
+        viewModel.BrowserPane.OpenResearchTabCommand = new RelayCommand<BrowserTabViewModel>(tab => { if (tab is not null) ShowResearchTab(tab); });
+        viewModel.BrowserPane.IsActionPreviewEnabled = viewModel.ContextControl.IsBrowserActionPreviewEnabled;
+        viewModel.ContextControl.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(viewModel.ContextControl.IsBrowserActionPreviewEnabled))
+                viewModel.BrowserPane.IsActionPreviewEnabled = viewModel.ContextControl.IsBrowserActionPreviewEnabled;
+        };
     }
 
     private async Task<string?> SaveSnippetAsFileAsync(ChatSnippetViewModel snippet)

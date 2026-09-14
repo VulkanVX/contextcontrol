@@ -13,11 +13,6 @@
                 ClipToBounds="True"
                 MinHeight="0"
                 IsVisible="{Binding IsBrowserMode}">
-              <controls:WebView2Host
-                  x:Name="BrowserWebView"
-                  UserDataFolder="{Binding BrowserPane.NativeUserDataFolder}"
-                  NavigationStarted="OnBrowserNavigationStarted"
-                  NavigationCompleted="OnBrowserNavigationCompleted"
-                  InitializationFailed="OnBrowserInitializationFailed" />
+              <Grid x:Name="TabHosts" />
             </Border>
 </UserControl>

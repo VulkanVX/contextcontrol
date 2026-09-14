@@ -6,6 +6,8 @@ New coverage includes Granite 4.2, Qwen 3.8 and Flash Next, Ornith 1.5, Nemotron
 
 ## Connect a model server
 
+In **LLMs**, choose **Show all** to clear search, ownership, hardware and other filters. No GB limit is applied to the catalog; downloading remains an explicit action. **Newest** follows the official library listing order before falling back to known dates, so recent entries with an unknown release date are no longer buried. A source listing rank is not presented as a release date. Hosted-only models remain visibly labeled.
+
 Open **Settings → LLMs → Local model servers**. Enable a runtime, set its API base URL and context limit, then select **Apply and connect**. Discovered models appear in the LLM catalog and the chat model selector. Google research, streaming answers, reasoning, cancellation and usage accounting use the same chat workflow for these models.
 
 | Runtime | Default API | Starting and loading |

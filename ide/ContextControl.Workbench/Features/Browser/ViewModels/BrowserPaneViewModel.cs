@@ -32,6 +32,13 @@ public sealed class BrowserPaneViewModel : ObservableObject
         Tabs = [new BrowserTabViewModel(Guid.NewGuid().ToString("N"), DefaultUrl, CreateTabTitle(DefaultUrl))];
         _selectedTab = Tabs[0];
         _selectedTab.IsActive = true;
+        Tabs.CollectionChanged += (_, e) =>
+        {
+            if (e.OldItems is not null) foreach (BrowserTabViewModel tab in e.OldItems) tab.PropertyChanged -= OnTabChanged;
+            if (e.NewItems is not null) foreach (BrowserTabViewModel tab in e.NewItems) tab.PropertyChanged += OnTabChanged;
+            NotifyAgents();
+        };
+        _selectedTab.PropertyChanged += OnTabChanged;
     }
 
     public event EventHandler<string>? ExternalBrowserSelectionChanged;
@@ -45,6 +52,49 @@ public sealed class BrowserPaneViewModel : ObservableObject
     public ObservableCollection<BrowserTabViewModel> Tabs { get; }
 
     public bool HasMultipleTabs => Tabs.Count > 1;
+    public bool HasResearchTabs => Tabs.Any(tab => tab.IsResearch);
+    public IReadOnlyList<BrowserTabViewModel> ResearchTabs => Tabs.Reverse().Where(tab => tab.IsResearch).OrderByDescending(tab => tab.IsAgentWorking).Take(4).ToArray();
+    private System.Windows.Input.ICommand? _openResearchTabCommand;
+    public System.Windows.Input.ICommand? OpenResearchTabCommand { get => _openResearchTabCommand; set => SetProperty(ref _openResearchTabCommand, value); }
+    private bool _isActionPreviewEnabled;
+    public bool IsActionPreviewEnabled { get => _isActionPreviewEnabled; set => SetProperty(ref _isActionPreviewEnabled, value); }
+    public int ActiveAgentCount => Tabs.Count(tab => tab.IsAgentWorking);
+    public bool HasActiveAgents => ActiveAgentCount > 0;
+    public string AgentActivityLabel => $"{ActiveAgentCount} {(ActiveAgentCount == 1 ? "agent" : "agents")} working";
+    private void OnTabChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(BrowserTabViewModel.IsAgentWorking)) NotifyAgents();
+    }
+    private void NotifyAgents()
+    {
+        OnPropertyChanged(nameof(ActiveAgentCount)); OnPropertyChanged(nameof(HasActiveAgents)); OnPropertyChanged(nameof(AgentActivityLabel));
+        OnPropertyChanged(nameof(HasResearchTabs)); OnPropertyChanged(nameof(ResearchTabs));
+    }
+    public BrowserTabViewModel OpenResearchTab(string id, string title)
+    {
+        var tab = Tabs.FirstOrDefault(item => item.Id == "research-" + id);
+        if (tab is null) { tab = new("research-" + id, "https://www.google.com/", title) { IsResearch = true }; Tabs.Add(tab); }
+        tab.Title = title;
+        OnPropertyChanged(nameof(HasMultipleTabs));
+        return tab;
+    }
+    public BrowserTabViewModel OpenArticle(string title, string html)
+    {
+        var tab = new BrowserTabViewModel(Guid.NewGuid().ToString("N"), "about:blank", title) { DocumentHtml = html };
+        Tabs.Add(tab); OnPropertyChanged(nameof(HasMultipleTabs)); SelectTab(tab); return tab;
+    }
+    public void TabNavigating(BrowserTabViewModel tab, string url)
+    {
+        tab.Url = url;
+        if (!tab.IsResearch && tab.DocumentHtml is null) tab.Title = CreateTabTitle(url);
+        if (ReferenceEquals(tab, SelectedTab)) { UrlText = url; Status = url; IsLoading = true; }
+    }
+    public void TabNavigated(BrowserTabViewModel tab, string? url, bool succeeded, bool back, bool forward)
+    {
+        if (!string.IsNullOrWhiteSpace(url)) tab.Url = url;
+        if (!tab.IsResearch && tab.DocumentHtml is null) tab.Title = CreateTabTitle(tab.Url);
+        if (ReferenceEquals(tab, SelectedTab)) { UrlText = tab.Url; Status = succeeded ? tab.Url : "Navigation failed."; IsLoading = false; CanGoBack = back; CanGoForward = forward; }
+    }
 
     public BrowserTabViewModel? SelectedTab
     {
@@ -218,10 +268,12 @@ public sealed class BrowserPaneViewModel : ObservableObject
 
     public BrowserTabViewModel? CloseTab(BrowserTabViewModel? tab)
     {
-        if (tab is null || Tabs.Count <= 1)
+        if (tab is null || !Tabs.Contains(tab))
         {
             return null;
         }
+
+        if (Tabs.Count == 1) AddTab();
 
         var index = Tabs.IndexOf(tab);
         if (index < 0)
@@ -230,6 +282,8 @@ public sealed class BrowserPaneViewModel : ObservableObject
         }
 
         var wasActive = ReferenceEquals(SelectedTab, tab);
+        tab.CancelResearch?.Invoke();
+        tab.ActionPreviewImage = null;
         Tabs.RemoveAt(index);
         OnPropertyChanged(nameof(HasMultipleTabs));
 
@@ -253,7 +307,7 @@ public sealed class BrowserPaneViewModel : ObservableObject
         }
 
         SelectedTab.Url = url;
-        SelectedTab.Title = CreateTabTitle(url);
+        if (!SelectedTab.IsResearch && SelectedTab.DocumentHtml is null) SelectedTab.Title = CreateTabTitle(url);
     }
 
     private static string CreateTabTitle(string url)

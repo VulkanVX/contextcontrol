@@ -11,6 +11,9 @@ using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
 if (args.Contains("--runtime-regression")) { await LocalRuntimeTests.Run(); return; }
+if (args.Contains("--browser-workspace-smoke")) { GoogleBrowserTests.Run(null, workspace: true); return; }
+if (args.Contains("--browser-workspace-live")) { GoogleBrowserTests.Run("granite3.3:2b", workspace: true); return; }
+if (args.Contains("--browser-workspace-page-live")) { GoogleBrowserTests.Run("granite3.3:2b", workspace: true, sourceOnly: true); return; }
 if (args.Contains("--google-photo-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", photo: true); return; }
 if (args.Contains("--google-knowledge-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", knowledge: true); return; }
 if (args.Contains("--google-media-smoke")) { var at = Array.IndexOf(args, "--google-media-smoke"); GoogleBrowserTests.Run("granite3.3:2b", media: args.Length > at + 1 ? args[at + 1] : "wow"); return; }

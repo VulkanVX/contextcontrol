@@ -8,6 +8,18 @@ namespace ContextControl.Workbench.Views;
 
 public sealed partial class MainWindow
 {
+    private void ShowResearchTab(BrowserTabViewModel tab)
+    {
+        if (ViewModel is not { } viewModel) return;
+        viewModel.SwitchWorkspaceModeCommand.Execute(viewModel.WorkspaceModes.First(mode => mode.Key == "browser"));
+        viewModel.BrowserPane.SelectTab(tab);
+    }
+    internal void OnResearchActivityClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var tab = ViewModel?.BrowserPane.Tabs.FirstOrDefault(tab => tab.IsAgentWorking);
+        if (tab is not null) ShowResearchTab(tab);
+        e.Handled = true;
+    }
     internal void OnBrowserOpenClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         NavigateBrowserFromAddressBar();
@@ -27,6 +39,7 @@ public sealed partial class MainWindow
 
     internal void OnBrowserBackClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (ViewModel?.BrowserPane.SelectedTab?.IsAgentWorking == true) return;
         try
         {
             BrowserWebView.GoBack();
@@ -41,6 +54,7 @@ public sealed partial class MainWindow
 
     internal void OnBrowserForwardClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (ViewModel?.BrowserPane.SelectedTab?.IsAgentWorking == true) return;
         try
         {
             BrowserWebView.GoForward();
@@ -55,6 +69,7 @@ public sealed partial class MainWindow
 
     internal void OnBrowserRefreshClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (ViewModel?.BrowserPane.SelectedTab?.IsAgentWorking == true) return;
         try
         {
             BrowserWebView.Reload();
@@ -74,8 +89,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        var tab = browserPane.AddTab();
-        NavigateBrowserToUrl(tab.Url);
+        browserPane.AddTab();
         e.Handled = true;
     }
 
@@ -88,10 +102,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (browserPane.SelectTab(tab))
-        {
-            NavigateBrowserToUrl(tab.Url);
-        }
+        browserPane.SelectTab(tab);
 
         e.Handled = true;
     }
@@ -104,11 +115,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        var nextTab = browserPane.CloseTab(tab);
-        if (nextTab is not null)
-        {
-            NavigateBrowserToUrl(nextTab.Url);
-        }
+        browserPane.CloseTab(tab);
 
         e.Handled = true;
     }
@@ -140,6 +147,7 @@ public sealed partial class MainWindow
         }
 
         var url = browserPane.NormalizeUrl();
+        if (browserPane.SelectedTab?.IsAgentWorking == true) browserPane.AddTab();
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             browserPane.SetBrowserUnavailable("Invalid URL.");

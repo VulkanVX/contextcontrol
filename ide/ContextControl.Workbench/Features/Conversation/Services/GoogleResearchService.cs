@@ -12,7 +12,7 @@ public interface IGoogleResearchBrowser
 public sealed record GooglePageImage(string Url, string Caption = "", string Section = "", string Kind = "Article image");
 public sealed record GooglePageContent(string Url, string Text, string? ImageUrl = null, IReadOnlyList<GooglePageImage>? Images = null, string Title = "");
 public sealed record GooglePageEvidence(int SourceNumber, string Text, bool FullPageRead, IReadOnlyList<GooglePageImage>? Images = null);
-public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages, string? PhotoSubject = null)
+public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages, string? PhotoSubject = null, string Topic = "")
 {
     public bool DidSearch => Search is { Sources.Count: > 0 };
 }
@@ -109,7 +109,7 @@ public static partial class GoogleResearchService
             await ReadSelectedPages(choices);
         }
         status(pages.Any(page => page.FullPageRead) ? "Analyzing sources and writing the answer…" : "Pages unavailable · answering from search snippets with limitations…");
-        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages, ResolvePhotoSubject(question, response));
+        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages, ResolvePhotoSubject(question, response), PlanningQuestion(question));
     }
 
     public static string? ParseQuery(string response, string question)

@@ -6,6 +6,7 @@ public sealed class WorkbenchModeOptionViewModel(string key, string name) : Obse
 
     public string Key { get; } = key;
     public string Name { get; } = name;
+    public bool IsBrowserOption => Key == "browser";
 
     public bool IsActive
     {

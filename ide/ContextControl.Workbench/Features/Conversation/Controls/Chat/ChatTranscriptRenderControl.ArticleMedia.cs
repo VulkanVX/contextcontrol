@@ -15,7 +15,7 @@ public sealed partial class ChatTranscriptRenderControl
         foreach (var (photo, index) in photos.Select((photo, index) => (photo, index)))
         {
             var target = intro;
-            if (index > 0)
+            if (index > 1)
             {
                 var matches = blocks.Select((block, at) => (at, score: MediaSectionScore(photo.PhotoSection, photo.PhotoCaption, photo.EntryTitle, BlockText(block))))
                     .OrderByDescending(item => item.score).ToArray();

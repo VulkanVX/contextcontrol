@@ -30,7 +30,8 @@ public sealed record LocalLlmCatalogModel(
     string? RuntimeId = null,
     string? BackendModelId = null,
     string? RuntimeLabel = null,
-    string? SourceUrl = null);
+    string? SourceUrl = null,
+    int? LibraryOrder = null);
 
 public sealed record LocalLlmGpuInfo(string Name, long? AdapterRamBytes)
 {

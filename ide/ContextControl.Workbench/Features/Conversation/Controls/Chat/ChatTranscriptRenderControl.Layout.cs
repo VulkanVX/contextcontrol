@@ -34,9 +34,14 @@ public sealed partial class ChatTranscriptRenderControl
         if (message.HasModelTransition)
         {
             var transitionWidth = ResolveConversationColumnWidth(availableCardWidth);
-            var transitionX = (width - transitionWidth) / 2;
-            transitionHeight = AddRichParagraph(layout, [new(message.ModelTransitionLabel)], transitionX + CardPaddingX,
-                4, Math.Max(1, transitionWidth - CardPaddingX * 2), ChatMetaFontSize) + 6;
+            var font = ResolveFontFamily(UiFontFamily, Resource("UiFontFamily", DefaultUiFontFamily));
+            var textWidth = Math.Min(transitionWidth - CardPaddingX * 2 - 24,
+                MeasureTextWidth(message.ModelTransitionLabel, font, FontWeight.Normal, FontStyle.Normal, ChatMetaFontSize) + 2);
+            textWidth = Math.Max(1, textWidth);
+            var transitionX = (width - textWidth - 24) / 2;
+            transitionHeight = AddRichParagraph(layout, [new(message.ModelTransitionLabel)], transitionX + 24,
+                4, textWidth, ChatMetaFontSize, TextAlignment.Center) + 6;
+            layout.ModelTransitionIconRect = new Rect(transitionX, 4 + (Math.Max(ChatTextLineHeight, ChatMetaFontSize * 1.5) - 16) / 2, 16, 16);
         }
         var y = CardPaddingY + transitionHeight;
 
@@ -100,7 +105,8 @@ public sealed partial class ChatTranscriptRenderControl
         {
             var namedEntries = ContextControl.Workbench.Services.GoogleEntryPhotoService.EntryNames(message.VisibleText)
                 .Select(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName).ToHashSet();
-            foreach (var photo in message.AttachedFiles.Where(file => !file.IsSubjectPhoto && !string.IsNullOrWhiteSpace(file.EntryTitle) && !string.IsNullOrWhiteSpace(file.PreviewPath)))
+            foreach (var photo in message.AttachedFiles.Where(file => !file.IsSubjectPhoto && !string.IsNullOrWhiteSpace(file.EntryTitle) && !string.IsNullOrWhiteSpace(file.PreviewPath)
+                && ContextControl.Workbench.Services.GoogleEntryPhotoService.IsRelevantSavedPhoto(file, message.AttachedFiles)))
             {
                 if (!namedEntries.Add(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName(photo.EntryTitle!))) continue;
                 y = BuildInformationCard(layout, new ContextControl.Workbench.Services.ChatMarkdownBlock("card",
@@ -337,6 +343,12 @@ public sealed partial class ChatTranscriptRenderControl
         }
 
         var imagePath = message.AttachedFiles.FirstOrDefault(IsInlineImageAttachment)?.Path;
+        if (ContextControl.Workbench.Services.ResearchArticlePage.CanOpen(message))
+        {
+            var articleRect = new Rect(right - 61, centerY - ButtonHeight * .5, 58, ButtonHeight);
+            layout.Hits.Add(new HitRegion(articleRect, ChatTranscriptHitKind.OpenArticle, message));
+            right = articleRect.X - 5;
+        }
         if (!string.IsNullOrWhiteSpace(imagePath))
         {
             var downloadRect = new Rect(right - 17.0, centerY - 7.0, 14.0, 14.0);

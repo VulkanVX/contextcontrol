@@ -38,6 +38,7 @@ public sealed partial class ChatTranscriptRenderControl
 
         if (message.HasModelTransition)
         {
+            WorkspaceIcon.Draw(context, "model-change", OffsetY(layout.ModelTransitionIconRect, rowTop), Resource("AccentBrush", AccentBorderFallbackBrush));
             foreach (var text in layout.TextBlocks.Where(text => text.TextBlock.Rect.Bottom <= layout.CardRect.Y))
             {
                 DrawTextSelection(context, text.TextBlock, index, text.BlockIndex, rowTop, viewportTop, viewportBottom);
@@ -60,7 +61,7 @@ public sealed partial class ChatTranscriptRenderControl
             {
                 var background = decoration.Kind is "card" or "tableHeader" ? Resource("ChatSnippetShellBrush", EditorSurfaceFallbackBrush)
                     : Resource("ChatSnippetBodyBrush", CommandBackgroundFallbackBrush);
-                context.DrawRectangle(background, new Pen(border, 1), rect, decoration.Kind == "card" ? 8 : 2, decoration.Kind == "card" ? 8 : 2);
+                context.DrawRectangle(background, decoration.Kind == "card" ? null : new Pen(border, 1), rect, decoration.Kind == "card" ? 14 : 2, decoration.Kind == "card" ? 14 : 2);
                 if (decoration.Kind == "quote") context.DrawLine(new Pen(Resource("AccentBrush", AccentBorderFallbackBrush), 3), rect.TopLeft, rect.BottomLeft);
             }
         }
@@ -171,7 +172,7 @@ public sealed partial class ChatTranscriptRenderControl
             timeRect,
             new Point(timeRect.X, CenterTextY(timeRect, time)));
 
-        foreach (var hit in layout.Hits.Where(hit => hit.Kind is ChatTranscriptHitKind.CopyMessage or ChatTranscriptHitKind.CreateProject or ChatTranscriptHitKind.DownloadAttachment))
+        foreach (var hit in layout.Hits.Where(hit => hit.Kind is ChatTranscriptHitKind.CopyMessage or ChatTranscriptHitKind.CreateProject or ChatTranscriptHitKind.DownloadAttachment or ChatTranscriptHitKind.OpenArticle))
         {
             if (hit.Kind == ChatTranscriptHitKind.CopyMessage)
             {
@@ -180,6 +181,10 @@ public sealed partial class ChatTranscriptRenderControl
             else if (hit.Kind == ChatTranscriptHitKind.DownloadAttachment)
             {
                 DrawDownloadIconButton(context, OffsetY(hit.Rect, rowTop), CanExecuteHit(hit), ReferenceEquals(hit, _hoveredHit));
+            }
+            else if (hit.Kind == ChatTranscriptHitKind.OpenArticle)
+            {
+                DrawButton(context, OffsetY(hit.Rect, rowTop), "Article ↗", CanExecuteHit(hit), ReferenceEquals(hit, _hoveredHit));
             }
             else
             {

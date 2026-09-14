@@ -56,6 +56,7 @@ internal static class UiExperienceTests
         settingsWindow.Close();
         MainWindowFlow(workbench, output);
         Presentation(context, root, output);
+        LiveDeliveryAndCatalog(context, workbench, root, output);
         ThinkingScroll(output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;
@@ -120,6 +121,10 @@ internal static class UiExperienceTests
             var firstText = Read<System.Collections.IEnumerable>(transition, "TextBlocks").Cast<object>().First();
             Check(Read<Rect>(Read<object>(firstText, "TextBlock"), "Rect").Bottom < Read<Rect>(transition, "CardRect").Y, "The model change sits between messages, outside the new user bubble.");
             Check(Read<Rect>(transition, "HeaderRect").Y == Read<Rect>(transition, "CardRect").Y, "A model marker must shift the user header and its actions into the new bubble.");
+            var transitionText = Read<Rect>(Read<object>(firstText, "TextBlock"), "Rect");
+            var transitionIcon = Read<Rect>(transition, "ModelTransitionIconRect");
+            Check(transitionIcon.Width == 16 && Math.Abs((transitionIcon.Left + transitionText.Right) / 2 - (width - 32) / 2d) < 1,
+                "The model-change text and its icon must be centered as one group, including narrow windows.");
             var window = new Window { Content = new Border { Background = new SolidColorBrush(Color.Parse("#151922")), Child = new ScrollViewer { Content = transcript } } };
             WorkbenchThemeResources.Apply(window, "studio"); Snapshot(window, width, 1500, Path.Combine(output, $"article-model-change-{width}.png")); window.Close();
         }
@@ -127,6 +132,46 @@ internal static class UiExperienceTests
         history.Save(new ChatHistoryDocument { Sessions = [session.ToData()] }, root, "chat", mirrorDefaultScope: false);
         var savedPhoto = history.Load(root).Sessions.Single().Messages.Last().Attachments.First();
         Check(savedPhoto.IsSubjectPhoto && savedPhoto.PhotoCaption == "Overview" && savedPhoto.PhotoKind == "Article image", "Photo captions, section identity and article layout must survive history.");
+    }
+
+    private static void LiveDeliveryAndCatalog(ContextControlViewModel context, WorkbenchViewModel workbench, string root, string output)
+    {
+        var live = new LocalLlmChatMessageViewModel("assistant", "");
+        var received = string.Join(" ", Enumerable.Repeat("Already delivered text.", 300));
+        live.UpdateLiveStatus(received);
+        Check(live.VisibleText == received, "A buffered chunk must display in full without an artificial character timer.");
+        live.UpdateLiveStatus(received + " New token.");
+        Check(live.VisibleText.EndsWith("New token."), "Actual live deltas must still update the message immediately.");
+        live.UpdateContent(received + " Complete.");
+        Check(live.VisibleText.EndsWith("Complete."), "Completed and restored answers must display fully.");
+        context.LocalLlmSearchText = "no-such-model-xyz";
+        context.ShowAllLocalModelsCommand.Execute(null);
+        Check(context.VisibleLocalLlmModels.Count == context.LocalLlmModels.Count, "Show all must clear all catalog filters without a hardware or GB cap.");
+        Check(context.VisibleLocalLlmModels.Any(model => model.Id.StartsWith("qwen3.8", StringComparison.Ordinal)), "The expanded catalog must include Qwen3.8.");
+        var discovered = context.VisibleLocalLlmModels.Where(model => model.Model.LibraryOrder is not null).ToArray();
+        Check(discovered.Length > 400 && discovered.Select(model => model.Model.LibraryOrder).SequenceEqual(discovered.Select(model => model.Model.LibraryOrder).Order()), "Newest uses the verified source ordering, including entries without a release date.");
+        context.IsBrowserActionPreviewEnabled = true;
+        workbench.FlushAppearanceSettings();
+        Check(WorkbenchSettings.Load(root).BrowserActionPreviewEnabled, "The browser preview preference must survive settings reload.");
+        context.IsBrowserActionPreviewEnabled = false;
+
+        var bad = new ContextControlAttachmentViewModel("Human horde confirmed : r/pokemon", "https://www.reddit.com/r/pokemon/comments/example/", "web", Path.Combine(root, "article-0.png"), "Human (Horde)");
+        var message = new LocalLlmChatMessageViewModel("assistant", "1. **Human (Horde)**\n   - Racial abilities [1]", attachments: [
+            new("[1] World of Warcraft Forever racials", "https://www.wowhead.com/forever/racials", "web"), bad]);
+        var transcript = new ChatTranscriptRenderControl { Items = [message] };
+        var layout = Call(transcript, "BuildMessageLayout", message, 780d)!;
+        Check(!Read<System.Collections.IEnumerable>(layout, "Attachments").Cast<object>().Any(item => Read<bool>(item, "IsImagePreview")), "Saved Warcraft chats must also hide the reported unrelated Pokemon photos.");
+        var article = ResearchArticlePage.Build(message);
+        Check(!article.Html.Contains("data:image/"), "The Browser article must not revive a rejected old photo.");
+        var photos = Enumerable.Range(0, 4).Select(i => new ContextControlAttachmentViewModel("World of Warcraft Forever", "https://example.com/warcraft/" + i, "web", Path.Combine(root, $"collage-{i}.png"), "WoW Forever")
+            { IsSubjectPhoto = true, PhotoCaption = "Landscape " + i, IncludeInPrompt = false }).ToArray();
+        foreach (var (photo, index) in photos.Select((photo, index) => (photo, index))) File.WriteAllBytes(photo.PreviewPath, GooglePhotoPreviewTests.Photo(640 + index, 360));
+        var gallery = new LocalLlmChatMessageViewModel("assistant", "# World of Warcraft Forever\n\nAn overview with a collage.\n\n## Regions\n\nSource descriptions accompany their images.", attachments: photos);
+        var page = ResearchArticlePage.Build(gallery);
+        Check(System.Text.RegularExpressions.Regex.Matches(page.Html, "<figure>").Count == 4 && System.Text.Encoding.UTF8.GetByteCount(page.Html) < 1_900_000, "A four-photo article collage stays below WebView2's HTML size limit.");
+        File.WriteAllText(Path.Combine(output, "research-article.html"), page.Html);
+        context.SetResearchArticleOpener((title, html) => Check(title == page.Title && html.Contains("collage"), "The article command passes the generated page to Browser."));
+        context.OpenResearchArticleCommand.Execute(gallery);
     }
 
     private static void Typography(string output)
@@ -453,6 +498,24 @@ internal static class UiExperienceTests
         Check(floating?.IsVisible == true, "Settings toggle must show the actual floating window.");
         workbench.IsChatMonitorEnabled = false;
         Check(floating?.IsVisible == false, "Settings toggle must hide the actual floating window.");
+        workbench.UiFontSize = 11;
+        var workingTab = workbench.BrowserPane.OpenResearchTab("preview-fixture", "Warcraft research");
+        workingTab.IsAgentWorking = true;
+        workingTab.AgentStatus = "Searching Google: World of Warcraft racials";
+        workingTab.AgentStatus = "Reading [1] Official source";
+        context.IsBrowserActionPreviewEnabled = true;
+        Dispatcher.UIThread.RunJobs();
+        var preview = main.GetVisualDescendants().OfType<Expander>().Single(item => Equals(item.Header, "Browser actions"));
+        Check(preview.IsExpanded && workbench.BrowserPane.IsActionPreviewEnabled, "The saved preview setting must drive the actual chat expander and browser capture setting.");
+        var previewButton = main.GetVisualDescendants().OfType<Button>().Single(button => ReferenceEquals(button.CommandParameter, workingTab));
+        Check(previewButton.Command == workbench.BrowserPane.OpenResearchTabCommand && previewButton.Command is not null, "A browser preview must bind the command installed by the window.");
+        Snapshot(main, 1360, 840, Path.Combine(output, "browser-actions-preview.png"));
+        Check(previewButton.Bounds.Height >= 110 && previewButton.GetVisualDescendants().OfType<ActivityLineControl>().Any(line => line.Bounds.Height >= 20), "Preview rows must have room for the thumbnail and live action instead of inheriting compact chip height.");
+        previewButton.Command!.Execute(workingTab);
+        Check(workbench.IsBrowserMode && ReferenceEquals(workbench.BrowserPane.SelectedTab, workingTab), "Clicking a preview opens the exact research tab in the existing Browser workspace.");
+        context.IsBrowserActionPreviewEnabled = false;
+        workingTab.IsAgentWorking = false;
+        workbench.BrowserPane.CloseTab(workingTab);
         main.Close();
     }
 

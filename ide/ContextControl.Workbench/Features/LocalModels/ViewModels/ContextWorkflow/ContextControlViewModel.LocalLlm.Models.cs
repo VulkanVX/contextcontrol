@@ -558,6 +558,23 @@ public sealed partial class ContextControlViewModel
             : LlmRequirementAny;
     }
 
+    private RelayCommand<object>? _showAllLocalModelsCommand;
+    public RelayCommand<object> ShowAllLocalModelsCommand => _showAllLocalModelsCommand ??= new(_ =>
+    {
+        LocalLlmSearchText = "";
+        SelectedLocalLlmProviderFilter = LlmProviderAll;
+        SelectedLocalLlmSourceFilter = LlmSourceAll;
+        SelectedLocalLlmPurposeFilter = LlmPurposeAll;
+        SelectedLocalLlmBaseFilter = LlmBaseAll;
+        SelectedLocalLlmContextFilter = LlmContextAny;
+        SelectedLocalLlmRequirementFilter = LlmRequirementAny;
+        _selectedLocalLlmOwnershipFilter = LlmOwnershipAll;
+        OnPropertyChanged(nameof(LocalLlmOwnershipFilterLabel));
+        ShowOnlyHardwareUsableLocalLlms = false;
+        SelectedLocalLlmSortOption = LlmSortNewest;
+        ApplyLocalLlmFilters();
+    });
+
     private void ApplyLocalLlmFilters()
     {
         var filtered = ApplySharedLocalLlmFilters(LocalLlmModels)
@@ -717,7 +734,8 @@ public sealed partial class ContextControlViewModel
                 .ThenByDescending(model => model.ReleaseDateValue ?? DateTime.MinValue)
                 .ThenBy(model => model.DisplayName, StringComparer.OrdinalIgnoreCase),
             _ => models
-                .OrderByDescending(model => model.ReleaseDateValue ?? DateTime.MinValue)
+                .OrderBy(model => model.Model.LibraryOrder ?? int.MaxValue)
+                .ThenByDescending(model => model.ReleaseDateValue ?? DateTime.MinValue)
                 .ThenBy(model => model.Provider, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(model => model.DisplayName, StringComparer.OrdinalIgnoreCase)
         };

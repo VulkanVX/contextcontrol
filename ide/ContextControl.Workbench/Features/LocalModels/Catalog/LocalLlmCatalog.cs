@@ -34,6 +34,9 @@ public sealed partial class LocalLlmService
             ..QwenOllamaCatalog,
             ..CoreOllamaCatalog,
         ];
-        return curated.Concat(ReadDiscoverySnapshot()).DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).ToArray();
+        var discovered = ReadDiscoverySnapshot();
+        var order = discovered.ToDictionary(model => model.Id, model => model.LibraryOrder, StringComparer.OrdinalIgnoreCase);
+        return curated.Concat(discovered).DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(model => order.TryGetValue(model.Id, out var rank) ? model with { LibraryOrder = rank } : model).ToArray();
     }
 }

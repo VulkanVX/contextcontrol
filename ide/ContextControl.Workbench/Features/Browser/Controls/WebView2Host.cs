@@ -24,6 +24,8 @@ public sealed class WebView2Host : NativeControlHost
     private CoreWebView2Controller? _controller;
     private CoreWebView2? _webView;
     private string? _pendingUrl = "https://chatgpt.com";
+    private string? _pendingHtml;
+    private string? _documentNavigationUrl;
     private bool _isDisposed;
 
     // Optional restrictions for the research reader; ordinary browser panes keep their existing behavior.
@@ -39,6 +41,19 @@ public sealed class WebView2Host : NativeControlHost
     public Task<string> ExecuteScriptAsync(string script) => _webView?.ExecuteScriptAsync(script)
         ?? throw new InvalidOperationException("The embedded browser is still starting.");
     public void Stop() => _webView?.Stop();
+    public async Task<Avalonia.Media.Imaging.Bitmap?> CaptureActionPreviewAsync()
+    {
+        if (_webView is null || _isDisposed) return null;
+        try
+        {
+            using var stream = new MemoryStream();
+            await _webView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
+            if (_isDisposed) return null;
+            stream.Position = 0;
+            return Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 360);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException or ArgumentException) { return null; }
+    }
 
     public event EventHandler<WebView2NavigationStartingEventArgs>? NavigationStarted;
     public event EventHandler<WebView2NavigationCompletedEventArgs>? NavigationCompleted;
@@ -50,7 +65,9 @@ public sealed class WebView2Host : NativeControlHost
         set => SetValue(UserDataFolderProperty, value);
     }
 
-    public string? Source => _webView?.Source ?? _pendingUrl;
+    public string? Source => IsDocumentNavigation(_webView?.Source) ? "about:blank" : _webView?.Source ?? _pendingUrl;
+    private bool IsDocumentNavigation(string? url) => _documentNavigationUrl is { } expected && url is not null
+        && (url.Equals(expected, StringComparison.Ordinal) || url.StartsWith(expected + "#", StringComparison.Ordinal));
 
     public bool CanGoBack => _webView?.CanGoBack ?? false;
 
@@ -63,6 +80,8 @@ public sealed class WebView2Host : NativeControlHost
             return;
         }
 
+        _pendingHtml = null;
+        _documentNavigationUrl = null;
         _pendingUrl = url;
         IsNavigating = true;
         if (_webView is not null)
@@ -77,6 +96,12 @@ public sealed class WebView2Host : NativeControlHost
         {
             _webView.GoBack();
         }
+    }
+    public void NavigateHtml(string html)
+    {
+        _pendingHtml = html; _pendingUrl = "about:blank"; IsNavigating = true;
+        _documentNavigationUrl = "data:text/html;charset=utf-8;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html));
+        _webView?.NavigateToString(html);
     }
 
     public void GoForward()
@@ -153,6 +178,7 @@ public sealed class WebView2Host : NativeControlHost
             }
 
             _controller = await _environment.CreateCoreWebView2ControllerAsync(hostWindow).ConfigureAwait(true);
+            if (_isDisposed || hostWindow != _hostWindow) { _controller.Close(); _controller = null; return; }
             _webView = _controller.CoreWebView2;
             _controller.IsVisible = true;
 
@@ -160,7 +186,8 @@ public sealed class WebView2Host : NativeControlHost
             ResizeController(Bounds.Size);
 
             var url = _pendingUrl;
-            if (!string.IsNullOrWhiteSpace(url))
+            if (_pendingHtml is not null) _webView.NavigateToString(_pendingHtml);
+            else if (!string.IsNullOrWhiteSpace(url))
             {
                 _webView.Navigate(url);
             }
@@ -192,12 +219,16 @@ public sealed class WebView2Host : NativeControlHost
         {
             var url = args.Uri;
             StartedNavigationId = args.NavigationId;
-            if (NavigationFilter is not null && !NavigationFilter(url))
+            // NavigateToString reports its host-generated document as a data URI in
+            // NavigationStarting on current WebView2. Allow only that exact document.
+            var document = IsDocumentNavigation(url);
+            if (!document && NavigationFilter is not null && !NavigationFilter(url))
             {
                 args.Cancel = true;
                 return;
             }
             IsNavigating = true;
+            if (document) url = "about:blank";
             _pendingUrl = url;
             Dispatcher.UIThread.Post(() =>
                 NavigationStarted?.Invoke(this, new WebView2NavigationStartingEventArgs(url)));
@@ -250,8 +281,9 @@ public sealed class WebView2Host : NativeControlHost
         }
 
         var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        var width = Math.Max(1, (int)Math.Round(size.Width * scale));
-        var height = Math.Max(1, (int)Math.Round(size.Height * scale));
+        // Hidden tabs need a usable viewport for page text and article illustrations.
+        var width = Math.Max(1, (int)Math.Round((size.Width > 1 ? size.Width : 1100) * scale));
+        var height = Math.Max(1, (int)Math.Round((size.Height > 1 ? size.Height : 760) * scale));
         _controller.Bounds = new DrawingRectangle(0, 0, width, height);
     }
 

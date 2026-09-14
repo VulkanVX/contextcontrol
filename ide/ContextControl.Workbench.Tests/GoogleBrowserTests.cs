@@ -10,7 +10,7 @@ using Microsoft.Web.WebView2.Core;
 
 internal static class GoogleBrowserTests
 {
-    public static void Run(string? model, bool pizza = false, bool photo = false, bool knowledge = false, string media = "")
+    public static void Run(string? model, bool pizza = false, bool photo = false, bool knowledge = false, string media = "", bool workspace = false, bool sourceOnly = false)
     {
         if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("This opt-in browser check requires Windows.");
         Exception? failure = null;
@@ -21,6 +21,8 @@ internal static class GoogleBrowserTests
             GoogleBrowserTestApp.Photo = photo;
             GoogleBrowserTestApp.Knowledge = knowledge;
             GoogleBrowserTestApp.Media = media;
+            GoogleBrowserTestApp.Workspace = workspace;
+            GoogleBrowserTestApp.SourceOnly = sourceOnly;
             GoogleBrowserTestApp.Failed = ex => failure = ex;
             try { AppBuilder.Configure<GoogleBrowserTestApp>().UsePlatformDetect().WithInterFont().StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown); }
             catch (Exception ex) { failure = ex; }
@@ -39,6 +41,8 @@ public sealed class GoogleBrowserTestApp : Application
     internal static bool Photo;
     internal static bool Knowledge;
     internal static string Media = "";
+    internal static bool Workspace;
+    internal static bool SourceOnly;
     internal static Action<Exception>? Failed;
     public override void Initialize() => Styles.Add(new FluentTheme());
 
@@ -99,6 +103,7 @@ public sealed class GoogleBrowserTestApp : Application
                 try { GooglePageReader.Parse(blockedJson); throw new Exception("The reader accepted the Reddit block screen as article text."); }
                 catch (GooglePageUnavailableException) { Console.WriteLine("Native WebView2 block-screen detection passed."); }
                 fixture.Close();
+                if (Workspace) { await WorkspaceBrowserTests.RunAsync(deadline.Token, Model, SourceOnly); return; }
                 if (!string.IsNullOrWhiteSpace(Model))
                 {
                     researchBrowser = new GoogleResearchBrowser(Console.WriteLine);

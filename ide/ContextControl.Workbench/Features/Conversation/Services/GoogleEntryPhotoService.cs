@@ -86,6 +86,34 @@ public static class GoogleEntryPhotoService
         return false;
     }
 
+    public static bool MatchesPhotoTopic(string entry, string topic, GoogleSearchSource source, IReadOnlyList<string>? entries = null)
+    {
+        var context = NormalizeName(topic);
+        var evidence = " " + NormalizeName(source.Title + " " + source.Snippet + " " + Uri.UnescapeDataString(source.Url)) + " ";
+        // A race name such as Human, Gnome or Dwarf is not enough to identify a game.
+        // Keep the franchise anchor even when Google happens to return an exact name match.
+        if (Regex.IsMatch(context, @"\b(?:warcraft|wow)\b"))
+            return Regex.IsMatch(evidence, @"\b(?:warcraft|wow|wowhead|warcraftwiki)\b");
+        var ignored = ("a an the is are what which who when where how why of in on at to for from and or with by "
+            + "me my you your it its this that these those about find show search google latest newest current new best top "
+            + "photo photos picture pictures image images screenshot screenshots logo logos trailer trailers review reviews "
+            + "information explain compare please game games person people place places restaurant restaurants bar bars hotel hotels "
+            + NormalizeName(entry) + " " + string.Join(' ', (entries ?? []).Select(NormalizeName))).Split(' ').ToHashSet();
+        var anchors = context.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.Length >= 4 && word.Any(char.IsLetter) && !ignored.Contains(word)).Distinct().ToArray();
+        return anchors.Length == 0 || anchors.Any(word => evidence.Contains(" " + word + " ", StringComparison.Ordinal));
+    }
+
+    public static bool IsRelevantSavedPhoto(ContextControl.Workbench.ViewModels.ContextControlAttachmentViewModel photo,
+        IEnumerable<ContextControl.Workbench.ViewModels.ContextControlAttachmentViewModel> attachments)
+    {
+        // Old histories did not store the photo query. A clear franchise in the answer's
+        // numbered sources can still reject the unrelated pictures from the reported chat.
+        var sources = string.Join(' ', attachments.Where(a => a.Kind == "web" && Regex.IsMatch(a.Label, @"^\[\d+\]" )).Select(a => a.Label + " " + a.Path));
+        return !Regex.IsMatch(NormalizeName(sources), @"\b(?:warcraft|wow)\b")
+            || MatchesPhotoTopic(photo.EntryTitle, "World of Warcraft", new GoogleSearchSource(photo.Label, photo.Path, photo.PhotoCaption + " " + photo.PhotoSection));
+    }
+
     public static bool IsUsablePhoto(GooglePageImage image, string entry, bool subject)
     {
         if (!GooglePhotoPreviewService.IsImageLocation(image.Url)) return false;
@@ -99,16 +127,20 @@ public static class GoogleEntryPhotoService
 
     public static async Task LoadAsync(string markdown, GoogleResearchResult research, IGoogleResearchBrowser browser,
         Action<GoogleEntryPhoto> found, CancellationToken cancellationToken,
-        GooglePhotoPreviewService? images = null, TimeSpan? timeBudget = null, Action<string>? status = null)
+        GooglePhotoPreviewService? images = null, TimeSpan? timeBudget = null, Action<string>? status = null,
+        IReadOnlyList<string>? onlyEntries = null)
     {
         if (research.Search is not { } search) return;
-        var entries = research.PhotoSubject is { Length: > 0 } subject ? new[] { subject } : EntryNames(markdown);
+        var entries = onlyEntries ?? (research.PhotoSubject is { Length: > 0 } subject ? new[] { subject } : EntryNames(markdown));
+        var contextEntries = EntryNames(markdown).Concat(entries).DistinctBy(NormalizeName).ToArray();
         if (entries.Count == 0) return;
         images ??= GooglePhotoPreviewService.Shared;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeBudget ?? TimeSpan.FromSeconds(research.PhotoSubject is not null ? 45 : Math.Min(80, 12 * entries.Count + 10)));
         var usedImages = new HashSet<string>(StringComparer.Ordinal);
-        bool Matches(string entry, GoogleSearchSource source) => IsEntrySource(entry, source, entries, research.PhotoSubject is not null);
+        var topic = research.Topic + " " + search.Query;
+        bool InTopic(string entry, GoogleSearchSource source) => MatchesPhotoTopic(entry, topic, source, contextEntries);
+        bool Matches(string entry, GoogleSearchSource source) => InTopic(entry, source) && IsEntrySource(entry, source, contextEntries, research.PhotoSubject is not null);
         var subjectPhotos = research.PhotoSubject is not null;
         foreach (var (entry, entryIndex) in entries.Select((entry, index) => (entry, index)))
         {
@@ -117,11 +149,11 @@ public static class GoogleEntryPhotoService
             entryDeadline.CancelAfter(TimeSpan.FromSeconds(subjectPhotos ? 43 : 12));
             var token = entryDeadline.Token;
             var count = 0;
-            var wanted = subjectPhotos ? 3 : 1;
+            var wanted = subjectPhotos ? 4 : 1;
             status?.Invoke($"Finding photos · {entryIndex + 1}/{entries.Count} · {entry}");
             async Task TryImages(GoogleSearchSource source, IReadOnlyList<GooglePageImage>? candidates, string? fallback = null)
             {
-                if (!GoogleSearchContext.IsPublicWebUrl(source.Url)) return;
+                if (!GoogleSearchContext.IsPublicWebUrl(source.Url) || !InTopic(entry, source)) return;
                 var pageMatches = Matches(entry, source);
                 var available = (candidates ?? []).ToList();
                 if (pageMatches && fallback is not null) available.Add(new(fallback));
@@ -168,7 +200,7 @@ public static class GoogleEntryPhotoService
                     if (count >= wanted) break;
                 }
                 if (count < wanted) await Visit(search.Sources);
-                foreach (var query in new[] { $"\"{entry.Replace('"', ' ')}\" {search.Query}", $"\"{entry.Replace('"', ' ')}\" photos screenshots" })
+                foreach (var query in new[] { $"\"{entry.Replace('"', ' ')}\" {search.Query}", $"\"{entry.Replace('"', ' ')}\" {search.Query} photos screenshots" })
                 {
                     if (count >= wanted) break;
                     var specific = await browser.SearchAsync(GoogleSearchContext.NormalizeQuery(query), token);

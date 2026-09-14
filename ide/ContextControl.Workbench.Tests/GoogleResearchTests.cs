@@ -117,7 +117,7 @@ internal static class GoogleResearchTests
         var recoveredResearch = await GoogleResearchService.ResearchAsync("What is NVIDIA RTX 5090?", (_, _) => Task.FromResult("{\"search\":false}"), gapBrowser, _ => { }, default, knowledgeGap: true);
         Check(recoveredResearch.DidSearch && gapBrowser.Queries.Count == 1 && gapBrowser.Reads.Count > 0, "A knowledge-gap retry must search and read even when a small planner repeats its no-search decision.");
         var photoPrompt = GoogleSearchContext.AugmentPrompt("Show me a photo of Nvidia 5090", recoveredResearch with { PhotoSubject = "Nvidia 5090" });
-        Check(photoPrompt.Contains("will attempt to attach a matching source photo") && photoPrompt.Contains("Do not invent image license"), "The answer must know the host can attach source photos without inventing attachment or license claims.");
+        Check(photoPrompt.Contains("retrieves source photos alongside your response") && photoPrompt.Contains("Do not invent image license"), "The answer must know the host can attach source photos without inventing attachment or license claims.");
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         try { await GoogleResearchService.ResearchAsync("search now", Ask, browser, _ => { }, cancellation.Token); Check(false, "Cancellation must stop planning."); } catch (OperationCanceledException) { _checks++; }
 

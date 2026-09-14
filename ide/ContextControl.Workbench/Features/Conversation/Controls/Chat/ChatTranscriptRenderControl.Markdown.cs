@@ -19,7 +19,7 @@ public sealed partial class ChatTranscriptRenderControl
     private double BuildMarkdown(MessageLayout layout, LocalLlmChatPartViewModel part, double x, double y, double width)
     {
         var blocks = _markdownCache.GetValue(part, static item => new(ChatMarkdown.Parse(item.Text))).Blocks;
-        var photos = layout.Message.AttachedFiles.Where(photo => photo.IsSubjectPhoto && TryGetImageBitmap(photo.PreviewPath) is not null).Take(3).ToArray();
+        var photos = layout.Message.AttachedFiles.Where(photo => photo.IsSubjectPhoto && GoogleEntryPhotoService.IsRelevantSavedPhoto(photo, layout.Message.AttachedFiles) && TryGetImageBitmap(photo.PreviewPath) is not null).Take(4).ToArray();
         if (photos.Length > 0 && ReferenceEquals(layout.Message.Parts.FirstOrDefault(item => item.IsText), part))
             return BuildResearchArticle(layout, blocks, photos, x, y, width);
         return BuildMarkdownBlocks(layout, blocks, x, y, width);
@@ -64,7 +64,7 @@ public sealed partial class ChatTranscriptRenderControl
         return y;
     }
 
-    private double AddRichParagraph(MessageLayout layout, IReadOnlyList<ChatMarkdownRun> input, double x, double y, double width, double size)
+    private double AddRichParagraph(MessageLayout layout, IReadOnlyList<ChatMarkdownRun> input, double x, double y, double width, double size, TextAlignment alignment = TextAlignment.Left)
     {
         var runs = ResolveCitationRuns(input, layout.Message);
         var plain = string.Concat(runs.Select(run => run.Text));
@@ -88,7 +88,7 @@ public sealed partial class ChatTranscriptRenderControl
             offset += run.Text.Length;
         }
         var lineHeight = Math.Max(ChatTextLineHeight, size * 1.5);
-        var text = new TextLayout(plain, new Typeface(uiFont), size, bodyBrush, textWrapping: TextWrapping.Wrap,
+        var text = new TextLayout(plain, new Typeface(uiFont), size, bodyBrush, textAlignment: alignment, textWrapping: TextWrapping.Wrap,
             maxWidth: Math.Max(1, width), lineHeight: lineHeight, textStyleOverrides: styles);
         var starts = text.TextLines.Select(line => line.FirstTextSourceIndex).ToArray();
         var lines = text.TextLines.Select(line => plain.Substring(Math.Min(plain.Length, line.FirstTextSourceIndex),
@@ -131,33 +131,37 @@ public sealed partial class ChatTranscriptRenderControl
     private double BuildInformationCard(MessageLayout layout, ChatMarkdownBlock block, double x, double y, double width)
     {
         var top = y;
-        const double padding = 12;
+        var padding = Math.Clamp(ChatTextFontSize * 1.4, 16, 24);
         var innerWidth = Math.Max(1, width - padding * 2);
         var photo = FindEntryPhoto(block, layout.Message);
-        var sidePhoto = photo is not null && innerWidth >= 450;
-        var textWidth = sidePhoto ? innerWidth - 180 : innerWidth;
-        y = AddRichParagraph(layout, [new(block.Marker + " " + block.PlainText, Bold: true)], x + padding, y + padding, textWidth, ChatTextFontSize * 1.14);
+        var sidePhoto = photo is not null && innerWidth >= Math.Max(540, ChatTextFontSize * 29);
+        var photoWidth = sidePhoto ? Math.Min(260, innerWidth * .34) : innerWidth;
+        var textWidth = sidePhoto ? innerWidth - photoWidth - 24 : innerWidth;
+        if (!string.IsNullOrWhiteSpace(block.Marker))
+            y = AddRichParagraph(layout, [new(block.Marker.TrimEnd('.'), Bold: true)], x + padding, y + padding, textWidth, ChatMetaFontSize);
+        else y += padding;
+        y = AddRichParagraph(layout, [new(block.PlainText, Bold: true)], x + padding, y, textWidth, ChatTextFontSize * 1.3) + 6;
         var photoBottom = y;
         if (photo is not null)
         {
-            var rect = sidePhoto ? new Rect(x + width - padding - 164, top + padding, 164, 112)
-                : new Rect(x + padding, y, Math.Min(232, innerWidth), 140);
+            var rect = sidePhoto ? new Rect(x + width - padding - photoWidth, top + padding, photoWidth, photoWidth * .7)
+                : new Rect(x + padding, y, photoWidth, Math.Min(240, photoWidth * .62));
             layout.Attachments.Add(new AttachmentLayout(rect, photo.DisplayTitle, photo, true));
             layout.Hits.Add(new HitRegion(rect, ChatTranscriptHitKind.OpenImagePreview, photo.PreviewPath));
             layout.EmbeddedWebPhotos.Add(photo.Path);
-            photoBottom = AddRichParagraph(layout, [new("Photo source", Url: photo.Path)], rect.X, rect.Bottom + 3, rect.Width, ChatMetaFontSize);
+            photoBottom = AddRichParagraph(layout, [new("Source photo ↗", Url: photo.Path)], rect.X + 2, rect.Bottom + 5, rect.Width - 4, ChatMetaFontSize) + 5;
             if (!sidePhoto) y = photoBottom;
         }
         y = BuildMarkdownBlocks(layout, block.Children ?? [], x + padding, y, textWidth);
         var bottom = Math.Max(y, photoBottom) + padding - 4;
         layout.MarkdownDecorations.Add(new(new Rect(x, top, width, bottom - top), "card"));
-        return bottom + 10;
+        return bottom + 16;
     }
 
     private ContextControlAttachmentViewModel? FindEntryPhoto(ChatMarkdownBlock block, LocalLlmChatMessageViewModel message, bool allowCitedSource = true)
     {
         var entry = GoogleEntryPhotoService.NormalizeName(block.PlainText);
-        var matched = message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && !string.IsNullOrWhiteSpace(source.EntryTitle)
+        var matched = message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && !string.IsNullOrWhiteSpace(source.EntryTitle) && GoogleEntryPhotoService.IsRelevantSavedPhoto(source, message.AttachedFiles)
             && GoogleEntryPhotoService.NormalizeName(source.EntryTitle) == entry && TryGetImageBitmap(source.PreviewPath) is not null);
         if (matched is not null) return matched;
         if (!allowCitedSource) return null;
@@ -166,7 +170,7 @@ public sealed partial class ChatTranscriptRenderControl
         var name = Name(block.PlainText);
         if (name.Length < 8) return null;
         var body = Details(block);
-        return message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && Name(source.Label).Contains(name, StringComparison.Ordinal)
+        return message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !source.IsSubjectPhoto && GoogleEntryPhotoService.IsRelevantSavedPhoto(source, message.AttachedFiles) && Name(source.Label).Contains(name, StringComparison.Ordinal)
             && source.Label.StartsWith('[') && source.Label.IndexOf(']') is var end && end > 0 && body.Contains(source.Label[..(end + 1)], StringComparison.Ordinal)
             && TryGetImageBitmap(source.PreviewPath) is not null);
     }

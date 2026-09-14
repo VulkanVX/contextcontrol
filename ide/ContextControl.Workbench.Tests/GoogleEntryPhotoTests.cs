@@ -39,7 +39,7 @@ internal static class GoogleEntryPhotoTests
         var search = new GoogleSearchResult("pizza Vilnius", GoogleSearchContext.SearchUrl("pizza Vilnius"), [Source("Top pizza places", image)]);
         var research = new GoogleResearchResult(search, []);
         var browser = new FixtureBrowser(query => new GoogleSearchResult(query, GoogleSearchContext.SearchUrl(query),
-            query.Contains("Garden") ? [Source("Garden Cafe - official", image)] : [Source("Monstro - official", image)]));
+            query.Contains("Garden") ? [Source("Garden Cafe - Vilnius official", image)] : [Source("Monstro - Vilnius official", image)]));
         var found = new List<GoogleEntryPhoto>();
         var singlePhoto = new List<GoogleEntryPhoto>();
         await GoogleEntryPhotoService.LoadAsync("A prose answer without a list.", new GoogleResearchResult(new GoogleSearchResult("Nvidia 5090 photo", GoogleSearchContext.SearchUrl("Nvidia 5090 photo"),
@@ -50,6 +50,11 @@ internal static class GoogleEntryPhotoTests
         Check(found.Count == 1 && found[0].EntryTitle == "Garden Café", "Attach the correct named photo and avoid reusing an identical image for another entry.");
         Check(browser.Queries.Count is >= 2 and <= 4 && browser.Queries[0].Contains("\"Garden Café\"") && !browser.Queries[0].Contains("[1]"), "Use bounded named-venue queries and retry an unusable photo without sending the answer.");
         Check(found.All(photo => File.Exists(photo.PreviewPath)), "Only attach decoded and cached photos.");
+        var ambiguous = research with { Search = search with { Sources = [Source("Garden Cafe and Monstro - Vilnius", image)] } };
+        var ambiguousPhotos = new List<GoogleEntryPhoto>();
+        var ambiguousBrowser = new FixtureBrowser(query => new GoogleSearchResult(query, "https://google.com/search", []));
+        await GoogleEntryPhotoService.LoadAsync(numbered, ambiguous, ambiguousBrowser, ambiguousPhotos.Add, default, cache, onlyEntries: ["Garden Café"]);
+        Check(ambiguousPhotos.Count == 0, "A single-entry live job must still know the other entry names and reject a shared roundup hero.");
         Check(GoogleResearchService.PhotoSubject("What is wow forever? Show me photos of it") == "World of Warcraft forever", "Resolve the photo pronoun to the named topic in the same request.");
         Check(GoogleEntryPhotoService.IsEntrySource("WoW Forever", Source("World of Warcraft: Forever Found Photos Panel Recap"), ["WoW Forever"], true), "WoW abbreviations must match the official full title.");
         Check(GoogleEntryPhotoService.MentionsName("World of Warcraft Forever", "Warcraft Forever logo"), "Recognize the shorter official Warcraft title.");
@@ -67,11 +72,41 @@ internal static class GoogleEntryPhotoTests
         var noNetwork = new FixtureBrowser(_ => throw new Exception("Named photos from an already-read page must not re-search."));
         await GoogleEntryPhotoService.LoadAsync(numbered, gallery, noNetwork, galleryPhotos.Add, default, cache);
         Check(galleryPhotos.Count == 2 && galleryPhotos.Select(photo => photo.EntryTitle).SequenceEqual(entries), "A multi-place article can supply each venue's own section-labelled image.");
-        var gameGallery = gallery with { PhotoSubject = "WoW Forever", Search = gallery.Search! with { Sources = [Source("World of Warcraft: Forever")] },
+        var gameGallery = gallery with { PhotoSubject = "WoW Forever", Search = gallery.Search! with { Query = "WoW Forever", Sources = [Source("World of Warcraft: Forever")] },
             Pages = [new(1, "Game article", true, [new(image, "Riverglades", "Riverglades"), new(secondImage, "Mount Hyjal", "Mount Hyjal")])] };
         var gamePhotos = new List<GoogleEntryPhoto>();
         await GoogleEntryPhotoService.LoadAsync("Explanation", gameGallery, browser, gamePhotos.Add, default, cache);
         Check(gamePhotos.Count == 2 && gamePhotos.All(photo => photo.IsSubjectPhoto) && gamePhotos[1].Section == "Mount Hyjal", "An explicit subject can retain several distinct captioned article images.");
+
+        foreach (var wrong in new[] {
+            new GoogleSearchSource("Human horde confirmed : r/pokemon", "https://www.reddit.com/r/pokemon/comments/2d5s4j/human_horde_confirmed/", ""),
+            new GoogleSearchSource("Kobold Anti-Gnome Alliance", "https://steamcommunity.com/id/KoboldCoterie/recommended/", ""),
+            new GoogleSearchSource("Dwarf Horde by Imre Halapi", "https://unityleague.gg/decklists/example/", "Dwarven Mauler") })
+            Check(!GoogleEntryPhotoService.MatchesPhotoTopic("Human (Horde)", "new racial abilities in World of Warcraft Forever", wrong), "Reject the unrelated photo sources from the reported racials chat.");
+        Check(GoogleEntryPhotoService.MatchesPhotoTopic("Human", "new racial abilities in WoW Forever", new("Human racials", "https://www.wowhead.com/forever/human", "")), "Keep a race page whose actual source identifies Warcraft.");
+        Check(!GoogleEntryPhotoService.MatchesPhotoTopic("Garden Cafe", "best bars Tallinn", new("Garden Cafe London", "https://example.com/london", "London venue")), "A same-name venue in another city is not a matching photo.");
+        Check(browser.Queries.All(query => query.Contains("pizza Vilnius") || query.Contains("WoW Forever")), "Photo fallback queries must preserve the topic.");
+
+        var liveSearch = new GoogleResearchResult(new GoogleSearchResult("World of Warcraft Forever", "https://google.com/search", [Source("World of Warcraft Forever")]),
+            [new(1, "Game article", true, [new(image, "Riverglades", "Riverglades")])], "World of Warcraft Forever");
+        var early = new TaskCompletionSource<GoogleEntryPhoto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (var live = new GoogleLivePhotos(liveSearch, blockedBrowser(), photo => early.TrySetResult(photo), default))
+        {
+            await early.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Check(live.PhotoCount == 1, "Explicit subject photo loading begins without waiting for a completed answer.");
+            await live.CompleteAsync("An answer that arrived later.");
+            Check(live.PhotoCount == 1, "Final completion reuses the live worker rather than downloading the same image again.");
+        }
+        static IGoogleResearchBrowser blockedBrowser() => new FixtureBrowser(_ => throw new InvalidOperationException("No further sources"));
+        var observed = new FixtureBrowser(query => new GoogleSearchResult(query, "https://google.com/search", []));
+        using (var live = new GoogleLivePhotos(research, observed, _ => { }, default))
+        {
+            live.Observe("1. **Garden Ca");
+            Check(observed.Queries.Count == 0, "Do not search a partially streamed entry name.");
+            live.Observe("1. **Garden Café**\n   - In Vilnius [1]\n");
+            await live.CompleteAsync("1. **Garden Café**\n   - In Vilnius [1]\n");
+            Check(observed.Queries.Count == 2, "A complete entry starts its bounded photo search while text is streaming, without repeating at completion.");
+        }
 
         using var stop = new CancellationTokenSource();
         stop.Cancel();

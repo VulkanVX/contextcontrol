@@ -5,6 +5,19 @@ namespace ContextControl.Workbench.ViewModels;
 public sealed partial class ContextControlViewModel
 {
     private IGoogleResearchBrowser? _googleBrowser;
+    private sealed record ResearchSessionHandle(IGoogleResearchSession Browser, ChatRequestProgressViewModel Progress, System.ComponentModel.PropertyChangedEventHandler Handler);
+    private readonly Dictionary<LocalLlmChatMessageViewModel, ResearchSessionHandle> _researchSessions = [];
+    private readonly Dictionary<LocalLlmChatMessageViewModel, GoogleLivePhotos> _livePhotos = [];
+    private IGoogleResearchBrowser BrowserFor(LocalLlmChatMessageViewModel assistant) => _researchSessions.TryGetValue(assistant, out var session) ? session.Browser
+        : _googleBrowser ?? throw new InvalidOperationException("Research browser is unavailable.");
+    private void EndGoogleResearch(LocalLlmChatMessageViewModel assistant)
+    {
+        if (_livePhotos.Remove(assistant, out var photos)) photos.Dispose();
+        _messageResearch.Remove(assistant);
+        if (!_researchSessions.Remove(assistant, out var session)) return;
+        session.Progress.PropertyChanged -= session.Handler;
+        session.Browser.Dispose();
+    }
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<LocalLlmChatMessageViewModel, GoogleResearchResult> _messageResearch = new();
 
     public bool IsGoogleSearchEnabled
@@ -27,6 +40,20 @@ public sealed partial class ContextControlViewModel
     public RelayCommand<object> ToggleGoogleSearchCommand { get; private set; } = null!;
 
     public void SetGoogleResearchBrowser(IGoogleResearchBrowser browser) => _googleBrowser = browser;
+    private Action<string, string>? _openResearchArticle;
+    public void SetResearchArticleOpener(Action<string, string> open) => _openResearchArticle = open;
+    private RelayCommand<LocalLlmChatMessageViewModel>? _openResearchArticleCommand;
+    public RelayCommand<LocalLlmChatMessageViewModel> OpenResearchArticleCommand => _openResearchArticleCommand ??= new(message =>
+    {
+        if (!ResearchArticlePage.CanOpen(message)) return;
+        var article = ResearchArticlePage.Build(message!);
+        _openResearchArticle?.Invoke(article.Title, article.Html);
+    });
+    public bool IsBrowserActionPreviewEnabled
+    {
+        get => _settings.BrowserActionPreviewEnabled;
+        set { if (_settings.BrowserActionPreviewEnabled == value) return; _settings.BrowserActionPreviewEnabled = value; OnPropertyChanged(); SaveSettingsQuietly(); }
+    }
 
     private async Task<string> PrepareGooglePromptAsync(string modelId, string question, string prompt, bool enabled,
         ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant, ChatRequestProgressViewModel progress,
@@ -34,6 +61,13 @@ public sealed partial class ContextControlViewModel
     {
         if (!enabled) return prompt;
         if (_googleBrowser is null) throw new InvalidOperationException("Google research is unavailable. Open this chat in the ContextControl desktop app, or switch Google off.");
+        if (_googleBrowser is IGoogleResearchSessionFactory factory && !_researchSessions.ContainsKey(assistant))
+        {
+            var browser = factory.CreateSession(session.Id, session.Title, () => CancelCodexRequest(progress), cancellationToken);
+            System.ComponentModel.PropertyChangedEventHandler handler = (_, e) => { if (e.PropertyName == nameof(progress.Status)) browser.SetStatus(progress.Status); };
+            progress.PropertyChanged += handler;
+            _researchSessions.Add(assistant, new(browser, progress, handler));
+        }
         void UpdateStatus(string status)
         {
             progress.Status = status;
@@ -48,7 +82,7 @@ public sealed partial class ContextControlViewModel
             token.ThrowIfCancellationRequested();
             return GoogleResearchService.PlannerText(answer);
         }
-        var result = await GoogleResearchService.ResearchAsync(question, AskModel, _googleBrowser, UpdateStatus, cancellationToken, knowledgeGap);
+        var result = await GoogleResearchService.ResearchAsync(question, AskModel, BrowserFor(assistant), UpdateStatus, cancellationToken, knowledgeGap);
         cancellationToken.ThrowIfCancellationRequested();
         var prepared = GoogleSearchContext.AugmentPrompt(prompt, result, contextTokens);
         if (result.Search is { } search)
@@ -60,9 +94,17 @@ public sealed partial class ContextControlViewModel
             }
             _messageResearch.Remove(assistant);
             _messageResearch.Add(assistant, result);
+            if (_livePhotos.Remove(assistant, out var previous)) previous.Dispose();
+            _livePhotos[assistant] = new GoogleLivePhotos(result, BrowserFor(assistant), photo =>
+            {
+                assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel(photo.SourceTitle, photo.SourceUrl, "web", photo.PreviewPath, photo.EntryTitle)
+                    { IncludeInPrompt = false, PhotoCaption = photo.Caption, PhotoSection = photo.Section, PhotoKind = photo.Kind, IsSubjectPhoto = photo.IsSubjectPhoto });
+                RefreshLiveAssistantMessage(session, assistant);
+            }, cancellationToken);
         }
         RefreshLiveAssistantMessage(session, assistant);
         UpdateStatus(result.DidSearch ? "Writing an answer with sources…" : "Writing the answer…");
+        if (!result.DidSearch) EndGoogleResearch(assistant);
         return prepared;
     }
 
@@ -105,17 +147,11 @@ public sealed partial class ContextControlViewModel
         ChatRequestProgressViewModel progress, CancellationToken cancellationToken)
     {
         if (_googleBrowser is null || !_messageResearch.TryGetValue(assistant, out var research)) return;
-        _messageResearch.Remove(assistant);
         if (GoogleEntryPhotoService.EntryNames(assistant.VisibleText).Count == 0 && research.PhotoSubject is null) return;
-        var photoCount = 0;
-        progress.Status = "Answer ready · finding photos for its entries…";
-        await GoogleEntryPhotoService.LoadAsync(assistant.VisibleText, research, _googleBrowser, photo =>
-        {
-            photoCount++;
-            assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel(photo.SourceTitle, photo.SourceUrl, "web", photo.PreviewPath, photo.EntryTitle)
-                { IncludeInPrompt = false, PhotoCaption = photo.Caption, PhotoSection = photo.Section, PhotoKind = photo.Kind, IsSubjectPhoto = photo.IsSubjectPhoto });
-            RefreshLiveAssistantMessage(session, assistant);
-        }, cancellationToken, status: value => progress.Status = value);
+        if (!_livePhotos.TryGetValue(assistant, out var photos)) return;
+        progress.Status = "Answer ready · finishing photos…";
+        await photos.CompleteAsync(assistant.VisibleText);
+        var photoCount = photos.PhotoCount;
         AppendTerminalOutput($"Photo lookup: {photoCount} matching source photo(s) attached.");
         var reconciled = GoogleEvidenceText.WithoutPhotoCapabilityClaims(assistant.RawText);
         if (reconciled != assistant.RawText)

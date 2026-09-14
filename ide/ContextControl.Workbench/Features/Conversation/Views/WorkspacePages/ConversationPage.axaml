@@ -135,6 +135,7 @@
                       CodeFontFamily="{Binding CodeFontFamily}"
                       ChatFontSize="{Binding ChatWindowFontSize}"
                       OpenAttachmentCommand="{Binding OpenAttachmentCommand}"
+                      OpenArticleCommand="{Binding ContextControl.OpenResearchArticleCommand}"
                       CopyChatTextCommand="{Binding ContextControl.CopyChatTextCommand}"
                       CreateProjectFromMessageCommand="{Binding ContextControl.CreateProjectFromMessageCommand}"
                       ToggleSnippetCommand="{Binding ContextControl.ToggleSnippetCommand}"
@@ -174,11 +175,35 @@
                 </Border>
                 </Grid>
                 <Border Grid.Column="1" Grid.Row="1" Padding="8,4">
+                  <StackPanel Spacing="5">
+                    <Expander Header="Browser actions" IsExpanded="{Binding ContextControl.IsBrowserActionPreviewEnabled, Mode=TwoWay}" IsVisible="{Binding BrowserPane.HasResearchTabs}" HorizontalAlignment="Stretch" Background="{DynamicResource ChatSnippetShellBrush}" BorderThickness="0" Padding="0">
+                      <ScrollViewer MaxHeight="210" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding BrowserPane.ResearchTabs}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BrowserTabViewModel">
+                              <Button Margin="0,0,0,5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" MinHeight="112" Padding="10"
+                                  Background="{DynamicResource ChatSnippetShellBrush}" BorderBrush="{DynamicResource ChatSnippetBorderBrush}" BorderThickness="1" CornerRadius="10"
+                                  Command="{Binding DataContext.BrowserPane.OpenResearchTabCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" ToolTip.Tip="Open this working tab in Browser">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                  <Image Source="{Binding ActionPreviewImage}" Width="170" Height="96" Stretch="UniformToFill" />
+                                  <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <controls:ActivityLineControl Text="{Binding AgentStatus}" IsActive="{Binding IsAgentWorking}" Height="22" Foreground="{DynamicResource TextPrimaryBrush}" Accent="{DynamicResource AccentBrush}" />
+                                    <TextBlock Text="{Binding ActionPreview}" FontSize="10" TextWrapping="Wrap" MaxLines="4" Foreground="{DynamicResource TextMutedBrush}" />
+                                  </StackPanel>
+                                </Grid>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </Expander>
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                     <Button Content="Reasoning ↗" Click="OnOpenReasoning" Classes="cc-prompt-chip" ToolTip.Tip="Open live reasoning, grouped by reply" />
                     <TextBlock Grid.Column="1" Text="{Binding ContextControl.SelectedChatActivity.CompactStatus}" Classes="history-meta" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Text="{Binding ContextControl.SelectedChatActivity.ElapsedLabel}" Classes="history-meta" VerticalAlignment="Center" />
                   </Grid>
+                  </StackPanel>
                 </Border>
               </Grid>
             </Border>

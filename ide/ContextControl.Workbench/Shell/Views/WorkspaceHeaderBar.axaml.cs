@@ -14,6 +14,7 @@ public sealed partial class WorkspaceHeaderBar : UserControl
     }
 
     private MainWindow? OwnerWindow => this.FindAncestorOfType<MainWindow>();
+    private void OnResearchActivityClick(object? sender, RoutedEventArgs e) => OwnerWindow?.OnResearchActivityClick(sender, e);
 
     private void OnBrowserTabPointerPressed(object? sender, PointerPressedEventArgs e) => OwnerWindow?.OnBrowserTabPointerPressed(sender, e);
 

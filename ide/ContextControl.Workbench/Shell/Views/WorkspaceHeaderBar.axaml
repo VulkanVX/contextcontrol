@@ -22,6 +22,7 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:WorkbenchModeOptionViewModel}">
+                      <StackPanel Orientation="Horizontal" Spacing="2">
                       <Button
                           Classes="workspace-mode-button"
                           Classes.active="{Binding IsActive}"
@@ -32,6 +33,17 @@
                           <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
+                      <Border IsVisible="{Binding IsBrowserOption}" VerticalAlignment="Center">
+                        <Button Classes="header-mini" Click="OnResearchActivityClick"
+                                IsVisible="{Binding DataContext.BrowserPane.HasActiveAgents, RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip.Tip="Active research chats have their own browser tabs. Open a working tab.">
+                          <controls:ActivityLineControl Width="128" FontSize="10" Height="22"
+                              Text="{Binding DataContext.BrowserPane.AgentActivityLabel, RelativeSource={RelativeSource AncestorType=Window}}"
+                              IsActive="{Binding DataContext.BrowserPane.HasActiveAgents, RelativeSource={RelativeSource AncestorType=Window}}"
+                              Foreground="{DynamicResource TextPrimaryBrush}" Accent="{DynamicResource AccentBrush}" />
+                        </Button>
+                      </Border>
+                      </StackPanel>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -64,16 +76,20 @@
                             Classes.active="{Binding IsActive}"
                             PointerPressed="OnBrowserTabPointerPressed">
                           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                            <StackPanel Spacing="1" MaxWidth="210">
                             <TextBlock
                                 Text="{Binding Title}"
                                 Classes="browser-tab-title"
                                 ToolTip.Tip="{Binding Url}" />
+                              <controls:ActivityLineControl Text="{Binding AgentStatus}" IsActive="{Binding IsAgentWorking}" IsVisible="{Binding IsResearch}"
+                                  FontSize="9" Height="20" Width="190" Foreground="{DynamicResource TextMutedBrush}" Accent="{DynamicResource AccentBrush}" ToolTip.Tip="{Binding AgentStatus}" />
+                            </StackPanel>
                             <Button
                                 Grid.Column="1"
                                 Classes="browser-tab-close"
                                 Content="x"
                                 Click="OnBrowserTabCloseClick"
-                                ToolTip.Tip="Close tab" />
+                                ToolTip.Tip="{Binding CloseToolTip}" />
                           </Grid>
                         </Border>
                       </DataTemplate>

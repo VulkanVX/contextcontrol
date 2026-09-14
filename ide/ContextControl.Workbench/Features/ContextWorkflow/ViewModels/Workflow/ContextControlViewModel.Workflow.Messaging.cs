@@ -701,6 +701,7 @@ public sealed partial class ContextControlViewModel
     {
         if (_localChatRequests.Remove(item, out var handle))
         {
+            EndGoogleResearch(handle.LiveAssistant);
             handle.Cancellation.Dispose();
             (CancelCodexRequestCommand as RelayCommand<ChatRequestProgressViewModel>)?.RaiseCanExecuteChanged();
         }
@@ -773,7 +774,7 @@ public sealed partial class ContextControlViewModel
         });
     }
 
-    private static IProgress<LocalLlmGenerationProgress> CreateLiveAssistantProgress(
+    private IProgress<LocalLlmGenerationProgress> CreateLiveAssistantProgress(
         LocalLlmChatMessageViewModel liveAssistant,
         IProgress<LocalLlmGenerationProgress> downstream)
     {
@@ -820,6 +821,7 @@ public sealed partial class ContextControlViewModel
             {
                 liveAssistant.IsAwaitingAnswer = false;
                 liveAssistant.UpdateLiveStatus(answer.ToString());
+                if (_livePhotos.TryGetValue(liveAssistant, out var photos)) photos.Observe(answer.ToString());
             }
             else
             {

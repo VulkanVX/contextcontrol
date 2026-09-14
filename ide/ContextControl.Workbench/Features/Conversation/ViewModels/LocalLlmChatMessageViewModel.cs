@@ -14,7 +14,6 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     private string _capsuleSummary;
     private string _visibleText = "";
     private string _thinkingText = "";
-    private readonly DispatcherTimer _liveTypingTimer;
     private readonly DispatcherTimer _liveWaitingTimer;
     private bool _canShowLiveThinkingPlaceholder;
     private string _liveTargetText = "";
@@ -61,11 +60,6 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         };
         CreatedUtc = createdUtc ?? DateTime.UtcNow;
         Time = CreatedUtc.ToLocalTime().ToString("HH:mm");
-        _liveTypingTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(28)
-        };
-        _liveTypingTimer.Tick += (_, _) => TickLiveTyping();
         _liveWaitingTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(420)
@@ -327,71 +321,12 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     private void QueueLiveVisibleText(string text)
     {
         var target = text ?? "";
-        if (string.Equals(_liveTargetText, target, StringComparison.Ordinal)
-            && _liveVisibleTextLength >= target.Length)
-        {
-            return;
-        }
-
-        var visiblePrefix = _liveVisibleTextLength > 0 && _liveVisibleTextLength <= _liveTargetText.Length
-            ? _liveTargetText[.._liveVisibleTextLength]
-            : _visibleText;
-        var continues = !string.IsNullOrEmpty(visiblePrefix)
-            && target.StartsWith(visiblePrefix, StringComparison.Ordinal);
+        if (_liveTargetText == target && _liveVisibleTextLength == target.Length) return;
+        // Render everything the backend has delivered. Real streaming supplies its own cadence;
+        // a buffered/full response must not be replayed through a character animation.
         _liveTargetText = target;
-        _liveVisibleTextLength = continues ? Math.Min(visiblePrefix.Length, target.Length) : 0;
-        StartLiveTyping();
-        TickLiveTyping();
-    }
-
-    private void StartLiveTyping()
-    {
-        if (!_liveTypingTimer.IsEnabled)
-        {
-            _liveTypingTimer.Start();
-        }
-    }
-
-    private void TickLiveTyping()
-    {
-        var hasMore = false;
-        if (_liveVisibleTextLength < _liveTargetText.Length)
-        {
-            var remaining = _liveTargetText.Length - _liveVisibleTextLength;
-            _liveVisibleTextLength = Math.Min(_liveTargetText.Length, _liveVisibleTextLength + ResolveLiveTypingBatchSize(remaining));
-            ApplyLiveVisibleText(_liveTargetText[.._liveVisibleTextLength]);
-            hasMore = _liveVisibleTextLength < _liveTargetText.Length;
-        }
-
-        if (_liveThinkingVisibleTextLength < _liveThinkingTargetText.Length)
-        {
-            var remaining = _liveThinkingTargetText.Length - _liveThinkingVisibleTextLength;
-            _liveThinkingVisibleTextLength = Math.Min(
-                _liveThinkingTargetText.Length,
-                _liveThinkingVisibleTextLength + ResolveLiveTypingBatchSize(remaining));
-            _thinkingText = _liveThinkingTargetText[.._liveThinkingVisibleTextLength];
-            OnPropertyChanged(nameof(ThinkingText));
-            OnPropertyChanged(nameof(HasThinking));
-            hasMore |= _liveThinkingVisibleTextLength < _liveThinkingTargetText.Length;
-        }
-
-        if (!hasMore)
-        {
-            _liveTypingTimer.Stop();
-        }
-    }
-
-    private static int ResolveLiveTypingBatchSize(int remaining)
-    {
-        return remaining switch
-        {
-            > 4000 => 720,
-            > 1600 => 280,
-            > 520 => 96,
-            > 140 => 32,
-            > 48 => 14,
-            _ => 7
-        };
+        _liveVisibleTextLength = target.Length;
+        ApplyLiveVisibleText(target);
     }
 
     private void StartLiveWaiting()
@@ -448,7 +383,6 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
 
     private void StopLivePresentation()
     {
-        _liveTypingTimer.Stop();
         _isLiveWaitingActive = false;
         _isLiveThinkingPlaceholderActive = false;
         _liveWaitingTimer.Stop();

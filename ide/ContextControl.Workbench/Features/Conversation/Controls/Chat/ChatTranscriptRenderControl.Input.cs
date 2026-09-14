@@ -721,6 +721,7 @@ public sealed partial class ChatTranscriptRenderControl
         return kind switch
         {
             ChatTranscriptHitKind.OpenAttachment => OpenAttachmentCommand,
+            ChatTranscriptHitKind.OpenArticle => OpenArticleCommand,
             ChatTranscriptHitKind.CopyMessage => CopyChatTextCommand,
             ChatTranscriptHitKind.CreateProject => CreateProjectFromMessageCommand,
             ChatTranscriptHitKind.ToggleSnippet => ToggleSnippetCommand,

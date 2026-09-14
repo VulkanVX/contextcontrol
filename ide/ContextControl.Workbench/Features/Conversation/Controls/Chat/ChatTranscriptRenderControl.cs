@@ -23,6 +23,7 @@ public enum ChatTranscriptHitKind
 {
     None,
     OpenAttachment,
+    OpenArticle,
     OpenImagePreview,
     DownloadAttachment,
     CopyMessage,
@@ -47,6 +48,10 @@ public sealed partial class ChatTranscriptRenderControl : Control
 
     public static readonly StyledProperty<ICommand?> OpenAttachmentCommandProperty =
         AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(OpenAttachmentCommand));
+
+    public static readonly StyledProperty<ICommand?> OpenArticleCommandProperty =
+        AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(OpenArticleCommand));
+    public ICommand? OpenArticleCommand { get => GetValue(OpenArticleCommandProperty); set => SetValue(OpenArticleCommandProperty, value); }
 
     public static readonly StyledProperty<ICommand?> CopyChatTextCommandProperty =
         AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(CopyChatTextCommand));

@@ -6,7 +6,7 @@ namespace ContextControl.Workbench.Views;
 public sealed partial class MainWindow
 {
     private ChatMonitorWindow? _chatMonitorWindow;
-    private ContextControl.Workbench.Services.GoogleResearchBrowser? _googleResearchBrowser;
+    private ContextControl.Workbench.Services.WorkspaceResearchBrowser? _googleResearchBrowser;
 
     private void UpdateChatMonitor()
     {

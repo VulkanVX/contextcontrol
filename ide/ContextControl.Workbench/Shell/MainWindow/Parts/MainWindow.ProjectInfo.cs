@@ -94,6 +94,7 @@ public sealed partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
+                if (!IsVisible) return;
                 FitToWorkingArea();
                 RefreshHoveredScrollableMenus();
             }, DispatcherPriority.Background);

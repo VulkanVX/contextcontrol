@@ -37,7 +37,8 @@
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
         <StackPanel Spacing="6">
           <TextBlock Classes="field-label" Text="Google research for local models" />
-          <TextBlock Classes="muted" Text="Let any installed chat model decide when to search, write a Google query, choose pages to read, and answer with sources. Google may ask for consent or verification in the browser window." TextWrapping="Wrap" />
+          <TextBlock Classes="muted" Text="Let any installed chat model search Google, choose pages, and answer with sources. Each research chat uses its own tab in Browser. Google may ask for consent or verification there." TextWrapping="Wrap" />
+          <CheckBox Content="Show browser actions and page previews in chat" IsChecked="{Binding ContextControl.IsBrowserActionPreviewEnabled, Mode=TwoWay}" />
         </StackPanel>
         <ToggleSwitch Grid.Column="1" IsChecked="{Binding ContextControl.IsGoogleSearchEnabled, Mode=TwoWay}" OnContent="Auto" OffContent="Off" VerticalAlignment="Top" />
       </Grid>

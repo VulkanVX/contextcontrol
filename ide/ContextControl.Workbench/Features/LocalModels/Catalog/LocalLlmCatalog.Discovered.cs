@@ -30,7 +30,7 @@ public sealed partial class LocalLlmService
                 FourKSourceBudget, "Not benchmarked on this machine",
                 $"Official library tag verified {checkedAt}. {(row.GetProperty("vision").GetBoolean() ? "Vision model. " : "")}" +
                 "Download size is the published weight size, not total working memory. Check the source for architecture, license and minimum Ollama version. " + source,
-                cloud || !knownSize ? 0 : Math.Ceiling(gb + 1), cloud ? 0 : recommended, !cloud && knownSize, cloud ? "" : $"ollama pull {id}", SourceUrl: source));
+                cloud || !knownSize ? 0 : Math.Ceiling(gb + 1), cloud ? 0 : recommended, !cloud && knownSize, cloud ? "" : $"ollama pull {id}", SourceUrl: source, LibraryOrder: models.Count));
         }
         return models;
     }

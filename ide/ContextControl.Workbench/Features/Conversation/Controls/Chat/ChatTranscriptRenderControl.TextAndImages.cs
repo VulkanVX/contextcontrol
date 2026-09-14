@@ -771,6 +771,7 @@ public sealed partial class ChatTranscriptRenderControl
         public double Height { get; set; }
         public Rect CardRect { get; set; }
         public Rect HeaderRect { get; set; }
+        public Rect ModelTransitionIconRect { get; set; }
         public Rect HeaderMetaClip { get; set; }
         public Rect ToolIconRect { get; set; }
         public Rect TimeRect { get; set; }
