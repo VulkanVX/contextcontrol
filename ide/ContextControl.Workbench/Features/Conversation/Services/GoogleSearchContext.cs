@@ -84,8 +84,11 @@ public static partial class GoogleSearchContext
         if (research.Search is not { } result)
             return "ContextControl can search Google and read public webpages for you when a request needs research. No web search was needed or performed for this message.\n\nUSER REQUEST:\n" + userPrompt;
         if (result.Sources.Count == 0) throw new InvalidOperationException("Google returned no readable sources. No web context was sent to the model.");
-        // Reserve room for the unchanged user/capsule prompt, instructions, and the answer.
-        var budget = Math.Clamp((int)(contextTokens * 2.5) - userPrompt.Length - 2200, 0, 24000);
+        // Character counts only estimate tokens (each model has a different tokenizer).
+        // Reserve at least a third of a small context for the answer before budgeting
+        // source text, rather than letting research consume nearly the entire window.
+        var answerReserve = Math.Clamp(contextTokens / 3, 768, 4096);
+        var budget = Math.Clamp((int)((contextTokens - answerReserve) * 2.5) - userPrompt.Length - 1600, 0, 24000);
         if (budget < 1500) throw new InvalidOperationException("The prompt leaves too little room for web sources. Increase the local model context size or shorten the prompt, then retry.");
         var builder = new StringBuilder();
         builder.AppendLine($"ContextControl searched Google on {DateTime.UtcNow:yyyy-MM-dd} UTC; {research.Pages.Count(page => page.FullPageRead)} selected pages were readable. Answer the user's request using the evidence below.");

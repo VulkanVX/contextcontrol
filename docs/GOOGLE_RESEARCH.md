@@ -6,11 +6,13 @@ Ask normally: “Search for Avalonia's official documentation” or “What is t
 
 The request's progress row and Chat Monitor show planning, searching, choosing pages, reading and answering. Blocked or failed pages are marked unavailable, and the model gets one opportunity to choose alternatives from untried results. Research makes at most five distinct page attempts to collect up to three readable pages. The normal Stop button cancels the complete request, including time spent waiting for another chat's browser operation. Browser operations are serialized, and each result is checked against its own query or requested URL.
 
-## Source photo previews
+## Photos beside entries
 
-When a Google result includes a thumbnail, or a readable page supplies a preview image, its source appears as a compact photo card below the answer. Click the photo to open the larger image viewer; press **Escape** or **×** to close it. Click the caption to open the source page. Cards wrap to fit the chat width, and captions follow the chat font setting.
+The answer appears first. For lists of named places or products, ContextControl then looks for an individual source whose title matches each entry. A matching photo appears inside that entry's card, beside its details on wide windows and below its name on narrow windows. Numbered entries, repeated bold-name sections and named table rows are supported. General roundup images are not displayed in a gallery below the answer. Sources remain available as compact links.
 
-Previews are optional: blocked, missing, unsupported or oversized images leave a normal source link. Loading all photos has a six-second budget, and downloads and resizing run outside the UI thread. Photos are downscaled to at most 1280 pixels on the longest edge. The cache at `%LOCALAPPDATA%\ContextControl\WebPhotos` keeps up to 256 images, pruning older entries around 120 MB. Preview paths are saved in chat history; if an old cached image is removed, its source link remains available. Existing answers created before this feature retain their links; new research answers can include photos.
+Click the photo to enlarge it and **Photo source** to open its page. Entry names are matched conservatively, including accented spellings. Roundup titles, ambiguous multi-entry sources, recognizable logo URLs and repeated images are skipped. Matching uses source metadata; it does not establish the contents of the image through visual analysis.
+
+Photos are optional. A lookup can add the displayed entry name to the original Google query, with at most six entries, two candidate pages per entry, and a 30-second overall budget. Each image-loading batch has a six-second limit. Blocked, missing or oversized images leave the answer intact, and Stop cancels optional photo work without removing completed text. Downloads and resizing run outside the UI thread. Photos are downscaled to at most 1280 pixels on the longest edge. The cache at `%LOCALAPPDATA%\ContextControl\WebPhotos` keeps up to 256 images, pruning older entries around 120 MB. Entry identities and preview paths are saved in chat history. Existing answers retain their source links; new research answers can include matched photos.
 
 These are source illustrations for the user. Image bytes are not added to the model's text context, and this feature does not give a text-only model visual understanding. Ordinary public image requests use no browser cookies or sign-in credentials. A failed image request is not retried through an access-block workaround.
 
@@ -28,6 +30,7 @@ The separate browser profile is stored in `%LOCALAPPDATA%\ContextControl\GoogleR
 - Google may change its page layout, require verification, or return no readable results. In that case ContextControl reports the failure instead of silently answering as if research succeeded.
 - Page reading is limited to visible HTML text. PDFs, sign-in pages, blocked pages and redirects that do not match the selected source may be unavailable. HTTP failures and recognizable block screens are rejected as evidence; access restrictions are not bypassed. The final prompt clearly distinguishes page excerpts from search snippets and discloses when a requested source was unavailable.
 - Excerpts are bounded by the selected context window. Large project capsules may require a larger local context setting or a shorter prompt. Search and page selection add local model generation time before the final answer.
+- Web evidence reserves space for the answer using a conservative character estimate; exact token usage depends on the model. Thinking off is sent explicitly. A thinking-only result retries once with thinking off when it was previously enabled or unspecified. If it still cannot answer, the chat reports the failure alongside the source previews. Responses cut short by a context/output limit are labelled incomplete.
 - This supplies evidence to a model; it does not guarantee that every statement or citation in its answer is correct.
 
 The browser integration uses Microsoft's [WebView2 script evaluation API](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.executescriptasync). It does not depend on Google's Custom Search JSON API, which is [closed to new customers](https://developers.google.com/custom-search/v1/overview).
@@ -38,6 +41,7 @@ Offline checks, with no Google or model requests:
 
 ```powershell
 dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --google-research-regression
+dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --local-chat-regression
 dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --ui-experience-regression .tmp/ui-review
 ```
 
@@ -54,3 +58,11 @@ dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --google-b
 ```
 
 This last check opens the real Google browser window and may require user interaction for consent or verification. It prints the plans, source URLs and final answer. It is not part of unattended release checks.
+
+The original pizza-research failure has its own opt-in check at 4,096 context tokens:
+
+```powershell
+dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --google-pizza-smoke qwen3.5:4b-q4_K_M
+```
+
+For repeatable inference using synthetic source evidence without contacting Google, use `--local-chat-live qwen3.5:4b-q4_K_M` instead.

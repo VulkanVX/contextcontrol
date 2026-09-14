@@ -2,7 +2,7 @@
 
 namespace ContextControl.Workbench.ViewModels;
 
-public sealed class ContextControlAttachmentViewModel(string label, string path, string kind, string? previewPath = null) : ObservableObject
+public sealed class ContextControlAttachmentViewModel(string label, string path, string kind, string? previewPath = null, string? entryTitle = null) : ObservableObject
 {
     private static readonly (string Background, string Border, string Foreground)[] ExtensionPalette =
     [
@@ -21,6 +21,7 @@ public sealed class ContextControlAttachmentViewModel(string label, string path,
     private bool _includeInPrompt = true;
 
     public string PreviewPath { get; } = previewPath ?? "";
+    public string EntryTitle { get; } = entryTitle ?? "";
     public string ImagePreviewPath => Kind == "web" ? PreviewPath : Path;
 
     public string Label

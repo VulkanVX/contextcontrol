@@ -22,7 +22,28 @@ public static class ChatMarkdown
     public static IReadOnlyList<ChatMarkdownBlock> Parse(string text)
     {
         var document = Markdown.Parse(text, Pipeline);
-        return Blocks(document, 0);
+        return PromoteNamedSections(Blocks(document, 0));
+    }
+
+    private static IReadOnlyList<ChatMarkdownBlock> PromoteNamedSections(IReadOnlyList<ChatMarkdownBlock> blocks)
+    {
+        static bool IsTitle(ChatMarkdownBlock block) => block.Kind == "heading"
+            || block.Kind == "paragraph" && block.Runs.Count > 0 && block.Runs.All(run => run.Bold || string.IsNullOrWhiteSpace(run.Text));
+        static bool IsEntryTitle(ChatMarkdownBlock block) => IsTitle(block) && block.PlainText.Length is >= 4 and <= 120
+            && !System.Text.RegularExpressions.Regex.IsMatch(block.PlainText.Trim(), @"^(?:sources?|references?|additional notes|notes?|summary|conclusion|recommendations?|places and reviews)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Small models often emit bold names or headings instead of numbered entries.
+        // Promote repeated titled sections so they can use the same per-entry layout.
+        if (blocks.Count(IsEntryTitle) < 2) return blocks;
+        var result = new List<ChatMarkdownBlock>();
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            if (!IsEntryTitle(block) || i + 1 >= blocks.Count || blocks[i + 1].Kind is not ("paragraph" or "listItem")) { result.Add(block); continue; }
+            var children = new List<ChatMarkdownBlock>();
+            while (i + 1 < blocks.Count && !IsTitle(blocks[i + 1]) && blocks[i + 1].Kind is "paragraph" or "listItem") children.Add(blocks[++i]);
+            result.Add(new ChatMarkdownBlock("card", block.Runs, Children: children));
+        }
+        return result;
     }
 
     private static IReadOnlyList<ChatMarkdownBlock> Blocks(ContainerBlock container, int depth)
@@ -79,8 +100,10 @@ public static class ChatMarkdown
                     result.Add(new("code", [new(code.Lines.ToString(), Code: true)]));
                     break;
                 case HtmlBlock html:
-                    // Literal HTML is text, never a browser or executable control.
-                    result.Add(new("paragraph", [new(html.Lines.ToString())]));
+                    // Some small models mix HTML detail lists into Markdown entries.
+                    // Convert their basic typography to semantic text, without a web
+                    // renderer, external image loads, attributes or executable content.
+                    result.AddRange(Blocks(Markdown.Parse(HtmlDetailsAsMarkdown(html.Lines.ToString()), Pipeline), depth));
                     break;
                 case ContainerBlock nested:
                     result.AddRange(Blocks(nested, depth + 1));
@@ -91,6 +114,24 @@ public static class ChatMarkdown
             }
         }
         return result;
+    }
+
+    private static string HtmlDetailsAsMarkdown(string html)
+    {
+        static string Replace(string value, string pattern, string replacement) => System.Text.RegularExpressions.Regex.Replace(
+            value, pattern, replacement, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline, TimeSpan.FromSeconds(1));
+        var text = Replace(html, @"<(script|style)\b[^>]*>.*?</\1\s*>", "");
+        text = Replace(text, @"<!--.*?-->", "");
+        text = Replace(text, @"</?(?:strong|b)\b[^>]*>", "**");
+        text = Replace(text, @"</?(?:em|i)\b[^>]*>", "*");
+        text = Replace(text, @"<br\s*/?>", "\n");
+        text = Replace(text, @"<li\b[^>]*>", "\n- ");
+        text = Replace(text, @"</(?:li|p|div|section|ul|ol)\s*>", "\n");
+        text = Replace(text, @"<(?:p|div|section|ul|ol)\b[^>]*>", "\n");
+        text = Replace(text, @"</?[a-z][^>]*>", "");
+        // Escape any incomplete tag or declaration that remains, so reparsing can
+        // never recurse into another HTML block (including a bare DOCTYPE).
+        return text.Replace("<", "&lt;", StringComparison.Ordinal).Replace(">", "&gt;", StringComparison.Ordinal).Trim();
     }
 
     private static bool IsTitledEntry(EmphasisInline title, IReadOnlyList<ChatMarkdownBlock> children)

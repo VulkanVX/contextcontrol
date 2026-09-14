@@ -22,6 +22,24 @@ if (args.Contains("--google-research-regression"))
     return;
 }
 
+if (args.Contains("--google-pizza-smoke"))
+{
+    GoogleBrowserTests.Run(args.SkipWhile(arg => arg != "--google-pizza-smoke").Skip(1).FirstOrDefault() ?? "qwen3.5:4b-q4_K_M", pizza: true);
+    return;
+}
+
+if (args.Contains("--local-chat-regression"))
+{
+    await LocalLlmChatTests.Run();
+    return;
+}
+
+if (args.Contains("--local-chat-live"))
+{
+    await LocalLlmChatTests.RunLive(args.SkipWhile(arg => arg != "--local-chat-live").Skip(1).FirstOrDefault() ?? "qwen3.5:4b-q4_K_M");
+    return;
+}
+
 if (args.Contains("--ui-experience-regression"))
 {
     UiExperienceTests.Run(args.SkipWhile(arg => arg != "--ui-experience-regression").Skip(1).FirstOrDefault());

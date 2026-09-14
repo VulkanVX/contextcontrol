@@ -10,13 +10,14 @@ using Microsoft.Web.WebView2.Core;
 
 internal static class GoogleBrowserTests
 {
-    public static void Run(string? model)
+    public static void Run(string? model, bool pizza = false)
     {
         if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("This opt-in browser check requires Windows.");
         Exception? failure = null;
         var thread = new Thread(() =>
         {
             GoogleBrowserTestApp.Model = model;
+            GoogleBrowserTestApp.Pizza = pizza;
             GoogleBrowserTestApp.Failed = ex => failure = ex;
             try { AppBuilder.Configure<GoogleBrowserTestApp>().UsePlatformDetect().WithInterFont().StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown); }
             catch (Exception ex) { failure = ex; }
@@ -31,6 +32,7 @@ internal static class GoogleBrowserTests
 public sealed class GoogleBrowserTestApp : Application
 {
     internal static string? Model;
+    internal static bool Pizza;
     internal static Action<Exception>? Failed;
     public override void Initialize() => Styles.Add(new FluentTheme());
 
@@ -92,12 +94,13 @@ public sealed class GoogleBrowserTestApp : Application
                     var local = new LocalLlmService();
                     async Task<string> Ask(string prompt, CancellationToken token)
                     {
-                        var response = await local.SendChatAsync(new LocalLlmRequest(Model!, prompt, "research-test", [], 8192, Think: false, MaxOutputTokens: 256), null, null, token);
+                        var response = await local.SendChatAsync(new LocalLlmRequest(Model!, prompt, "research-test", [], Pizza ? 4096 : 8192, Think: false, MaxOutputTokens: 256), null, null, token);
                         if (!response.Succeeded) throw new InvalidOperationException(response.Status);
                         Console.WriteLine("MODEL PLAN: " + response.Message);
                         return response.Message ?? "";
                     }
-                    const string question = "Search Google for the official Avalonia UI documentation. Open a result and briefly explain what Avalonia is, citing the source.";
+                    var question = Pizza ? "Search for pizza places in Vilnius. Suggest three places with citations in under 150 words."
+                        : "Search Google for the official Avalonia UI documentation. Open a result and briefly explain what Avalonia is, citing the source.";
                     var researchTask = GoogleResearchService.ResearchAsync(question, Ask, researchBrowser, Console.WriteLine, deadline.Token);
                     for (var tick = 0; tick < 15 && !researchTask.IsCompleted; tick++) await Task.Delay(1000, deadline.Token);
                     if (!researchTask.IsCompleted)
@@ -116,9 +119,24 @@ public sealed class GoogleBrowserTestApp : Application
                     var photoCount = previews.Count(File.Exists);
                     if (photoCount == 0) throw new InvalidOperationException("Live research did not produce any cached source photo previews.");
                     Console.WriteLine($"Live source photo previews passed: {photoCount} decoded and cached images.");
-                    var response = await local.SendChatAsync(new LocalLlmRequest(Model, GoogleSearchContext.AugmentPrompt(question, research, 8192), "research-test", [], 8192, MaxOutputTokens: 600), null, null, deadline.Token);
+                    var context = Pizza ? 4096 : 8192;
+                    var response = await local.SendChatAsync(new LocalLlmRequest(Model, GoogleSearchContext.AugmentPrompt(question, research, context), "research-test", [], context, Think: false, MaxOutputTokens: 600), null, null, deadline.Token);
                     if (!response.Succeeded || string.IsNullOrWhiteSpace(response.Message)) throw new InvalidOperationException(response.Status);
+                    var message = new ContextControl.Workbench.ViewModels.LocalLlmChatMessageViewModel("assistant", response.Message);
+                    if (string.IsNullOrWhiteSpace(message.VisibleText) || response.Stats?.OutputTokens is not > 0)
+                        throw new InvalidOperationException("A research answer must have visible text and populated token counts.");
                     Console.WriteLine("FINAL ANSWER: " + response.Message);
+                    if (Pizza)
+                    {
+                        var entryPhotos = new List<GoogleEntryPhoto>();
+                        await GoogleEntryPhotoService.LoadAsync(response.Message!, research, researchBrowser, photo =>
+                        {
+                            entryPhotos.Add(photo);
+                            Console.WriteLine($"ENTRY PHOTO: {photo.EntryTitle} <- {photo.SourceTitle} ({photo.SourceUrl})");
+                        }, deadline.Token);
+                        if (entryPhotos.Count == 0) throw new InvalidOperationException("The live entry-photo check did not find an individual place photo within its budget.");
+                        Console.WriteLine($"Live per-entry photos passed: {entryPhotos.Count} matched and cached photos.");
+                    }
                     Console.WriteLine($"Live Google research passed with {Model}: {research.Search.Sources.Count} results, {research.Pages.Count(page => page.FullPageRead)} pages read.");
                 }
             }

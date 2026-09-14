@@ -53,10 +53,12 @@ public sealed partial class LocalLlmService
     private sealed record OllamaChatResponse(
         OllamaChatMessage? Message,
         bool? Done,
-        long? TotalDuration,
-        long? LoadDuration,
-        long? PromptEvalCount,
-        long? PromptEvalDuration,
-        long? EvalCount,
-        long? EvalDuration);
+        [property: JsonPropertyName("total_duration")] long? TotalDuration,
+        [property: JsonPropertyName("load_duration")] long? LoadDuration,
+        [property: JsonPropertyName("prompt_eval_count")] long? PromptEvalCount,
+        [property: JsonPropertyName("prompt_eval_duration")] long? PromptEvalDuration,
+        [property: JsonPropertyName("eval_count")] long? EvalCount,
+        [property: JsonPropertyName("eval_duration")] long? EvalDuration,
+        [property: JsonPropertyName("done_reason")] string? DoneReason = null,
+        string? Error = null);
 }

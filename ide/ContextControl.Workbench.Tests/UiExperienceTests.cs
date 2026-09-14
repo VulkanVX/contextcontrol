@@ -129,18 +129,25 @@ internal static class UiExperienceTests
         File.WriteAllBytes(photoPath, GooglePhotoPreviewTests.Photo());
         var sources = new[]
         {
-            new ContextControlAttachmentViewModel("[1] Photo source · open page", "https://example.com/article", "web", photoPath),
+            new ContextControlAttachmentViewModel("[1] Garden Café · official source", "https://example.com/article", "web", photoPath, "Garden Café"),
             new ContextControlAttachmentViewModel("[2] Another source", "https://example.org/article", "web", photoPath),
             new ContextControlAttachmentViewModel("[3] Text-only source", "https://example.net/article", "web"),
             new ContextControlAttachmentViewModel("[4] Unavailable photo", "https://example.edu/article", "web", Path.Combine(root, "missing.jpg"))
         };
         foreach (var (width, size) in new[] { (780, 11d), (380, 22d) })
         {
-            var message = new LocalLlmChatMessageViewModel("assistant", "Source photos now appear below the answer. Click a photo to enlarge it, or its title to open the source. [1] [2]", attachments: sources);
+            var text = width == 780 ? "1. **Garden Café**\n   - Pizza and coffee in Vilnius. Fixture details [1].\n2. **Monstro**\n   - A second place without a matching photo [2]."
+                : "| Restaurant | Details |\n| --- | --- |\n| Garden Café | Pizza and coffee in Vilnius. Fixture details [1]. |\n| Monstro | No matching photo [2]. |";
+            var message = new LocalLlmChatMessageViewModel("assistant", text, attachments: sources);
             var transcript = new ChatTranscriptRenderControl { ChatFontSize = size, Items = [message] };
             var layout = Call(transcript, "BuildMessageLayout", message, (double)width - 40)!;
             var attachments = Read<System.Collections.IEnumerable>(layout, "Attachments").Cast<object>().ToArray();
-            Check(attachments.Count(item => Read<bool>(item, "IsImagePreview")) == 2, "Available web photos must render; missing previews must retain a plain source chip.");
+            Check(attachments.Count(item => Read<bool>(item, "IsImagePreview")) == 1, "Only the matched entry photo should render; unrelated roundup previews must not appear below the answer.");
+            var photoRect = Read<Rect>(attachments.Single(item => Read<bool>(item, "IsImagePreview")), "Rect");
+            var entryCards = Read<System.Collections.IEnumerable>(layout, "MarkdownDecorations").Cast<object>()
+                .Where(item => Read<string>(item, "Kind") == "card").Select(item => Read<Rect>(item, "Rect")).ToArray();
+            Check(entryCards.Length == 2 && photoRect.Y >= entryCards[0].Y && photoRect.Bottom <= entryCards[0].Bottom,
+                "The photo must be inside its own entry card for both numbered lists and table rows.");
             var card = Read<Rect>(layout, "CardRect");
             foreach (var item in attachments)
             {

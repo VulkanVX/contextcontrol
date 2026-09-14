@@ -68,7 +68,7 @@ With **Google auto** enabled, any installed Ollama chat model can decide to sear
 
 For example: “Search Google for the official Avalonia documentation.” Research progress appears alongside your chat. Complete any Google consent or verification in the browser window when needed.
 
-Blocked pages are marked unavailable and the model can choose other results. Sources with an available photo now show a compact preview below the answer: click the photo to enlarge it, or its title to open the source. See [Google research](docs/GOOGLE_RESEARCH.md) and [v0.4.3 release notes](docs/releases/v0.4.3.md).
+Blocked pages are marked unavailable and the model can choose other results. When an individual source supplies a matching photo, it appears beside the place or product in the answer. Source links stay compact; general roundup images are not shown as a bottom gallery. Thinking-only replies retry once with thinking off; incomplete output is clearly reported. See [Google research](docs/GOOGLE_RESEARCH.md) and [v0.4.4 release notes](docs/releases/v0.4.4.md).
 
 ## What Is Bundled
 

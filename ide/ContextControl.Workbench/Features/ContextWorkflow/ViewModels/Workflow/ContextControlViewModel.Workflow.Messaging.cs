@@ -820,7 +820,7 @@ public sealed partial class ContextControlViewModel
             {
                 liveAssistant.UpdateLiveStatus(answer.ToString());
             }
-            else if (thinking.Length == 0 && string.IsNullOrWhiteSpace(lastInlineThinking))
+            else
             {
                 liveAssistant.UpdateLiveStatus(string.IsNullOrWhiteSpace(status) ? LiveThinkingPlaceholder : status);
             }
@@ -1529,6 +1529,7 @@ public sealed partial class ContextControlViewModel
                     capsule.Summary,
                     result.Stats);
                 RefreshLiveAssistantMessage(targetSession, liveAssistant);
+                await AttachGoogleEntryPhotosAsync(targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token);
                 var latestPatchBlocks = _promptBuilder.ExtractPatchBlocks(result.Message);
                 if (!string.IsNullOrWhiteSpace(latestPatchBlocks) && ReferenceEquals(SelectedChatSession, targetSession))
                 {
@@ -1554,7 +1555,7 @@ public sealed partial class ContextControlViewModel
             }
             else
             {
-                liveAssistant.UpdateContent(result.Status, capsule.Summary, result.Stats);
+                liveAssistant.UpdateContent(result.Message ?? result.Status, capsule.Summary, result.Stats);
                 RefreshLiveAssistantMessage(targetSession, liveAssistant);
             }
 
@@ -1675,6 +1676,7 @@ public sealed partial class ContextControlViewModel
                     "clean chat",
                     result.Stats);
                 RefreshLiveAssistantMessage(targetSession, liveAssistant);
+                await AttachGoogleEntryPhotosAsync(targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token);
                 if (liveAssistant.HasThinking)
                 {
                     model.MarkThinkingDetected();
@@ -1683,7 +1685,7 @@ public sealed partial class ContextControlViewModel
             }
             else
             {
-                liveAssistant.UpdateContent(result.Status, "clean chat", result.Stats);
+                liveAssistant.UpdateContent(result.Message ?? result.Status, "clean chat", result.Stats);
                 RefreshLiveAssistantMessage(targetSession, liveAssistant);
             }
 

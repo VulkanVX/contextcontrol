@@ -5,6 +5,7 @@ namespace ContextControl.Workbench.ViewModels;
 public sealed partial class ContextControlViewModel
 {
     private IGoogleResearchBrowser? _googleBrowser;
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<LocalLlmChatMessageViewModel, GoogleResearchResult> _messageResearch = new();
 
     public bool IsGoogleSearchEnabled
     {
@@ -52,17 +53,31 @@ public sealed partial class ContextControlViewModel
         var prepared = GoogleSearchContext.AugmentPrompt(prompt, result, contextTokens);
         if (result.Search is { } search)
         {
-            UpdateStatus("Loading source photo previews…");
-            var previews = await GooglePhotoPreviewService.Shared.LoadManyAsync(search.Sources, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
             for (var i = 0; i < search.Sources.Count; i++)
             {
                 var source = search.Sources[i];
-                assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel($"[{i + 1}] {source.Title}", source.Url, "web", previews[i]));
+                assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel($"[{i + 1}] {source.Title}", source.Url, "web"));
             }
+            _messageResearch.Remove(assistant);
+            _messageResearch.Add(assistant, result);
         }
         RefreshLiveAssistantMessage(session, assistant);
         UpdateStatus(result.DidSearch ? "Writing an answer with sources…" : "Writing the answer…");
         return prepared;
+    }
+
+    private async Task AttachGoogleEntryPhotosAsync(ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
+        ChatRequestProgressViewModel progress, CancellationToken cancellationToken)
+    {
+        if (_googleBrowser is null || !_messageResearch.TryGetValue(assistant, out var research)) return;
+        _messageResearch.Remove(assistant);
+        if (GoogleEntryPhotoService.EntryNames(assistant.VisibleText).Count == 0) return;
+        progress.Status = "Answer ready · finding photos for its entries…";
+        await GoogleEntryPhotoService.LoadAsync(assistant.VisibleText, research, _googleBrowser, photo =>
+        {
+            assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel(photo.SourceTitle, photo.SourceUrl, "web", photo.PreviewPath, photo.EntryTitle)
+                { IncludeInPrompt = false });
+            RefreshLiveAssistantMessage(session, assistant);
+        }, cancellationToken);
     }
 }

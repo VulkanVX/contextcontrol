@@ -142,7 +142,7 @@ public sealed partial class ChatTranscriptRenderControl
             layout.Attachments.Add(new AttachmentLayout(rect, photo.DisplayTitle, photo, true));
             layout.Hits.Add(new HitRegion(rect, ChatTranscriptHitKind.OpenImagePreview, photo.PreviewPath));
             layout.EmbeddedWebPhotos.Add(photo.Path);
-            photoBottom = rect.Bottom + 6;
+            photoBottom = AddRichParagraph(layout, [new("Photo source", Url: photo.Path)], rect.X, rect.Bottom + 3, rect.Width, ChatMetaFontSize);
             if (!sidePhoto) y = photoBottom;
         }
         y = BuildMarkdownBlocks(layout, block.Children ?? [], x + padding, y, textWidth);
@@ -151,8 +151,13 @@ public sealed partial class ChatTranscriptRenderControl
         return bottom + 10;
     }
 
-    private ContextControlAttachmentViewModel? FindEntryPhoto(ChatMarkdownBlock block, LocalLlmChatMessageViewModel message)
+    private ContextControlAttachmentViewModel? FindEntryPhoto(ChatMarkdownBlock block, LocalLlmChatMessageViewModel message, bool allowCitedSource = true)
     {
+        var entry = GoogleEntryPhotoService.NormalizeName(block.PlainText);
+        var matched = message.AttachedFiles.FirstOrDefault(source => source.Kind == "web" && !string.IsNullOrWhiteSpace(source.EntryTitle)
+            && GoogleEntryPhotoService.NormalizeName(source.EntryTitle) == entry && TryGetImageBitmap(source.PreviewPath) is not null);
+        if (matched is not null) return matched;
+        if (!allowCitedSource) return null;
         static string Name(string value) => string.Concat(value.Where(char.IsLetterOrDigit)).ToLowerInvariant();
         static string Details(ChatMarkdownBlock value) => value.PlainText + string.Concat((value.Children ?? []).Select(Details));
         var name = Name(block.PlainText);
@@ -165,6 +170,11 @@ public sealed partial class ChatTranscriptRenderControl
 
     private double BuildMarkdownTable(MessageLayout layout, IReadOnlyList<ChatMarkdownBlock> rows, double x, double y, double width)
     {
+        // A list of named places may arrive as a table. Once a related photo is
+        // available, keep each row's fields together in a photo-bearing entry card.
+        var cards = GoogleEntryPhotoService.TableCards(rows);
+        if (cards.Any(card => FindEntryPhoto(card, layout.Message, allowCitedSource: false) is not null))
+            return BuildMarkdownBlocks(layout, cards, x, y, width);
         var columns = rows.Select(row => row.Children?.Count ?? 0).DefaultIfEmpty(0).Max();
         if (columns == 0) return y;
         var headers = rows.FirstOrDefault(row => row.Kind == "tableHeader")?.Children ?? [];

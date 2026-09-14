@@ -19,6 +19,7 @@ internal static class GoogleResearchTests
     {
         _checks += await GoogleBlockedSourceTests.Run();
         _checks += await GooglePhotoPreviewTests.Run();
+        _checks += await GoogleEntryPhotoTests.Run();
         Check(GoogleResearchService.ParseQuery("{\"search\":false}", "hello") is null, "Greetings must not search.");
         Check(GoogleResearchService.ParseQuery("{\"search\":true,\"query\":\"Google capabilities\"}", "Can you use google?") is null, "Capability questions must not become searches.");
         Check(GoogleResearchService.ParseQuery("```json\n{\"search\":true,\"query\":\"  Avalonia   release  \"}\n```", "latest version") == "Avalonia release", "Use the model's normalized query.");

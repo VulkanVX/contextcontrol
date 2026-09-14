@@ -172,6 +172,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "UI experience regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --google-research-regression
     if ($LASTEXITCODE -ne 0) { throw "Google research regression failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --local-chat-regression
+    if ($LASTEXITCODE -ne 0) { throw "Local chat regression failed ($LASTEXITCODE)." }
 }
 
 dotnet publish $project `
