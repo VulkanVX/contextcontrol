@@ -60,6 +60,7 @@ public sealed partial class ContextControlViewModel
         session.IsGenerating = true;
         var item = new ChatRequestProgressViewModel(session.Id, $"{phase} with {modelName}", isCancellable);
         _generationSessions[item] = session;
+        session.Activity = item;
         TrackChatSession(session).AddRequest(item);
         ChatRequestProgressItems.Add(item);
 
@@ -88,7 +89,10 @@ public sealed partial class ContextControlViewModel
         item.StopElapsedTimer();
         ChatRequestProgressItems.Remove(item);
         if (_generationSessions.Remove(item, out var owner))
+        {
             owner.IsGenerating = _generationSessions.Values.Contains(owner);
+            owner.Activity = _generationSessions.LastOrDefault(pair => ReferenceEquals(pair.Value, owner)).Key;
+        }
         ChatMonitor.CompleteRequest(item);
         var session = ChatSessions.FirstOrDefault(chat =>
             string.Equals(chat.Id, item.SessionId, StringComparison.OrdinalIgnoreCase));
@@ -121,7 +125,7 @@ public sealed partial class ContextControlViewModel
             return $"{progress.EvalCount.Value / evalSeconds:0.#} tok/s";
         }
 
-        return elapsedSeconds > 0 ? $"pending {elapsedSeconds:0.0}s" : "speed pending";
+        return elapsedSeconds > 0 ? $"pending {ChatRequestProgressViewModel.FormatElapsed(elapsedSeconds)}" : "speed pending";
     }
 
     private static string BuildGenerationSizeLabel(LocalLlmGenerationProgress progress)

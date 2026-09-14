@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <UserControl
     x:Class="ContextControl.Workbench.Views.MainWindowParts.ContextPromptBar"
     xmlns="https://github.com/avaloniaui"
@@ -29,8 +29,8 @@
                     IsVisible="{Binding ContextControl.ShowBusyPromptProgress}"
                     IsIndeterminate="{Binding ContextControl.ShowBusyPromptProgress}" />
   
+                <Border Grid.Row="1" IsVisible="{Binding IsChatProgressPanelEnabled}">
                 <ItemsControl
-                    Grid.Row="1"
                     Margin="0,0,0,2"
                     ItemsSource="{Binding ContextControl.ChatRequestProgressItems}"
                     IsVisible="{Binding ContextControl.HasChatRequestProgress}">
@@ -74,18 +74,13 @@
                                 IsIndeterminate="{Binding IsIndeterminate}" />
                             <TextBlock Grid.Column="2" Classes="cc-transfer-percent" Text="{Binding ElapsedLabel}" />
                           </Grid>
-                          <TextBlock
-                              Grid.Row="2"
-                              Classes="cc-transfer-thinking-preview"
-                              Text="{Binding ThinkingPreviewText}"
-                              TextWrapping="NoWrap"
-                              TextTrimming="CharacterEllipsis"
-                              IsVisible="{Binding HasThinking}" />
+
                         </Grid>
                       </Border>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </Border>
   
                 <Border
                     Grid.Row="2"

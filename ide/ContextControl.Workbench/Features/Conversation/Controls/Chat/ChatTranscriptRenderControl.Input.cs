@@ -701,7 +701,6 @@ public sealed partial class ChatTranscriptRenderControl
             return;
         }
 
-        BeginThinkingAnimation(message, !message.IsThinkingExpanded);
         command.Execute(message);
     }
 

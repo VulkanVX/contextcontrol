@@ -1,4 +1,4 @@
-﻿// CC-DESC: Draws the shared chat/image-generation transcript as one cached virtualized surface.
+// CC-DESC: Draws the shared chat/image-generation transcript as one cached virtualized surface.
 
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -54,6 +54,7 @@ public sealed partial class ChatTranscriptRenderControl
         var uiFontFamily = ResolveFontFamily(UiFontFamily, Resource("UiFontFamily", DefaultUiFontFamily));
         foreach (var part in message.Parts)
         {
+            if (message.IsAwaitingAnswer) break;
             if (part.IsText)
             {
                 if (!message.IsUser)
@@ -89,11 +90,19 @@ public sealed partial class ChatTranscriptRenderControl
 
         if (message.HasAttachments && attachmentsAfterText)
         {
+            var namedEntries = ContextControl.Workbench.Services.GoogleEntryPhotoService.EntryNames(message.VisibleText)
+                .Select(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName).ToHashSet();
+            foreach (var photo in message.AttachedFiles.Where(file => !string.IsNullOrWhiteSpace(file.EntryTitle) && !string.IsNullOrWhiteSpace(file.PreviewPath)))
+            {
+                if (!namedEntries.Add(ContextControl.Workbench.Services.GoogleEntryPhotoService.NormalizeName(photo.EntryTitle!))) continue;
+                y = BuildInformationCard(layout, new ContextControl.Workbench.Services.ChatMarkdownBlock("card",
+                    [new ContextControl.Workbench.Services.ChatMarkdownRun(photo.EntryTitle!, Bold: true)]), contentLeft, y, contentWidth);
+            }
             y = BuildAttachments(layout, message, contentLeft, y, contentWidth);
             y += 4.0;
         }
 
-        if (message.HasThinking)
+        if (message.HasThinking || message.IsAwaitingAnswer)
         {
             y = BuildThinking(layout, message, contentLeft, y, contentWidth);
         }
@@ -532,41 +541,12 @@ public sealed partial class ChatTranscriptRenderControl
 
     private double BuildThinking(MessageLayout layout, LocalLlmChatMessageViewModel message, double x, double y, double contentWidth)
     {
-        var buttonRect = new Rect(x, y, contentWidth, ButtonHeight);
+        var height = Math.Max(ButtonHeight, ChatTextFontSize * 1.65);
+        var buttonRect = new Rect(x, y, message.IsAwaitingAnswer ? contentWidth : Math.Min(contentWidth, 150), height);
         var hit = new HitRegion(buttonRect, ChatTranscriptHitKind.ToggleThinking, message);
         layout.Hits.Add(hit);
-        var thinking = new ThinkingLayout(buttonRect, hit, message.IsThinkingExpanded);
-        var expansionProgress = GetThinkingExpansionProgress(message);
-        y += ButtonHeight + 2.0;
-
-        if (expansionProgress > 0.01)
-        {
-            var codeFontFamily = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
-            var lines = WrapLines(GetNormalizedThinkingText(message), contentWidth - 26.0, codeFontFamily, FontWeight.Normal, FontStyle.Normal, ChatCodeFontSize);
-            var expandedTextHeight = Math.Clamp(lines.Count * ChatCodeLineHeight, 44.0, 232.0);
-            var bodyHeight = Math.Max(1.0, (expandedTextHeight + 12.0) * expansionProgress);
-            var textHeight = Math.Max(1.0, bodyHeight - 12.0);
-            thinking.BodyRect = new Rect(x, y, contentWidth, bodyHeight);
-            var textBlock = new TextBlockLayout(
-                new Rect(x + 8.0, y + 6.0, Math.Max(1.0, contentWidth - 26.0), textHeight),
-                lines,
-                ChatCodeFontSize,
-                ChatCodeLineHeight,
-                FontWeight.Normal,
-                FontStyle.Normal,
-                true,
-                Resource("TextPrimaryBrush", TextPrimaryFallbackBrush));
-            thinking.SelectableTextBlock = AddSelectableTextBlock(layout, textBlock, drawInMessage: false);
-            thinking.TextBlock = thinking.SelectableTextBlock.TextBlock;
-            y += bodyHeight + 5.0 * expansionProgress;
-        }
-        else
-        {
-            y += 2.0;
-        }
-
-        layout.Thinking = thinking;
-        return y;
+        layout.Thinking = new ThinkingLayout(buttonRect, hit, false);
+        return y + height + 4;
     }
 
     private double BuildDiagnostic(MessageLayout layout, LocalLlmChatMessageViewModel message, double x, double y, double contentWidth)

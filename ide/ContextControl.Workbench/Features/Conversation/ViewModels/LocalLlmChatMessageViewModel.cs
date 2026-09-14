@@ -90,6 +90,23 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
     public string DiagnosticPrompt { get; }
     public string VisibleText => _visibleText;
     public string ThinkingText => _thinkingText;
+    private bool _isReasoningSelected;
+    private bool _isAwaitingAnswer;
+    private string _liveStage = "Thinking";
+    public bool IsReasoningSelected { get => _isReasoningSelected; set => SetProperty(ref _isReasoningSelected, value); }
+    public bool IsAwaitingAnswer { get => _isAwaitingAnswer; set => SetProperty(ref _isAwaitingAnswer, value); }
+    public string LiveStage { get => _liveStage; set => SetProperty(ref _liveStage, value); }
+    public string ReasoningHeader => $"{ModelLabel} · {Time}";
+    private string _reasoningContext = "";
+    public string ReasoningContext { get => _reasoningContext; set => SetProperty(ref _reasoningContext, value); }
+    public string ThinkingPreview
+    {
+        get
+        {
+            var tail = _thinkingText.Length > 300 ? _thinkingText[^300..] : _thinkingText;
+            return Regex.Replace(tail, @"\s+", " ").Trim();
+        }
+    }
     public ObservableCollection<LocalLlmChatPartViewModel> Parts { get; }
     public ObservableCollection<ChatSnippetViewModel> Snippets { get; }
     public ObservableCollection<ContextControlAttachmentViewModel> AttachedFiles { get; }
@@ -178,6 +195,8 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         string capsuleSummary = "",
         LocalLlmUsageStats? stats = null)
     {
+        IsAwaitingAnswer = false;
+        var previousThinking = _isLiveThinkingPlaceholderActive ? "" : _thinkingText;
         StopLivePresentation();
         _rawText = text ?? "";
         if (!string.IsNullOrWhiteSpace(capsuleSummary))
@@ -191,6 +210,11 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         }
 
         var parsed = ParseMessage(_rawText, ShouldExtractRequestSnippets(Role, Phase, _rawText));
+        if (string.IsNullOrWhiteSpace(parsed.Thinking) && !string.IsNullOrWhiteSpace(previousThinking))
+        {
+            _rawText = "<think>" + previousThinking + "</think>\n\n" + _rawText;
+            parsed = ParseMessage(_rawText, ShouldExtractRequestSnippets(Role, Phase, _rawText));
+        }
         _thinkingText = parsed.Thinking;
         _visibleText = parsed.VisibleText;
         Parts.Clear();
@@ -244,8 +268,7 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         _liveThinkingTargetText = string.IsNullOrEmpty(_liveThinkingTargetText)
             ? clean
             : $"{_liveThinkingTargetText}{clean}";
-        StartLiveTyping();
-        TickLiveTyping();
+        PublishLiveThinking();
     }
 
     public void DisableLiveThinkingPlaceholder()
@@ -275,9 +298,16 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         var continues = !string.IsNullOrEmpty(visiblePrefix)
             && clean.StartsWith(visiblePrefix, StringComparison.Ordinal);
         _liveThinkingTargetText = clean;
-        _liveThinkingVisibleTextLength = continues ? Math.Min(visiblePrefix.Length, clean.Length) : 0;
-        StartLiveTyping();
-        TickLiveTyping();
+        PublishLiveThinking();
+    }
+
+    private void PublishLiveThinking()
+    {
+        var hadThinking = HasThinking;
+        _thinkingText = _liveThinkingTargetText;
+        _liveThinkingVisibleTextLength = _thinkingText.Length;
+        OnPropertyChanged(nameof(ThinkingText));
+        if (hadThinking != HasThinking) OnPropertyChanged(nameof(HasThinking));
     }
 
     private void QueueLiveVisibleText(string text)

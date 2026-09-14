@@ -46,10 +46,10 @@ Codex prompt mode is gated on Codex CLI setup and authentication. The prompt is 
 
 Current app-side autosetup coverage documented in the README and packaged install guide:
 
-- 17/17 dependency cards expose an installer path
-- 262/302 catalog entries use local Ollama model pulls
-- 12/302 catalog entries use non-Ollama managed/backend setup
-- 28/302 catalog entries are Ollama Cloud entries with no local weight download
+- 544 catalog entries, including an official discovery snapshot of 443 tags across 240 families
+- Ollama pulls, compatible server discovery, and managed llama.cpp, KoboldCpp and Transformers chat routes
+- Hosted-only models remain labeled as cloud entries; no cloud weights are downloaded
+- Platform-specific dependencies have explicit native-install limits; compatible external servers can still be connected
 - 13/13 image-generation catalog entries have a route; 3 experimental Ollama image entries are macOS-only and disabled on Windows/Linux, and FLUX.2 Klein 4B has a Windows-capable Diffusers route
 
 FLUX.2 Klein Diffusers first-run downloads are large. The app downloads only the Diffusers pipeline files instead of the duplicate single-file checkpoint, fresh Diffusers installs request `diffusers>=0.38.0`, the terminal echoes the exact image prompt, authenticated Hugging Face download state is shown, keepalive status is printed while Hugging Face is quiet on a multi-GB shard, and FLUX.2 gets a longer first-run timeout. Users can paste a personal Hugging Face token in View -> Settings -> LLMs; ContextControl passes it as `HF_TOKEN` and `HUGGINGFACE_HUB_TOKEN` to Diffusers subprocesses.

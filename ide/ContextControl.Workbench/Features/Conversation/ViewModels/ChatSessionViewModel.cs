@@ -35,6 +35,8 @@ public sealed class ChatSessionViewModel : ObservableObject
     }
 
     public string Id { get; }
+    private ChatRequestProgressViewModel? _activity;
+    public ChatRequestProgressViewModel? Activity { get => _activity; set => SetProperty(ref _activity, value); }
     public DateTime CreatedUtc { get; }
 
     public string Title

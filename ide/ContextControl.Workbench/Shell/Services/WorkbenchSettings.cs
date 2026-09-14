@@ -150,7 +150,9 @@ public sealed class WorkbenchSettings
     public bool ThemeAdaptBytesColor { get; set; }
     public double UiFontSize { get; set; }
     public bool ChatMonitorEnabled { get; set; } = true;
+    public bool ChatProgressPanelEnabled { get; set; } = true;
     public bool GoogleSearchEnabled { get; set; } = true;
+    public IReadOnlyList<LocalRuntimeProfile> LocalRuntimeProfiles { get; set; } = LocalRuntimeProfile.Defaults;
     public int? ChatMonitorX { get; set; }
     public int? ChatMonitorY { get; set; }
     public double CodeEditorFontSize { get; set; }
@@ -266,7 +268,9 @@ public sealed class WorkbenchSettings
             data.ProjectGraphGenerationColors ?? DefaultProjectGraphGenerationColors)
         {
             ChatMonitorEnabled = data.ChatMonitorEnabled ?? true,
+            ChatProgressPanelEnabled = data.ChatProgressPanelEnabled ?? true,
             GoogleSearchEnabled = data.GoogleSearchEnabled ?? true,
+            LocalRuntimeProfiles = data.LocalRuntimeProfiles ?? LocalRuntimeProfile.Defaults,
             ChatMonitorX = data.ChatMonitorX,
             ChatMonitorY = data.ChatMonitorY
         };
@@ -283,7 +287,9 @@ public sealed class WorkbenchSettings
         var data = new WorkbenchSettingsJson
         {
             ChatMonitorEnabled = ChatMonitorEnabled,
+            ChatProgressPanelEnabled = ChatProgressPanelEnabled,
             GoogleSearchEnabled = GoogleSearchEnabled,
+            LocalRuntimeProfiles = LocalRuntimeProfiles,
             ChatMonitorX = ChatMonitorX,
             ChatMonitorY = ChatMonitorY,
             SkinKey = NormalizeSkinKey(SkinKey),
@@ -617,7 +623,9 @@ public sealed class WorkbenchSettings
         public bool? ThemeAdaptBytesColor { get; set; }
         public double? UiFontSize { get; set; }
         public bool? ChatMonitorEnabled { get; set; }
+        public bool? ChatProgressPanelEnabled { get; set; }
         public bool? GoogleSearchEnabled { get; set; }
+        public IReadOnlyList<LocalRuntimeProfile>? LocalRuntimeProfiles { get; set; }
         public int? ChatMonitorX { get; set; }
         public int? ChatMonitorY { get; set; }
         public double? CodeEditorFontSize { get; set; }

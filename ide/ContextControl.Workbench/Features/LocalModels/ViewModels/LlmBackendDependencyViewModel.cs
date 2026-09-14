@@ -62,13 +62,14 @@ public sealed class LlmBackendDependencyViewModel(
     }
 
     public Bitmap? IconImage => _iconImage ??= LoadIcon(IconSource);
-    public bool HasSafeAutomaticInstaller =>
+    public string? PlatformLimitation => PythonDependencyEnvironment.PlatformLimitation(Id);
+    public bool HasSafeAutomaticInstaller => PlatformLimitation is null && (
         PythonDependencyEnvironment.HasManagedInstaller(Id)
         || NativeDependencyEnvironment.HasManagedInstaller(Id)
         || PackageManagerDependencyEnvironment.HasManagedInstaller(Id)
-        || SourceDependencyEnvironment.HasManagedInstaller(Id);
+        || SourceDependencyEnvironment.HasManagedInstaller(Id));
     public bool CanRepairManaged => !IsReady && PythonDependencyEnvironment.HasManagedDependency(Id);
-    public string InstallActionLabel => IsReady
+    public string InstallActionLabel => PlatformLimitation is not null ? "Other platform" : IsReady
         ? CanUninstall ? "Uninstall" : CanForceInstall ? "Force install" : "External"
         : CanRepairManaged ? "Repair"
         : HasSafeAutomaticInstaller ? "Install" : "Manual";

@@ -206,15 +206,24 @@ internal static void RequireBackendDependenciesAutoinstallable()
         "rwkv_runner"
     ];
 
-    var missing = dependencyIds
-        .Select(CreateDependency)
-        .Where(dependency => !dependency.HasSafeAutomaticInstaller)
-        .Select(dependency => dependency.Id)
-        .ToArray();
-
-    if (missing.Length > 0)
+    foreach (var id in dependencyIds)
     {
-        throw new InvalidOperationException($"Dependencies should expose one-click installers on this platform: {string.Join(", ", missing)}");
+        var dependency = CreateDependency(id);
+        var unsupported = (id == "mlx_lm" && !OperatingSystem.IsMacOS())
+            || (OperatingSystem.IsWindows() && id is "vllm" or "sglang" or "tensorrt_llm");
+        if (unsupported)
+        {
+            if (dependency.HasSafeAutomaticInstaller
+                || string.IsNullOrWhiteSpace(dependency.PlatformLimitation)
+                || dependency.InstallActionLabel != "Other platform")
+            {
+                throw new InvalidOperationException($"{id} should explain its platform requirement without offering an unsupported installer.");
+            }
+        }
+        else if (!dependency.HasSafeAutomaticInstaller)
+        {
+            throw new InvalidOperationException($"{id} should expose its supported installer on this platform.");
+        }
     }
 }
 

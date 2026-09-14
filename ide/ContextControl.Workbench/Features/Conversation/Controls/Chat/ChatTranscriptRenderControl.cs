@@ -685,9 +685,17 @@ public sealed partial class ChatTranscriptRenderControl : Control
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        var keepMeasuredHeight = false;
+        var keepMeasuredHeight = true;
         if (sender is LocalLlmChatMessageViewModel message && _subscribedItems.TryGetValue(message, out var messageIndex))
         {
+            // The live reasoning strip has fixed geometry. Tokens should repaint it, not collapse the row's height.
+            if (e.PropertyName is nameof(LocalLlmChatMessageViewModel.ThinkingText) or nameof(LocalLlmChatMessageViewModel.LiveStage)
+                or nameof(LocalLlmChatMessageViewModel.IsReasoningSelected))
+            {
+                _normalizedThinkingTextCache.Remove(message);
+                InvalidateVisual();
+                return;
+            }
             EnsureCollapseStateInitialized(message);
             var isThinkingExpansionChange = e.PropertyName == nameof(LocalLlmChatMessageViewModel.IsThinkingExpanded);
             var isDiagnosticExpansionChange = e.PropertyName == nameof(LocalLlmChatMessageViewModel.IsDiagnosticExpanded);

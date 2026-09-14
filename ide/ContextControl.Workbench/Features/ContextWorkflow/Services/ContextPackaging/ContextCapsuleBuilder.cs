@@ -156,6 +156,7 @@ public sealed class ContextCapsuleBuilder
     public static int EstimateContextTokens(string? contextLabel, int fallbackTokens = DefaultComfortableContextTokens)
     {
         var label = contextLabel ?? "";
+        if (int.TryParse(label.Trim(), out var exactTokens) && exactTokens > 0) return exactTokens;
         var digits = new StringBuilder();
         for (var index = 0; index < label.Length; index++)
         {

@@ -223,6 +223,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
         _apiConnection = new ApiAiConnectionService();
         _browserConnection = new BrowserAiConnectionService();
         _localLlmService = new LocalLlmService();
+        InitializeRuntimeProfiles();
         _skillbookService = new SkillbookService(settings.ContextControlRoot);
         _codexHarnessService = new CodexHarnessService();
         _capsuleBuilder = new ContextCapsuleBuilder();
@@ -483,7 +484,8 @@ public sealed partial class ContextControlViewModel : ObservableObject
         UseSnippetForCcCommand = new RelayCommand<ChatSnippetViewModel>(UseSnippetForCc);
         PreviewSnippetCommand = new RelayCommand<ChatSnippetViewModel>(snippet => _ = PreviewSnippetAsync(snippet), snippet => snippet?.IsPatch == true);
         RemoveAttachmentCommand = new RelayCommand<ContextControlAttachmentViewModel>(RemoveAttachment);
-        ToggleThinkingCommand = new RelayCommand<LocalLlmChatMessageViewModel>(message => message?.ToggleThinking());
+        ToggleThinkingCommand = new RelayCommand<LocalLlmChatMessageViewModel>(OpenReasoning);
+        InitializeReasoning();
         ToggleDiagnosticCommand = new RelayCommand<LocalLlmChatMessageViewModel>(message => message?.ToggleDiagnostic());
         ToggleSnippetCommand = new RelayCommand<ChatSnippetViewModel>(snippet => snippet?.ToggleExpanded());
         NewChatSessionCommand = new RelayCommand<object>(_ => CreateNewChatSession());

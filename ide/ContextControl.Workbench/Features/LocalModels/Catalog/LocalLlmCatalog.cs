@@ -22,7 +22,7 @@ public sealed partial class LocalLlmService
 
     private static IReadOnlyList<LocalLlmCatalogModel> BuildCatalog()
     {
-        return
+        LocalLlmCatalogModel[] curated =
         [
             ..ImageGenerationCatalog,
             ..QwenModernCatalog,
@@ -34,5 +34,6 @@ public sealed partial class LocalLlmService
             ..QwenOllamaCatalog,
             ..CoreOllamaCatalog,
         ];
+        return curated.Concat(ReadDiscoverySnapshot()).DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 }

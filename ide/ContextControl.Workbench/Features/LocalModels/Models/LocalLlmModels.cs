@@ -26,7 +26,11 @@ public sealed record LocalLlmCatalogModel(
     double MinimumVramGiB,
     double RecommendedVramGiB,
     bool WorksOnCpu,
-    string PullCommand);
+    string PullCommand,
+    string? RuntimeId = null,
+    string? BackendModelId = null,
+    string? RuntimeLabel = null,
+    string? SourceUrl = null);
 
 public sealed record LocalLlmGpuInfo(string Name, long? AdapterRamBytes)
 {
@@ -139,7 +143,7 @@ public sealed record LocalLlmUsageStats(
     private static string FormatStatsDuration(long? nanoseconds)
     {
         var seconds = nanoseconds is > 0 ? nanoseconds.Value / 1_000_000_000d : 0;
-        return seconds <= 0 ? "?" : $"{seconds:0.##}s";
+        return seconds <= 0 ? "?" : $"{Math.Floor(seconds):0}s";
     }
 }
 
@@ -157,7 +161,8 @@ public sealed record LocalLlmChatResult(
     bool Succeeded,
     string Status,
     string? Message = null,
-    LocalLlmUsageStats? Stats = null);
+    LocalLlmUsageStats? Stats = null,
+    bool OutputLimited = false);
 
 public sealed record LocalLlmImageGenerationResult(
     bool Succeeded,

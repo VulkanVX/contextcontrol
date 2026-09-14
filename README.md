@@ -4,6 +4,8 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
+Version 0.5.0 adds a split reasoning pane, stable scrolling during thinking, whole-second progress, standalone photo lookup, 544 catalog entries and chat connections beyond Ollama. See the [release notes](docs/releases/v0.5.0.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+
 ## Install On Windows
 
 Latest release:
@@ -64,7 +66,7 @@ Chat answers now render rich Markdown, including bold text, lists, links and com
 
 ## Google research with local models
 
-With **Google auto** enabled, any installed Ollama chat model can decide to search, write a Google query, choose results to open, read page excerpts, and answer with source links. It works without native tool calling or an API key. The switch is in the Local composer, Chat Monitor quick reply, and **Settings → Prompt Window**.
+With **Google auto** enabled, an installed Ollama chat model or a connected compatible chat model can decide to search, write a Google query, choose results to open, read page excerpts, and answer with source links. It works without native tool calling or a Google API key. The switch is in the Local composer, Chat Monitor quick reply, and **Settings → Prompt Window**.
 
 For example: “Search Google for the official Avalonia documentation.” Research progress appears alongside your chat. Complete any Google consent or verification in the browser window when needed.
 
@@ -136,16 +138,17 @@ One-click dependency install currently covers **17/17** dependency cards shown b
 
 On a fresh Windows PC, ContextControl ignores the Microsoft Store `python.exe` alias in `%LOCALAPPDATA%\Microsoft\WindowsApps` because that is not a real interpreter. If no usable Python is found, installing a Python-backed dependency such as Diffusers bootstraps Python 3.12 through `winget`, then creates a ContextControl-managed virtual environment. Diffusers generation uses only ContextControl's managed venv under `%LOCALAPPDATA%\ContextControl\dependencies\python\diffusers\.venv`; it does not use or modify Python packages from the user's PATH, user site-packages, Conda, or other development environments.
 
-Catalog-wide model autosetup coverage in the current catalog:
+The current catalog has **544 entries**, including the curated models and a snapshot of 443 verified public tags across 240 families. Connected server models are discovered in addition to these entries. This is catalog coverage, not an inference-test count.
 
-| Model route | Count |
-|---|---:|
-| Ollama local model pull | 262/302 |
-| Non-Ollama managed/backend setup | 12/302 |
-| Ollama Cloud entries, no local weight download | 28/302 |
-| Local autosetup path, excluding cloud | 274/302 |
-| Any app route, including cloud | 302/302 |
-| Windows/Linux enabled routes, excluding macOS-only Ollama image models | 299/302 |
+| Chat runtime | Validated in 0.5.0 |
+|---|---|
+| Ollama | Existing local chat and research checks |
+| llama.cpp | Managed install, start, streamed answer, usage, stop; Qwen2.5-Coder 1.5B GGUF |
+| KoboldCpp | Managed install, start, streamed answer, usage, stop; same existing GGUF |
+| LM Studio / llmster | Server discovery, streamed answer and usage; one imported copy of that GGUF |
+| Transformers | Isolated CPU environment, model loading, streamed answer, usage and stop; SmolLM2 135M |
+
+See [local model runtimes](docs/LOCAL_MODEL_RUNTIMES.md) for connection settings, platform limits and repeatable checks.
 
 Important caveat: "autosetup" means ContextControl has a button or route for the next safe setup step. It does not mean every backend is fully hands-off after that. Large model weights, vendor drivers, CUDA/WSL setup, cloud sign-in, model licenses, and some server launch steps can still be external.
 

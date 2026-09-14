@@ -42,6 +42,10 @@
   <Style Selector="Border.rule-card">
     <Setter Property="CornerRadius" Value="8" />
   </Style>
+  <Style Selector="Border.reasoning-entry.active">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
   <Style Selector="Border.chat-activity-strip">
     <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />

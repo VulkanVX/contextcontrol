@@ -1,12 +1,16 @@
 # Google research for local models
 
-Turn on **Google auto** in the Local chat composer or **Settings → Prompt Window → Google research for local models**. It is enabled by default and also available in Chat Monitor's quick reply. It works in Raw chat and CC flow with installed Ollama chat models, including models without native function calling. It does not apply to image generation or Codex CLI.
+Turn on **Google auto** in the Local chat composer or **Settings → Prompt Window → Google research for local models**. It is enabled by default and also available in Chat Monitor's quick reply. It works in Raw chat and CC flow with installed Ollama or connected compatible chat models, including models without native function calling. It does not apply to image generation or Codex CLI.
 
 Ask normally: “Search for Avalonia's official documentation” or “What is the current state of …?” ContextControl asks the selected local model whether research is needed. The model writes a Google query, receives up to six result titles, URLs and snippets, then chooses up to three numbered links to read. ContextControl retrieves visible page text and returns excerpts to that same model for its final answer. Source buttons below the answer open the original pages and remain in chat history.
 
 The request's progress row and Chat Monitor show planning, searching, choosing pages, reading and answering. Blocked or failed pages are marked unavailable, and the model gets one opportunity to choose alternatives from untried results. Research makes at most five distinct page attempts to collect up to three readable pages. The normal Stop button cancels the complete request, including time spent waiting for another chat's browser operation. Browser operations are serialized, and each result is checked against its own query or requested URL.
 
+Current-information requests override a mistaken no-search plan. If an unresearched answer admits missing public knowledge or an outdated training cutoff, Google auto makes one recovery attempt: research the subject, read sources, then replace the draft with a sourced answer. It skips text editing, recognized private-data questions, failed generation and answers already researched. If lookup fails, the draft remains with an explanation. This adds evidence to the reply and preserves its sources in chat history; it does not train or update the model's weights. Raw chat retains its existing per-prompt behavior.
+
 ## Photos beside entries
+
+Explicit requests such as “Show me a photo of Nvidia 5090” also trigger research. The subject can receive its own photo card even when the answer has no list or table. The host attempts the photo after the answer, and states when no matching photo could be retrieved. Image-search result pages are excluded as photo sources. Product matching can recognize a manufacturer in the source hostname, while still requiring the correct model number.
 
 The answer appears first. For lists of named places or products, ContextControl then looks for an individual source whose title matches each entry. A matching photo appears inside that entry's card, beside its details on wide windows and below its name on narrow windows. Numbered entries, repeated bold-name sections and named table rows are supported. General roundup images are not displayed in a gallery below the answer. Sources remain available as compact links.
 
@@ -20,7 +24,7 @@ These are source illustrations for the user. Image bytes are not added to the mo
 
 Google research uses the Windows WebView2 browser; no search API key or cloud model is required. If WebView2 is missing, use the runtime option in the ContextControl installer. The ordinary Google window opens when a search starts. Complete Google's consent or verification there if requested; ContextControl waits for the actual results page. Closing the window stops the current browser operation. **Stop research** cancels the active request. The window may be minimized while research runs.
 
-Only the generated query is submitted to Google; ContextControl does not upload the entire prompt, project capsule, or attachments to the search page. The chosen sites receive normal browser visits. Search content and page text are treated as untrusted reference data. The model can select only numbered results; it cannot execute browser scripts, submit forms, download files, or open local files through this feature. Ordinary page scripts still run as they would in a browser.
+Only a search query is submitted to Google: normally the model generates it; bounded lookup requests can supply a fallback query when planning fails. Project capsules and attachments are not uploaded to the search page. The chosen sites receive normal browser visits. Search content and page text are treated as untrusted reference data. The model can select only numbered results; it cannot execute browser scripts, submit forms, download files, or open local files through this feature. Ordinary page scripts still run as they would in a browser.
 
 The separate browser profile is stored in `%LOCALAPPDATA%\ContextControl\GoogleResearch`. The Auto/Off preference is saved with other local settings. Switch Google off to prevent Google research requests from local chats.
 
@@ -36,6 +40,8 @@ The separate browser profile is stored in `%LOCALAPPDATA%\ContextControl\GoogleR
 The browser integration uses Microsoft's [WebView2 script evaluation API](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.executescriptasync). It does not depend on Google's Custom Search JSON API, which is [closed to new customers](https://developers.google.com/custom-search/v1/overview).
 
 ## Validation
+
+On Windows, `dotnet run --project ide/ContextControl.Workbench.Tests -c Release -- --google-knowledge-smoke` reproduces the recovery path with a seeded unknown draft, live Google/page reads, a local Granite 3.3 2B answer and a matched source photo. It requires that model already installed in Ollama and makes real web requests. The release check produced an RTX 5090 caption and the matching photo from NVIDIA's own product page.
 
 Offline checks, with no Google or model requests:
 

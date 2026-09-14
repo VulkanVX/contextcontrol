@@ -23,21 +23,22 @@ public sealed partial class ContextControlViewModel
 
     public string GoogleSearchLabel => IsGoogleSearchEnabled ? "Google auto" : "Google off";
     public bool CanUseGoogleSearch => IsLocalPromptMode;
-    public string GoogleSearchToolTip => "Let the local model search Google, choose links to read, and cite sources when your request needs web research. Only the generated query goes to Google. No API key needed.";
+    public string GoogleSearchToolTip => "Let the local model search Google, read sources, and retry an answer that admits missing public knowledge. Relevant source photos can accompany the answer. Queries go to Google; this does not retrain the model. No API key needed.";
     public RelayCommand<object> ToggleGoogleSearchCommand { get; private set; } = null!;
 
     public void SetGoogleResearchBrowser(IGoogleResearchBrowser browser) => _googleBrowser = browser;
 
     private async Task<string> PrepareGooglePromptAsync(string modelId, string question, string prompt, bool enabled,
         ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant, ChatRequestProgressViewModel progress,
-        CancellationToken cancellationToken, int contextTokens = 4096)
+        CancellationToken cancellationToken, int contextTokens = 4096, bool knowledgeGap = false)
     {
         if (!enabled) return prompt;
         if (_googleBrowser is null) throw new InvalidOperationException("Google research is unavailable. Open this chat in the ContextControl desktop app, or switch Google off.");
         void UpdateStatus(string status)
         {
             progress.Status = status;
-            assistant.UpdateLiveStatus(status);
+            assistant.IsAwaitingAnswer = true;
+            assistant.LiveStage = ChatRequestProgressViewModel.CompactStage(status);
             RefreshLiveAssistantMessage(session, assistant);
         }
         async Task<string> AskModel(string request, CancellationToken token)
@@ -45,10 +46,9 @@ public sealed partial class ContextControlViewModel
             var answer = await _localLlmService.SendChatAsync(new LocalLlmRequest(modelId, request, "research", [],
                 Math.Clamp(contextTokens, 2048, 8192), Think: false, MaxOutputTokens: 256), null, null, token);
             token.ThrowIfCancellationRequested();
-            if (!answer.Succeeded) throw new InvalidOperationException("The local research planner failed: " + answer.Status);
-            return answer.Message ?? "";
+            return GoogleResearchService.PlannerText(answer);
         }
-        var result = await GoogleResearchService.ResearchAsync(question, AskModel, _googleBrowser, UpdateStatus, cancellationToken);
+        var result = await GoogleResearchService.ResearchAsync(question, AskModel, _googleBrowser, UpdateStatus, cancellationToken, knowledgeGap);
         cancellationToken.ThrowIfCancellationRequested();
         var prepared = GoogleSearchContext.AugmentPrompt(prompt, result, contextTokens);
         if (result.Search is { } search)
@@ -66,18 +66,51 @@ public sealed partial class ContextControlViewModel
         return prepared;
     }
 
+    private Task<LocalLlmChatResult> RecoverGoogleKnowledgeAsync(string question, LocalLlmRequest originalRequest,
+        LocalLlmChatResult result, bool enabled, ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
+        ChatRequestProgressViewModel progress, IProgress<LocalLlmGenerationProgress> downstream,
+        IProgress<string> terminal, CancellationToken cancellationToken)
+    {
+        var alreadySearched = _messageResearch.TryGetValue(assistant, out var research) && research.DidSearch;
+        return GoogleKnowledgeRecovery.RecoverAsync(question, result, enabled, alreadySearched, async token =>
+        {
+            terminal.Report("The answer reported missing knowledge; checking Google for public sources.");
+            assistant.UpdateContent(result.Message ?? "");
+            progress.IsIndeterminate = true;
+            var prepared = await PrepareGooglePromptAsync(originalRequest.ModelId, question, originalRequest.Prompt, true,
+                session, assistant, progress, token, originalRequest.ContextWindowTokens ?? 4096, knowledgeGap: true);
+            return _messageResearch.TryGetValue(assistant, out var lookup) && lookup.DidSearch ? prepared : null;
+        }, async (prepared, token) =>
+        {
+            assistant.UpdateContent("");
+            assistant.IsAwaitingAnswer = true;
+            assistant.LiveStage = "Writing";
+            // Each generation has its own stream accumulator; the first draft must not prefix the corrected answer.
+            return await _localLlmService.SendChatAsync(originalRequest with { Prompt = prepared, Think = false },
+                CreateLiveAssistantProgress(assistant, downstream), terminal, token);
+        }, cancellationToken);
+    }
+
     private async Task AttachGoogleEntryPhotosAsync(ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
         ChatRequestProgressViewModel progress, CancellationToken cancellationToken)
     {
         if (_googleBrowser is null || !_messageResearch.TryGetValue(assistant, out var research)) return;
         _messageResearch.Remove(assistant);
-        if (GoogleEntryPhotoService.EntryNames(assistant.VisibleText).Count == 0) return;
+        if (GoogleEntryPhotoService.EntryNames(assistant.VisibleText).Count == 0 && research.PhotoSubject is null) return;
+        var photoCount = 0;
         progress.Status = "Answer ready · finding photos for its entries…";
         await GoogleEntryPhotoService.LoadAsync(assistant.VisibleText, research, _googleBrowser, photo =>
         {
+            photoCount++;
             assistant.AttachedFiles.Add(new ContextControlAttachmentViewModel(photo.SourceTitle, photo.SourceUrl, "web", photo.PreviewPath, photo.EntryTitle)
                 { IncludeInPrompt = false });
             RefreshLiveAssistantMessage(session, assistant);
         }, cancellationToken);
+        AppendTerminalOutput($"Photo lookup: {photoCount} matching source photo(s) attached.");
+        if (photoCount == 0 && research.PhotoSubject is not null && !cancellationToken.IsCancellationRequested)
+        {
+            assistant.UpdateContent(assistant.RawText + "\n\n*A matching photo could not be retrieved from the available sources.*");
+            RefreshLiveAssistantMessage(session, assistant);
+        }
     }
 }

@@ -27,6 +27,12 @@ internal static class GoogleEntryPhotoTests
         Check(!GoogleEntryPhotoService.IsEntrySource("Monstro", Source("Best pizza places: Monstro"), entries), "Reject a roundup hero image.");
         Check(!GoogleEntryPhotoService.IsEntrySource("Monstro", Source("Monstro and Garden Cafe"), entries), "Reject an ambiguous multi-place source.");
         Check(!GoogleEntryPhotoService.IsEntrySource("Monstro", Source("Monstro") with { Url = "file:///C:/photo" }, entries), "Use public photo source pages only.");
+        Check(GoogleResearchService.PhotoSubject("Show me a photo of Nvidia 5090") == "Nvidia 5090", "Recognize standalone photo requests.");
+        Check(GoogleResearchService.ParseQuery("{\"search\":false}", "Show me a photo of Nvidia 5090") == "Nvidia 5090 photo", "Explicit photo requests still search when a small model declines web access.");
+        Check(GoogleEntryPhotoService.IsEntrySource("Nvidia 5090", Source("NVIDIA GeForce RTX 5090 graphics card"), ["Nvidia 5090"], productPhoto: true), "Match product photos with intervening brand-family words.");
+        Check(!GoogleEntryPhotoService.IsEntrySource("Nvidia 5090", Source("NVIDIA GeForce RTX 5080 graphics card"), ["Nvidia 5090"], productPhoto: true), "Never substitute a different product number.");
+        Check(GoogleEntryPhotoService.IsEntrySource("Nvidia 5090", Source("GeForce RTX 5090 graphics cards") with { Url = "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5090/" }, ["Nvidia 5090"], productPhoto: true), "The official manufacturer hostname can identify the product brand.");
+        Check(!GoogleEntryPhotoService.IsEntrySource("Nvidia 5090", Source("32 Free images of Nvidia GeForce RTX 5090") with { Url = "https://pixabay.com/images/search/nvidia/" }, ["Nvidia 5090"], productPhoto: true), "An image-search page is not an individual product photo source.");
         var root = Path.Combine(Path.GetTempPath(), "ContextControlEntryPhotos", Guid.NewGuid().ToString("N"));
         var cache = new GooglePhotoPreviewService(Path.Combine(root, "photos"));
         var image = "data:image/png;base64," + Convert.ToBase64String(GooglePhotoPreviewTests.Photo());
@@ -35,6 +41,10 @@ internal static class GoogleEntryPhotoTests
         var browser = new FixtureBrowser(query => new GoogleSearchResult(query, GoogleSearchContext.SearchUrl(query),
             query.Contains("Garden") ? [Source("Garden Cafe - official", image)] : [Source("Monstro - official", image)]));
         var found = new List<GoogleEntryPhoto>();
+        var singlePhoto = new List<GoogleEntryPhoto>();
+        await GoogleEntryPhotoService.LoadAsync("A prose answer without a list.", new GoogleResearchResult(new GoogleSearchResult("Nvidia 5090 photo", GoogleSearchContext.SearchUrl("Nvidia 5090 photo"),
+            [Source("NVIDIA GeForce RTX 5090", image)]), [], "Nvidia 5090"), browser, singlePhoto.Add, default, cache);
+        Check(singlePhoto.Count == 1 && singlePhoto[0].EntryTitle == "Nvidia 5090", "A standalone photo request does not require a generated list or table.");
         await GoogleEntryPhotoService.LoadAsync(numbered, research, browser, found.Add, default, cache);
         Check(found.Count == 1 && found[0].EntryTitle == "Garden Café", "Attach the correct named photo and avoid reusing an identical image for another entry.");
         Check(browser.Queries.Count == 2 && browser.Queries[0].Contains("\"Garden Café\"") && !browser.Queries[0].Contains("[1]"), "Search just the displayed name with the original search query.");

@@ -30,12 +30,14 @@ public sealed partial class LocalLlmService
             18));
         var hardwareTask = DetectHardwareAsync(cancellationToken);
         var installedTask = DetectInstalledModelsAsync(cancellationToken);
+        var runtimesTask = DiscoverRuntimeModelsAsync(cancellationToken);
 
-        await Task.WhenAll(hardwareTask, installedTask).ConfigureAwait(false);
+        await Task.WhenAll(hardwareTask, installedTask, runtimesTask).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         var hardware = await hardwareTask.ConfigureAwait(false);
         var installed = await installedTask.ConfigureAwait(false);
+        var runtimeModels = await runtimesTask.ConfigureAwait(false);
         progress?.Report(new LocalLlmTransferProgress(
             "Refreshing Models",
             "Resolving installed tags and capabilities.",
@@ -50,6 +52,7 @@ public sealed partial class LocalLlmService
         var installedAliases = installed.ModelIds
             .SelectMany(ExpandModelIdAliases)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        installedAliases.UnionWith(runtimeModels.Select(model => model.Id));
         var unknown = installed.ModelIds
             .Where(modelId => !ExpandModelIdAliases(modelId).Any(catalogIds.Contains))
             .OrderBy(modelId => modelId, StringComparer.OrdinalIgnoreCase)
@@ -58,9 +61,10 @@ public sealed partial class LocalLlmService
         var status = installed.Reachable
             ? $"Ollama ready. {installed.ModelIds.Count} local model(s) installed."
             : installed.Status;
+        if (runtimeModels.Count > 0) status += $" {runtimeModels.Count} model(s) available through other runtimes.";
 
         return new LocalLlmRefreshResult(
-            Catalog,
+            Catalog.Concat(runtimeModels).ToArray(),
             installedAliases,
             ExpandInstalledModelSizes(installed.ModelSizes),
             ExpandInstalledModelCapabilities(capabilities),

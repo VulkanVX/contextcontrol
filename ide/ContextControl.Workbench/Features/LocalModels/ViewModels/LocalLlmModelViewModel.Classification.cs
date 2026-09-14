@@ -273,6 +273,7 @@ public sealed partial class LocalLlmModelViewModel
 
     private static string ResolveBackendRequirementLabel(LocalLlmCatalogModel model)
     {
+        if (!string.IsNullOrWhiteSpace(model.RuntimeId)) return model.RuntimeLabel ?? model.RuntimeId;
         if (IsCloudModelId(model.Id))
         {
             return "Ollama Cloud";
@@ -377,6 +378,7 @@ public sealed partial class LocalLlmModelViewModel
 
     private static string ResolveBackendRequirementDetail(LocalLlmCatalogModel model)
     {
+        if (!string.IsNullOrWhiteSpace(model.RuntimeId)) return $"Chat through {model.RuntimeLabel ?? model.RuntimeId}. Loading and weights are managed by that server; connection settings are in Settings → LLMs.";
         return ResolveBackendRequirementLabel(model) switch
         {
             "Ollama Cloud" => "Requires Ollama Desktop/API plus cloud access; the model is not stored as a local download.",

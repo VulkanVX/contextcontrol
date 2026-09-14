@@ -495,27 +495,9 @@ public sealed partial class ChatTranscriptRenderControl
 
     private void DrawThinking(DrawingContext context, ThinkingLayout thinking, int rowIndex, double rowTop, double viewportTop, double viewportBottom)
     {
-        DrawExtensionToggle(context, thinking.ButtonRect, thinking.Hit, "Thinking", thinking.IsExpanded, rowTop);
-        if (thinking.TextBlock is null)
-        {
-            return;
-        }
-
-        var surface = OffsetY(thinking.BodyRect, rowTop);
-        context.DrawRectangle(
-            Resource("ChatDiagnosticPanelBrush", EditorSurfaceFallbackBrush),
-            new Pen(Resource("ChatDiagnosticBorderBrush", CommandBorderFallbackBrush), 1),
-            surface,
-            3,
-            3);
-        var scrollOffset = GetExtensionScrollOffset(thinking.Hit.Parameter, thinking.TextBlock, _thinkingScrollOffsets);
-        if (thinking.SelectableTextBlock is not null)
-        {
-            DrawTextSelection(context, thinking.TextBlock, rowIndex, thinking.SelectableTextBlock.BlockIndex, rowTop, viewportTop, viewportBottom, scrollOffset);
-        }
-
-        DrawScrollableTextBlock(context, thinking.TextBlock, scrollOffset, rowTop, viewportTop, viewportBottom);
-        DrawExtensionScrollbar(context, surface, thinking.TextBlock, scrollOffset);
+        if (thinking.Hit.Parameter is not LocalLlmChatMessageViewModel message) return;
+        var label = message.IsAwaitingAnswer ? message.LiveStage + " · " + message.ThinkingPreview : "Reasoning";
+        DrawExtensionToggle(context, thinking.ButtonRect, thinking.Hit, label, false, rowTop);
     }
 
     private void DrawDiagnostic(DrawingContext context, DiagnosticLayout diagnostic, int rowIndex, double rowTop, double viewportTop, double viewportBottom)
@@ -680,7 +662,7 @@ public sealed partial class ChatTranscriptRenderControl
             : isEnabled
             ? Resource("ChatDiagnosticTitleBrush", TextMutedFallbackBrush)
             : Resource("TextMutedBrush", TextMutedFallbackBrush);
-        var title = GetFormattedText(label, titleBrush, codeFontFamily, FontWeight.Black, FontStyle.Normal, 8.7);
+        var title = GetFormattedText(label, titleBrush, codeFontFamily, FontWeight.Black, FontStyle.Normal, ChatMetaFontSize);
         var titleY = CenterTextY(buttonRect, title);
         DrawClippedText(
             context,
@@ -688,7 +670,7 @@ public sealed partial class ChatTranscriptRenderControl
             new Rect(buttonRect.X + 8.0, buttonRect.Y, Math.Max(0.0, buttonRect.Width - 34.0), buttonRect.Height),
             new Point(buttonRect.X + 8.0, titleY));
 
-        var marker = GetFormattedText(isExpanded ? "-" : "+", Resource("ChatDiagnosticTitleBrush", TextMutedFallbackBrush), codeFontFamily, FontWeight.Black, FontStyle.Normal, 9.0);
+        var marker = GetFormattedText(hit.Kind == ChatTranscriptHitKind.ToggleThinking ? "↗" : isExpanded ? "-" : "+", Resource("ChatDiagnosticTitleBrush", TextMutedFallbackBrush), codeFontFamily, FontWeight.Black, FontStyle.Normal, 9.0);
         var markerRect = new Rect(buttonRect.Right - 18.0, buttonRect.Y + Math.Max(0.0, (buttonRect.Height - 13.0) * 0.5), 13.0, 13.0);
         context.DrawRectangle(
             Resource("ChatDiagnosticMarkerBrush", EditorSurfaceFallbackBrush),

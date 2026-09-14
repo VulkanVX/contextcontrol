@@ -39,6 +39,52 @@ public sealed partial class ConversationPage : UserControl
         };
         _chatHistoryAnimationTimer.Tick += (_, _) => TickChatHistoryPanelAnimation();
         ChatSessionList.AddHandler(InputElement.PointerPressedEvent, OnChatSessionPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        DataContextChanged += (_, _) => BindReasoningContext();
+        DetachedFromVisualTree += (_, _) => { if (_reasoningContext is not null) _reasoningContext.PropertyChanged -= OnReasoningContextChanged; _reasoningContext = null; };
+        AttachedToVisualTree += (_, _) => BindReasoningContext();
+    }
+
+    private ContextControlViewModel? _reasoningContext;
+    private bool _followReasoning = true;
+    private void BindReasoningContext()
+    {
+        if (_reasoningContext is not null) _reasoningContext.PropertyChanged -= OnReasoningContextChanged;
+        _reasoningContext = ContextControl;
+        if (_reasoningContext is not null) _reasoningContext.PropertyChanged += OnReasoningContextChanged;
+        UpdateReasoningColumns();
+    }
+    private void UpdateReasoningColumns()
+    {
+        var open = ContextControl?.IsReasoningPaneOpen == true;
+        ReasoningSplitGrid.ColumnDefinitions[1].Width = new GridLength(open ? 5 : 0);
+        ReasoningSplitGrid.ColumnDefinitions[2].Width = new GridLength(open ? Math.Clamp(ReasoningSplitGrid.Bounds.Width * .38, 220, 380) : 0);
+    }
+    private void OnOpenReasoning(object? sender, RoutedEventArgs e) => ContextControl?.OpenReasoning(null);
+    private void OnCloseReasoning(object? sender, RoutedEventArgs e) { if (ContextControl is { } vm) vm.IsReasoningPaneOpen = false; }
+    private void OnReasoningContextChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ContextControlViewModel.IsReasoningPaneOpen)) UpdateReasoningColumns();
+        if (e.PropertyName != nameof(ContextControlViewModel.SelectedReasoningMessage)) return;
+        var target = ContextControl?.SelectedReasoningMessage;
+        Dispatcher.UIThread.Post(() =>
+        {
+            var card = ReasoningItems.GetVisualDescendants().OfType<Border>()
+                .FirstOrDefault(control => control.Classes.Contains("reasoning-entry") && ReferenceEquals(control.DataContext, target));
+            _followReasoning = false;
+            card?.BringIntoView();
+            if (target?.IsAwaitingAnswer == true)
+            {
+                _followReasoning = true;
+                ReasoningScroll.ScrollToEnd();
+            }
+        }, DispatcherPriority.Loaded);
+    }
+    private void OnReasoningScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (Math.Abs(e.ExtentDelta.Y) < 0.5 && Math.Abs(e.OffsetDelta.Y) > 0.5)
+            _followReasoning = ReasoningScroll.Extent.Height - ReasoningScroll.Viewport.Height - ReasoningScroll.Offset.Y <= 24;
+        if (_followReasoning && e.ExtentDelta.Y > 0.5)
+            Dispatcher.UIThread.Post(() => { if (_followReasoning) ReasoningScroll.ScrollToEnd(); }, DispatcherPriority.Loaded);
     }
 
     private MainWindow? OwnerWindow => this.FindAncestorOfType<MainWindow>();

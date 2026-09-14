@@ -49,11 +49,23 @@ public static class GoogleEntryPhotoService
         return Regex.Replace(normalized.ToString(), @"\s+", " ").Trim();
     }
 
-    public static bool IsEntrySource(string entry, GoogleSearchSource source, IReadOnlyList<string> allEntries)
+    public static bool IsEntrySource(string entry, GoogleSearchSource source, IReadOnlyList<string> allEntries, bool productPhoto = false)
     {
         var name = NormalizeName(entry);
         var title = " " + NormalizeName(source.Title) + " ";
-        if (name.Length < 4 || !title.Contains(" " + name + " ", StringComparison.Ordinal)) return false;
+        if (Regex.IsMatch(source.Title, @"\b(?:free images|stock photos|image search)\b", RegexOptions.IgnoreCase)
+            || (Uri.TryCreate(source.Url, UriKind.Absolute, out var sourceUri) && Regex.IsMatch(sourceUri.AbsolutePath, @"/(?:images/)?search(?:/|$)", RegexOptions.IgnoreCase))) return false;
+        var directMatch = title.Contains(" " + name + " ", StringComparison.Ordinal);
+        if (!directMatch && productPhoto)
+        {
+            static string ProductName(string value) => NormalizeName(Regex.Replace(value, @"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])", " "));
+            var tokens = ProductName(entry).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var host = Uri.TryCreate(source.Url, UriKind.Absolute, out var productUri) ? productUri.Host : "";
+            var productTitle = " " + ProductName(source.Title + " " + host) + " ";
+            directMatch = tokens.Length >= 2 && tokens.Any(token => token.Any(char.IsDigit))
+                && tokens.All(token => productTitle.Contains(" " + token + " ", StringComparison.Ordinal));
+        }
+        if (name.Length < 4 || !directMatch) return false;
         // A list page can mention a restaurant in its title while showing another place.
         if (Regex.IsMatch(title, @"\b(?:best|top|roundup|round up|places to|restaurants in)\b", RegexOptions.IgnoreCase)) return false;
         if (allEntries.Any(other => NormalizeName(other) != name && NormalizeName(other).Length >= 4
@@ -70,25 +82,31 @@ public static class GoogleEntryPhotoService
         GooglePhotoPreviewService? images = null, TimeSpan? timeBudget = null)
     {
         if (research.Search is not { } search) return;
-        var entries = EntryNames(markdown);
+        var entries = research.PhotoSubject is { Length: > 0 } subject ? new[] { subject } : EntryNames(markdown);
         if (entries.Count == 0) return;
         images ??= GooglePhotoPreviewService.Shared;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeBudget ?? TimeSpan.FromSeconds(30));
         var usedImages = new HashSet<string>(StringComparer.Ordinal);
+        bool Matches(string entry, GoogleSearchSource source) => IsEntrySource(entry, source, entries, research.PhotoSubject is not null);
         try
         {
             foreach (var entry in entries)
             {
                 deadline.Token.ThrowIfCancellationRequested();
-                var matches = search.Sources.Where(source => IsEntrySource(entry, source, entries)).ToArray();
+                var matches = search.Sources.Where(source => Matches(entry, source)).ToArray();
                 if (matches.Length == 0)
                 {
                     // The original query already went to Google. Add only the displayed
                     // entry name, rather than sending the answer or private chat history.
                     var query = GoogleSearchContext.NormalizeQuery($"\"{entry.Replace('"', ' ')}\" {search.Query}");
                     var specific = await browser.SearchAsync(query, deadline.Token);
-                    matches = specific.Sources.Where(source => IsEntrySource(entry, source, entries)).ToArray();
+                    matches = specific.Sources.Where(source => Matches(entry, source)).ToArray();
+                    if (matches.Length == 0)
+                    {
+                        specific = await browser.SearchAsync(GoogleSearchContext.NormalizeQuery($"\"{entry.Replace('"', ' ')}\" photos"), deadline.Token);
+                        matches = specific.Sources.Where(source => Matches(entry, source)).ToArray();
+                    }
                 }
                 foreach (var source in matches.Take(2))
                 {

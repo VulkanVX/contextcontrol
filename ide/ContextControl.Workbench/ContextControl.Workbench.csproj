@@ -6,10 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Icons\contextcontrol.ico</ApplicationIcon>
-    <Version>0.4.4</Version>
-    <AssemblyVersion>0.4.4.0</AssemblyVersion>
-    <FileVersion>0.4.4.0</FileVersion>
-    <InformationalVersion>0.4.4</InformationalVersion>
+    <Version>0.5.0</Version>
+    <AssemblyVersion>0.5.0.0</AssemblyVersion>
+    <FileVersion>0.5.0.0</FileVersion>
+    <InformationalVersion>0.5.0</InformationalVersion>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <NoWarn>$(NoWarn);NU1900</NoWarn>
     <DefaultItemExcludes>$(DefaultItemExcludes);.tmp\**</DefaultItemExcludes>
@@ -27,6 +27,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Features/LocalModels/Runtime/TransformersServer.py" LogicalName="ContextControl.TransformersServer.py" />
+    <EmbeddedResource Include="Features/LocalModels/Catalog/DiscoveredModels.json" LogicalName="ContextControl.DiscoveredModels.json" />
   </ItemGroup>
 
   <ItemGroup>

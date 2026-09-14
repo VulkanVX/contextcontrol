@@ -68,17 +68,19 @@
                                   VerticalAlignment="Stretch"
                                   Command="{Binding DataContext.ContextControl.SelectChatSessionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                   CommandParameter="{Binding}">
-                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="5" RowSpacing="2">
+                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="5" RowSpacing="2">
                                   <TextBlock Text="{Binding Title}" Classes="chat-session-title" />
+                                  <TextBlock Grid.Column="1" Text="{Binding Activity.ElapsedLabel}" Classes="history-meta" IsVisible="{Binding IsGenerating}" VerticalAlignment="Center" />
                                   <controls:LoadingRingControl
-                                      Grid.Column="1"
+                                      Grid.Column="2"
                                       Classes="chat-session-loader"
                                       IsVisible="{Binding ShowGeneratingLoader}" />
                                   <Border
-                                      Grid.Column="1"
+                                      Grid.Column="2"
                                       Classes="chat-session-unread-dot"
                                       IsVisible="{Binding ShowUnreadDot}" />
-                                  <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Summary}" Classes="history-meta chat-session-summary" />
+                                  <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Summary}" IsVisible="{Binding !IsGenerating}" Classes="history-meta chat-session-summary" />
+                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Activity.CompactStatus}" Classes="history-meta" IsVisible="{Binding IsGenerating}" />
                                 </Grid>
                               </Button>
                               <Button
@@ -114,8 +116,10 @@
                       PointerPressed="OnChatHistoryRailPressed" />
                 </Grid>
 
+                <Grid x:Name="ReasoningSplitGrid" Grid.Column="1" ColumnDefinitions="*,0,0" MinHeight="0" ClipToBounds="True">
                 <ScrollViewer
-                    Grid.Column="1"
+                    x:Name="TranscriptScroll"
+                    Grid.Column="0"
                     MinWidth="0"
                     Margin="8"
                     ClipToBounds="True"
@@ -144,10 +148,36 @@
                       ToggleThinkingCommand="{Binding ContextControl.ToggleThinkingCommand}"
                       ToggleDiagnosticCommand="{Binding ContextControl.ToggleDiagnosticCommand}" />
                 </ScrollViewer>
-                <Border Grid.Column="1" Grid.Row="1" Classes="chat-activity-strip" IsVisible="{Binding ContextControl.HasSelectedChatActivity}">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" DataContext="{Binding ContextControl.SelectedChatActivity}">
-                    <controls:ActivityLineControl Text="{Binding Status}" IsActive="{Binding IsIndeterminate}" FontFamily="{DynamicResource UiFontFamily}" Foreground="{DynamicResource TextMutedBrush}" Accent="{DynamicResource AccentBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding ElapsedLabel}" Classes="history-meta" VerticalAlignment="Center" />
+                <GridSplitter Grid.Column="1" Width="5" ResizeDirection="Columns" IsVisible="{Binding ContextControl.IsReasoningPaneOpen}" />
+                <Border Grid.Column="2" MinWidth="220" Classes="rule-card" Padding="10" IsVisible="{Binding ContextControl.IsReasoningPaneOpen}">
+                  <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="Reasoning · this chat" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Content="×" Click="OnCloseReasoning" Classes="cc-prompt-chip" ToolTip.Tip="Close reasoning pane" />
+                    </Grid>
+                    <ScrollViewer x:Name="ReasoningScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ScrollChanged="OnReasoningScrollChanged">
+                      <ItemsControl x:Name="ReasoningItems" ItemsSource="{Binding ContextControl.ReasoningMessages}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:LocalLlmChatMessageViewModel">
+                            <Border Classes="rule-card reasoning-entry" Classes.active="{Binding IsReasoningSelected}" IsVisible="{Binding HasThinking}" Padding="10" Margin="0,0,0,8">
+                              <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding ReasoningHeader}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ReasoningContext}" TextWrapping="Wrap" Classes="muted" />
+                                <SelectableTextBlock Text="{Binding ThinkingText}" TextWrapping="Wrap" FontWeight="Normal" FontFamily="{DynamicResource UiFontFamily}" FontSize="{Binding DataContext.ChatWindowFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </Grid>
+                </Border>
+                </Grid>
+                <Border Grid.Column="1" Grid.Row="1" Padding="8,4">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Button Content="Reasoning ↗" Click="OnOpenReasoning" Classes="cc-prompt-chip" ToolTip.Tip="Open live reasoning, grouped by reply" />
+                    <TextBlock Grid.Column="1" Text="{Binding ContextControl.SelectedChatActivity.CompactStatus}" Classes="history-meta" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding ContextControl.SelectedChatActivity.ElapsedLabel}" Classes="history-meta" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </Grid>

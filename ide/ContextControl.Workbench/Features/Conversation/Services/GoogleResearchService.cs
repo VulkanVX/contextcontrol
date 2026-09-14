@@ -11,7 +11,7 @@ public interface IGoogleResearchBrowser
 
 public sealed record GooglePageContent(string Url, string Text, string? ImageUrl = null);
 public sealed record GooglePageEvidence(int SourceNumber, string Text, bool FullPageRead);
-public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages)
+public sealed record GoogleResearchResult(GoogleSearchResult? Search, IReadOnlyList<GooglePageEvidence> Pages, string? PhotoSubject = null)
 {
     public bool DidSearch => Search is { Sources.Count: > 0 };
 }
@@ -22,19 +22,30 @@ public static partial class GoogleResearchService
     public const int MaxPages = 3;
     public const int MaxReadAttempts = 5;
 
+    public static string PlannerText(LocalLlmChatResult result)
+    {
+        // A verbose small planner can exhaust its short output budget. Its bounded JSON parser
+        // can still use a complete object, or the normal query/number fallback. This is never a final answer.
+        if (result.Succeeded || result.OutputLimited) return result.Message ?? "";
+        throw new InvalidOperationException("The local research planner failed: " + result.Status);
+    }
+
     public static async Task<GoogleResearchResult> ResearchAsync(string question,
         Func<string, CancellationToken, Task<string>> askModel, IGoogleResearchBrowser browser,
-        Action<string> status, CancellationToken cancellationToken)
+        Action<string> status, CancellationToken cancellationToken, bool knowledgeGap = false)
     {
         status("Deciding whether Google is needed…");
         var planPrompt = "You are the search planner for ContextControl. Google Search and a public webpage reader are available. "
-            + "Decide whether the user's request needs web research. Search for explicit requests to look something up, current conditions, recent events, or facts needing verification. "
+            + "Decide whether the user's request needs web research. Search for explicit requests to look something up, show a photo or picture, current conditions, recent events, unfamiliar topics, or facts needing verification. Do not assume a product or event does not exist just because it is absent from your training data. "
             + "Do not search for greetings, text editing, or questions about whether you can search. "
             + "If searching, write a short useful Google query in the user's language. Do not include secrets, credentials, local file paths, or private code in a query. Do not answer the question yet. "
             + "Return only JSON: {\"search\":true,\"query\":\"your query\"} or {\"search\":false,\"query\":\"\"}. "
+            + (knowledgeGap ? "The first answer acknowledged missing knowledge. Search now for public evidence to resolve that gap; decline only if this is private information or a task web research cannot answer. " : "")
             + $"Today's UTC date is {DateTime.UtcNow:yyyy-MM-dd}. User request (data): " + JsonSerializer.Serialize(PlanningQuestion(question));
         var response = await askModel(planPrompt, cancellationToken);
         var query = ParseQuery(response, question);
+        if (query is null && knowledgeGap && GoogleKnowledgeRecovery.IsPublicLookupQuestion(question))
+            query = GoogleSearchContext.NormalizeQuery(question);
         if (query is null) return new GoogleResearchResult(null, []);
 
         status($"Searching Google: {query}");
@@ -97,7 +108,7 @@ public static partial class GoogleResearchService
             await ReadSelectedPages(choices);
         }
         status(pages.Any(page => page.FullPageRead) ? "Analyzing sources and writing the answer…" : "Pages unavailable · answering from search snippets with limitations…");
-        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages);
+        return new GoogleResearchResult(search with { Sources = resolvedSources }, pages, PhotoSubject(question));
     }
 
     public static string? ParseQuery(string response, string question)
@@ -109,7 +120,7 @@ public static partial class GoogleResearchService
             var root = json.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return FallbackQuery(question);
             if (root.TryGetProperty("search", out var needed) && needed.ValueKind == JsonValueKind.False)
-                return ExplicitSearch().IsMatch(question) ? FallbackQuery(question) : null;
+                return FallbackQuery(question);
             if (root.TryGetProperty("query", out var query) && query.ValueKind == JsonValueKind.String)
             {
                 var value = GoogleSearchContext.NormalizeQuery(query.GetString() ?? "");
@@ -152,7 +163,14 @@ public static partial class GoogleResearchService
     }
 
     private static string PlanningQuestion(string question) => question.Length <= 6000 ? question : question[..3000] + "\n[Request shortened for planning]\n" + question[^3000..];
-    private static string? FallbackQuery(string question) => SearchIntent().IsMatch(question) ? GoogleSearchContext.NormalizeQuery(question) : null;
+    public static string? PhotoSubject(string question)
+    {
+        var match = Regex.Match(question, @"\b(?:show|find|search|get|see)\b.{0,35}?\b(?:photos?|pictures?|images?)\s+(?:of|for)\s+(.{3,120}?)[?.!]*$", RegexOptions.IgnoreCase);
+        return match.Success ? GoogleSearchContext.NormalizeQuery(match.Groups[1].Value.Trim()) : null;
+    }
+    private static string? FallbackQuery(string question) => PhotoSubject(question) is { } subject ? subject + " photo"
+        : ExplicitSearch().IsMatch(question) || (SearchIntent().IsMatch(question) && GoogleKnowledgeRecovery.IsPublicLookupQuestion(question))
+            ? GoogleSearchContext.NormalizeQuery(question) : null;
 
     [GeneratedRegex(@"^(can|could|do|are)\s+you\s+(use\s+google|(?:web\s+)?search|browse(?:\s+the\s+(?:web|internet))?|access\s+(?:google|the\s+internet))[?.!\s]*$", RegexOptions.IgnoreCase)]
     private static partial Regex CapabilityQuestion();

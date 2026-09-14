@@ -1,4 +1,4 @@
-﻿// CC-DESC: Extracted ContextControlViewModel system slice.
+// CC-DESC: Extracted ContextControlViewModel system slice.
 // CC-DESC: Owns Context Control workflow state, prompt bar state, and DIR/CC/GO commands.
 
 using System.Collections.ObjectModel;
@@ -670,7 +670,7 @@ public sealed partial class ContextControlViewModel
         {
             item.Status = "Stopping local response...";
             PhaseTitle = "Stopping local response";
-            PhaseDetail = "Cancelling the Ollama request.";
+            PhaseDetail = "Cancelling the local model request.";
             ProviderStatus = "Stopping local response...";
             AppendTerminalOutput("Local response cancellation requested.");
             local.Cancellation.Cancel();
@@ -818,11 +818,13 @@ public sealed partial class ContextControlViewModel
 
             if (answer.Length > 0)
             {
+                liveAssistant.IsAwaitingAnswer = false;
                 liveAssistant.UpdateLiveStatus(answer.ToString());
             }
             else
             {
-                liveAssistant.UpdateLiveStatus(string.IsNullOrWhiteSpace(status) ? LiveThinkingPlaceholder : status);
+                liveAssistant.IsAwaitingAnswer = true;
+                liveAssistant.LiveStage = ChatRequestProgressViewModel.CompactStage(status);
             }
 
             var downstreamProgress = string.IsNullOrEmpty(inlineThinkingDeltaForProgress)
@@ -1465,13 +1467,13 @@ public sealed partial class ContextControlViewModel
             model.Id,
             FormatCapsulePhase(phase),
             "live local response",
-            canShowLiveThinkingPlaceholder: requestThinking);
+            canShowLiveThinkingPlaceholder: false) { IsAwaitingAnswer = true, LiveStage = "Loading" };
         AppendChatMessageToSession(targetSession, liveAssistant);
         liveAssistant.UpdateLiveStatus(LiveThinkingPlaceholder);
         PromptText = "";
         PhaseTitle = "Local CC chat";
         PhaseDetail = $"{FormatCapsulePhase(phase)} with {model.DisplayName}; {capsule.Summary}.";
-        ProviderStatus = $"Local Ollama: {model.Id}";
+        ProviderStatus = $"Local: {model.DisplayName}";
         var chatCancellation = new CancellationTokenSource();
         var generationProgress = CreateGenerationProgress(targetSession, model.DisplayName, FormatCapsulePhase(phase), isCancellable: true);
         RegisterLocalChatRequest(generationProgress.Item, chatCancellation, targetSession, liveAssistant);
@@ -1479,7 +1481,7 @@ public sealed partial class ContextControlViewModel
         try
         {
             terminal.Report($"Sending {FormatCapsulePhase(phase)} capsule to {model.DisplayName} ({model.Id})...");
-            terminal.Report($"Requested Ollama context window: {capsule.RequestedContextTokens:N0} tokens.");
+            terminal.Report($"Requested local context window: {capsule.RequestedContextTokens:N0} tokens.");
             ReportCapsuleAttachments(terminal, capsuleAttachments);
             foreach (var imageAttachment in imageAttachmentSnapshot)
             {
@@ -1489,15 +1491,16 @@ public sealed partial class ContextControlViewModel
             var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, capsule.Text, useGoogle,
                 targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
-            var result = await _localLlmService.SendChatAsync(
-                new LocalLlmRequest(
+            var chatRequest = new LocalLlmRequest(
                     model.Id,
                     preparedPrompt,
                     FormatCapsulePhase(phase),
                     displayedAttachmentSnapshot.Select(attachment => attachment.DisplayTitle).ToArray(),
                     capsule.RequestedContextTokens,
                     imageAttachmentSnapshot.Select(attachment => attachment.Path).ToArray(),
-                    requestThinking),
+                    requestThinking);
+            var result = await _localLlmService.SendChatAsync(
+                chatRequest,
                 liveProgress,
                 terminal,
                 chatCancellation.Token);
@@ -1506,7 +1509,7 @@ public sealed partial class ContextControlViewModel
                 model.MarkThinkingUnsupported();
                 NotifyLocalThinkingCapabilityChanged();
                 liveAssistant.DisableLiveThinkingPlaceholder();
-                terminal.Report($"{model.DisplayName} rejected Ollama thinking; retrying without think.");
+                terminal.Report($"{model.DisplayName} rejected the thinking option; retrying with thinking off.");
                 chatCancellation.Token.ThrowIfCancellationRequested();
                 result = await _localLlmService.SendChatAsync(
                     new LocalLlmRequest(
@@ -1521,6 +1524,9 @@ public sealed partial class ContextControlViewModel
                     terminal,
                     chatCancellation.Token);
             }
+
+            result = await RecoverGoogleKnowledgeAsync(message, chatRequest with { Prompt = capsule.Text }, result, useGoogle,
+                targetSession, liveAssistant, generationProgress.Item, generationProgress.Progress, terminal, chatCancellation.Token);
 
             if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Message))
             {
@@ -1615,14 +1621,14 @@ public sealed partial class ContextControlViewModel
             model.Id,
             "raw",
             "live local response",
-            canShowLiveThinkingPlaceholder: requestThinking);
+            canShowLiveThinkingPlaceholder: false) { IsAwaitingAnswer = true, LiveStage = "Loading" };
         AppendChatMessageToSession(targetSession, liveAssistant);
         liveAssistant.UpdateLiveStatus(LiveThinkingPlaceholder);
         PromptText = "";
         MoveToCcStage(CcStageRequest);
         PhaseTitle = "Raw chat";
         PhaseDetail = $"Sending clean chat to {model.DisplayName}.";
-        ProviderStatus = $"Local Ollama: {model.Id}";
+        ProviderStatus = $"Local: {model.DisplayName}";
 
         var requestedContextTokens = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat);
         var chatCancellation = new CancellationTokenSource();
@@ -1633,19 +1639,20 @@ public sealed partial class ContextControlViewModel
         {
             terminal.Report($"Sending raw prompt to {model.DisplayName} ({model.Id})...");
             terminal.Report("No ContextControl capsule, attachments, skillbook, or workflow instructions included.");
-            terminal.Report($"Requested Ollama context window: {requestedContextTokens:N0} tokens.");
+            terminal.Report($"Requested local context window: {requestedContextTokens:N0} tokens.");
 
             var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, message, useGoogle,
                 targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
-            var result = await _localLlmService.SendChatAsync(
-                new LocalLlmRequest(
+            var chatRequest = new LocalLlmRequest(
                     model.Id,
                     preparedPrompt,
                     "raw",
                     [],
                     requestedContextTokens,
-                    Think: requestThinking),
+                    Think: requestThinking);
+            var result = await _localLlmService.SendChatAsync(
+                chatRequest,
                 liveProgress,
                 terminal,
                 chatCancellation.Token);
@@ -1654,7 +1661,7 @@ public sealed partial class ContextControlViewModel
                 model.MarkThinkingUnsupported();
                 NotifyLocalThinkingCapabilityChanged();
                 liveAssistant.DisableLiveThinkingPlaceholder();
-                terminal.Report($"{model.DisplayName} rejected Ollama thinking; retrying without think.");
+                terminal.Report($"{model.DisplayName} rejected the thinking option; retrying with thinking off.");
                 chatCancellation.Token.ThrowIfCancellationRequested();
                 result = await _localLlmService.SendChatAsync(
                     new LocalLlmRequest(
@@ -1668,6 +1675,9 @@ public sealed partial class ContextControlViewModel
                     terminal,
                     chatCancellation.Token);
             }
+
+            result = await RecoverGoogleKnowledgeAsync(message, chatRequest with { Prompt = message }, result, useGoogle,
+                targetSession, liveAssistant, generationProgress.Item, generationProgress.Progress, terminal, chatCancellation.Token);
 
             if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Message))
             {

@@ -55,12 +55,14 @@ internal static class UiExperienceTests
         Snapshot(settingsWindow, 1080, 700, Path.Combine(output, "settings-200.png"));
         settingsWindow.Close();
         MainWindowFlow(workbench, output);
+        ThinkingScroll(output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;
+        workbench.IsChatProgressPanelEnabled = false;
         workbench.SaveChatMonitorPosition(new PixelPoint(-500, 210));
         workbench.FlushAppearanceSettings();
         var restored = WorkbenchSettings.Load(root);
-        Check(restored.UiFontSize == 17.5 && !restored.ChatMonitorEnabled && restored.ChatMonitorX == -500,
+        Check(restored.UiFontSize == 17.5 && !restored.ChatMonitorEnabled && restored.ChatMonitorX == -500 && !restored.ChatProgressPanelEnabled,
             "Latest scale, monitor visibility and negative-screen position must survive restart.");
         Console.WriteLine($"UI experience regression passed: {_checks} checks. Render artifacts: {output}");
     }
@@ -352,6 +354,19 @@ internal static class UiExperienceTests
         Dispatcher.UIThread.RunJobs();
         Check(Equals(google.Content, "Google off") && !context.IsGoogleSearchEnabled, "Clicking the composer research switch must update its real binding.");
         context.IsGoogleSearchEnabled = true;
+        var reasoningMessage = new LocalLlmChatMessageViewModel("assistant", "", "qwen3.5:4b", "raw") { IsAwaitingAnswer = true, LiveStage = "Thinking" };
+        reasoningMessage.AppendLiveThinking("I will compare the entries, check the source dates, and match each photo to its named place.\n\nThe answer should preserve source links and distinguish ratings from review counts.");
+        Call(context, "AppendChatMessageToSession", session, reasoningMessage);
+        context.ToggleThinkingCommand.Execute(reasoningMessage);
+        Snapshot(main, 1360, 840, Path.Combine(output, "reasoning-split.png"));
+        Check(context.IsReasoningPaneOpen && ReferenceEquals(context.SelectedReasoningMessage, reasoningMessage), "Message reasoning button must open and select that exact reply.");
+        Check(main.GetVisualDescendants().OfType<SelectableTextBlock>().Any(block => block.IsEffectivelyVisible && block.Text == reasoningMessage.ThinkingText), "Real reasoning pane must bind the model's text.");
+        reasoningMessage.AppendLiveThinking("\nThis newest chunk must be visible immediately.");
+        Dispatcher.UIThread.RunJobs();
+        Check(main.GetVisualDescendants().OfType<SelectableTextBlock>().Any(block => block.Text?.EndsWith("immediately.") == true), "Reasoning must stream without a second typing animation.");
+        reasoningMessage.UpdateContent("Here is the completed answer.");
+        Check(reasoningMessage.HasThinking && reasoningMessage.RawText.Contains("newest chunk"), "Final or failed response text must preserve the streamed reasoning in saved history.");
+        context.IsReasoningPaneOpen = false;
         var accent = main.Resources["AccentBrush"];
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < 300; i++) workbench.UiFontSize = 8 + (i % 29) * .5;
@@ -373,6 +388,34 @@ internal static class UiExperienceTests
         workbench.IsChatMonitorEnabled = false;
         Check(floating?.IsVisible == false, "Settings toggle must hide the actual floating window.");
         main.Close();
+    }
+
+    private static void ThinkingScroll(string output)
+    {
+        var previous = new LocalLlmChatMessageViewModel("assistant", string.Join("\n\n", Enumerable.Repeat("A long earlier answer with enough content to scroll. Keep the reader's position while new reasoning arrives.", 60)));
+        var live = new LocalLlmChatMessageViewModel("assistant", "Model is thinking…", "qwen3.5:4b", "raw") { IsAwaitingAnswer = true, LiveStage = "Thinking" };
+        live.AppendLiveThinking("First reasoning chunk.");
+        var transcript = new ChatTranscriptRenderControl { ChatFontSize = 14, Items = [previous, live] };
+        var scroll = new ScrollViewer { Content = transcript };
+        var window = new Window { Content = scroll };
+        WorkbenchThemeResources.Apply(window, "studio");
+        Snapshot(window, 800, 440, Path.Combine(output, "thinking-scroll-before.png"));
+        scroll.ScrollToEnd(); Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        scroll.Offset = new Vector(0, Math.Max(0, scroll.Offset.Y - 120));
+        Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        var anchor = scroll.Offset.Y;
+        var height = scroll.Extent.Height;
+        for (var i = 0; i < 60; i++)
+        {
+            live.AppendLiveThinking($" Reasoning update {i}: checking the sources and details.");
+            Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+            Check(Math.Abs(scroll.Offset.Y - anchor) < 2, "Streaming reasoning must not reset the reader's scroll position.");
+            Check(Math.Abs(scroll.Extent.Height - height) < 2, "Fixed reasoning strip must not shrink and regrow the transcript.");
+        }
+        Check(ChatRequestProgressViewModel.FormatElapsed(143.9) == "2m 23s" && ChatRequestProgressViewModel.FormatElapsed(.9) == "0s", "Elapsed durations use whole seconds.");
+        Check(ChatRequestProgressViewModel.CompactStage("Model is thinking…") == "Thinking" && ChatRequestProgressViewModel.CompactStage("Searching Google…") == "Googling", "Sidebar activity labels stay compact.");
+        Snapshot(window, 800, 440, Path.Combine(output, "thinking-scroll-after.png"));
+        window.Close();
     }
 
     private static void Snapshot(Window window, int width, int height, string path)

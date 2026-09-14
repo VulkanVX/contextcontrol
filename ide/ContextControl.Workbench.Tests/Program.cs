@@ -10,6 +10,12 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--runtime-regression")) { await LocalRuntimeTests.Run(); return; }
+if (args.Contains("--google-photo-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", photo: true); return; }
+if (args.Contains("--google-knowledge-smoke")) { GoogleBrowserTests.Run("granite3.3:2b", knowledge: true); return; }
+if (args.Contains("--runtime-install")) { await LocalRuntimeTests.Install(args[Array.IndexOf(args, "--runtime-install") + 1]); return; }
+if (args.Contains("--runtime-live")) { var at = Array.IndexOf(args, "--runtime-live"); await LocalRuntimeTests.Live(args[at + 1], args.Length > at + 2 ? args[at + 2] : ""); return; }
+
 if (args.Contains("--google-browser-smoke"))
 {
     GoogleBrowserTests.Run(args.SkipWhile(arg => arg != "--google-browser-smoke").Skip(1).FirstOrDefault());

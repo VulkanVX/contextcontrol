@@ -27,7 +27,10 @@
           <TextBlock Classes="muted" Text="A compact, draggable window for your chats. See live status, open a conversation, or reply with files without bringing the full workbench forward." TextWrapping="Wrap" />
           <TextBlock Classes="muted" Text="New chats and replies appear automatically. Right-click a chat in history to add or remove it. Removing a monitor row keeps the conversation." TextWrapping="Wrap" />
         </StackPanel>
-        <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsChatMonitorEnabled, Mode=TwoWay}" OnContent="On" OffContent="Off" VerticalAlignment="Top" />
+        <StackPanel Grid.Column="1" Spacing="10">
+          <ToggleSwitch IsChecked="{Binding IsChatMonitorEnabled, Mode=TwoWay}" OnContent="On" OffContent="Off" VerticalAlignment="Top" />
+          <CheckBox IsChecked="{Binding IsChatProgressPanelEnabled, Mode=TwoWay}" Content="Progress panel above terminal" />
+        </StackPanel>
       </Grid>
     </Border>
     <Border Classes="rule-card" Padding="14,12">

@@ -36,4 +36,16 @@ public sealed partial class LlmsSettingsPage : UserControl
             // Settings remain usable even if the system browser cannot be opened.
         }
     }
+
+    private async void OnRuntimeModelBrowseClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { DataContext: ContextControl.Workbench.ViewModels.LocalRuntimeProfileViewModel profile }
+            || TopLevel.GetTopLevel(this) is not { } top) return;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Choose a GGUF model (existing Ollama GGUF blobs also work)", AllowMultiple = false,
+            FileTypeFilter = [new("GGUF model") { Patterns = ["*.gguf"] }, new("All files") { Patterns = ["*"] }]
+        });
+        if (files.FirstOrDefault()?.Path is { IsFile: true } path) profile.ModelPath = path.LocalPath;
+    }
 }

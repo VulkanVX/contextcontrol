@@ -92,6 +92,8 @@ public static partial class GoogleSearchContext
         if (budget < 1500) throw new InvalidOperationException("The prompt leaves too little room for web sources. Increase the local model context size or shorten the prompt, then retry.");
         var builder = new StringBuilder();
         builder.AppendLine($"ContextControl searched Google on {DateTime.UtcNow:yyyy-MM-dd} UTC; {research.Pages.Count(page => page.FullPageRead)} selected pages were readable. Answer the user's request using the evidence below.");
+        if (research.PhotoSubject is not null)
+            builder.AppendLine("ContextControl will attempt to attach a matching source photo after your text response. Briefly describe the subject using the evidence. Do not claim a photo is already attached or that you cannot show images. Do not invent image license or reuse rights.");
         builder.AppendLine("Cite supporting sources with [1], [2], etc. Page excerpts may be shortened; a snippet-only source was NOT read. State uncertainty or missing evidence. Do not claim live facts that the evidence does not establish.");
         builder.AppendLine("Use readable Markdown suited to the information. For place, product or review lists, use numbered entries with a bold name on its own line, followed by indented detail lines and supporting citations within that entry. Include useful fields such as location, price or review summary only when supported. Attribute ratings to their source and include review count/date when available; never invent a rating, address, opening status or review. Use Markdown tables for concise comparisons when helpful.");
         if (research.Pages.Any(page => !page.FullPageRead))
@@ -124,6 +126,11 @@ public static partial class GoogleSearchContext
         builder.AppendLine("END WEB EVIDENCE");
         builder.AppendLine("USER REQUEST:");
         builder.Append(userPrompt);
+        if (research.PhotoSubject is not null)
+        {
+            builder.AppendLine();
+            builder.AppendLine("CONTEXTCONTROL RESPONSE FORMAT: Write only a short factual caption identifying the requested subject, using the evidence and numbered source citations. ContextControl itself retrieves and displays the source photo after your caption. Leave image-display capability, image-search instructions and licensing claims out of the caption.");
+        }
         return builder.ToString();
     }
 

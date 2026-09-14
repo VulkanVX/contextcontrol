@@ -32,8 +32,8 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         : ResolveProviderIcon(model.Id, model.DisplayName);
     private readonly int _advertisedContextTokens = ContextCapsuleBuilder.EstimateContextTokens(model.AdvertisedContext, 0);
     private readonly bool _isCloudModel = IsCloudModelId(model.Id);
-    private readonly bool _supportsNativeThinkingById = SupportsNativeThinkingById(model.Id);
-    private readonly bool _supportsThinkingOutputById = SupportsThinkingOutputById(model.Id);
+    private readonly bool _supportsNativeThinkingById = SupportsNativeThinkingById(model.BackendModelId ?? model.Id);
+    private readonly bool _supportsThinkingOutputById = SupportsThinkingOutputById(model.BackendModelId ?? model.Id);
     private readonly string _modelBaseLabel = ResolveModelBaseLabel(model);
     private readonly string _modelBaseDetail = ResolveModelBaseDetail(model);
     private readonly string _backendRequirementLabel = ResolveBackendRequirementLabel(model);
@@ -133,7 +133,9 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
     public bool IsImageModel => _isImageModel;
     public bool IsImageGenerationModel => _isImageGenerationModel;
     public bool IsOllamaChatBlocked => _isOllamaChatBlocked;
-    public bool CanUseInLocalChat => !IsImageGenerationModel && !IsOllamaChatBlocked;
+    public bool IsConnectedRuntime => !string.IsNullOrWhiteSpace(Model.RuntimeId);
+    public bool CanUseInLocalChat => !IsImageGenerationModel && (!IsOllamaChatBlocked || IsConnectedRuntime)
+        && ModelBaseLabel is not ("Embedding" or "Reranker");
     public bool SupportsNativeThinkingRequest => !_thinkingUnsupported && (_supportsNativeThinkingById || _hasNativeThinkingCapability);
     public bool SupportsThinking => SupportsNativeThinkingRequest || _supportsThinkingOutputById || _hasDetectedThinking;
     public string ThinkingLabel => SupportsNativeThinkingRequest ? "API thinking" : SupportsThinking ? "Thinking output" : "No think tag";
@@ -143,8 +145,8 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
     public string BackendRequirementDetail => _backendRequirementDetail;
     public bool IsOllamaImageRoute => BackendRequirementLabel.Equals("Ollama image", StringComparison.OrdinalIgnoreCase);
     public bool IsBackendPlatformSupported => !IsOllamaImageRoute || OperatingSystem.IsMacOS();
-    public bool UsesOllamaPull => BackendRequirementLabel.StartsWith("Ollama", StringComparison.OrdinalIgnoreCase);
-    public bool RequiresManualBackend => !IsCloudModel && !UsesOllamaPull;
+    public bool UsesOllamaPull => !IsConnectedRuntime && BackendRequirementLabel.StartsWith("Ollama", StringComparison.OrdinalIgnoreCase);
+    public bool RequiresManualBackend => !IsConnectedRuntime && !IsCloudModel && !UsesOllamaPull;
     public string DependencyId => ResolveDependencyId(BackendRequirementLabel);
     public bool IsBackendDependencyReady
     {
@@ -276,9 +278,9 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         : IsInstalled ? "Installed" : "Not installed";
 
     public bool CanPull => !IsCloudModel && !IsInstalled && !IsPulling && UsesOllamaPull && IsBackendPlatformSupported;
-    public bool CanUninstall => !IsCloudModel && IsInstalled && !IsPulling;
+    public bool CanUninstall => !IsConnectedRuntime && !IsCloudModel && IsInstalled && !IsPulling;
 
-    public string PullButtonLabel => IsCloudModel
+    public string PullButtonLabel => IsConnectedRuntime ? IsInstalled ? "Connected" : "Offline" : IsCloudModel
         ? IsAvailable ? "Cloud ready" : "Cloud"
         : IsPulling ? "Working" : IsInstalled ? "Uninstall" : !IsBackendPlatformSupported ? "Mac only" : IsBackendModelReady ? "Ready" : CanDownloadBackendModel ? "Download" : CanUseManualBackend ? "Backend ready" : HasBackendOnlyReadyState ? "Need model" : CanInstallDependency ? "Install dep" : RequiresManualBackend ? "Manual" : "Download";
 
@@ -346,7 +348,7 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         IsAvailable = RequiresManualBackend
             ? IsInstalled || CanUseManualBackend
             : isAvailable;
-        var fit = IsCloudModel
+        var fit = IsConnectedRuntime ? new ModelFit(false, "Runtime managed", Model.MinimumRequirement) : IsCloudModel
             ? new ModelFit(
                 isAvailable,
                 isAvailable ? "Cloud ready" : "Cloud",

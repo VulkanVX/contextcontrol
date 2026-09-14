@@ -13,7 +13,7 @@ public sealed class ChatRequestProgressViewModel : ObservableObject
     private string _status = "Loading model...";
     private string _sizeLabel = "0 output tok";
     private string _speedLabel = "speed pending";
-    private string _elapsedLabel = "0.0s";
+    private string _elapsedLabel = "0s";
     private string _thinkingPreviewText = "";
     private double _value;
     private bool _isIndeterminate = true;
@@ -25,7 +25,7 @@ public sealed class ChatRequestProgressViewModel : ObservableObject
         IsCancellable = isCancellable;
         _elapsedTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromSeconds(1)
         };
         _elapsedTimer.Tick += (_, _) => RefreshElapsed();
         RefreshElapsed();
@@ -43,7 +43,22 @@ public sealed class ChatRequestProgressViewModel : ObservableObject
     public string Status
     {
         get => _status;
-        set => SetProperty(ref _status, value ?? "");
+        set { if (SetProperty(ref _status, value ?? "")) OnPropertyChanged(nameof(CompactStatus)); }
+    }
+
+    public string CompactStatus => CompactStage(Status);
+    public static string CompactStage(string? status)
+    {
+        var text = (status ?? "").ToLowerInvariant();
+        if (text.Contains("photo") || text.Contains("image")) return "Photos";
+        if (text.Contains("googl") || text.Contains("search")) return "Googling";
+        if (text.Contains("reading") || text.Contains("source [")) return "Reading";
+        if (text.Contains("think") || text.Contains("reason")) return "Thinking";
+        if (text.Contains("load") || text.Contains("prepar") || text.Contains("warm")) return "Loading";
+        if (text.Contains("stop") || text.Contains("cancel")) return "Stopping";
+        if (text.Contains("complet") || text.Contains("ready")) return "Done";
+        if (text.Contains("writ") || text.Contains("generat") || text.Contains("analyz") || text.Contains("answer")) return "Writing";
+        return "Working";
     }
 
     public string SizeLabel
@@ -123,11 +138,12 @@ public sealed class ChatRequestProgressViewModel : ObservableObject
         ThinkingPreviewText = BuildThinkingPreview(_thinkingText.ToString());
     }
 
-    private static string FormatElapsed(double seconds)
+    internal static string FormatElapsed(double seconds)
     {
+        seconds = Math.Floor(Math.Max(0, seconds));
         return seconds < 60
-            ? $"{seconds:0.0}s"
-            : $"{(int)(seconds / 60)}m {seconds % 60:00.0}s";
+            ? $"{seconds:0}s"
+            : $"{(int)(seconds / 60)}m {seconds % 60:00}s";
     }
 
     private static string NormalizeThinkingDelta(string text)

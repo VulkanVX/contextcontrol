@@ -247,6 +247,14 @@ public sealed partial class ContextControlViewModel
     private void ApplyLocalModelRefresh(LocalLlmRefreshResult result, bool preserveBackendModelStates = false)
     {
         _isOllamaReachable = result.OllamaReachable;
+        foreach (var catalogModel in result.Catalog)
+        {
+            if (LocalLlmModels.Any(model => model.Id.Equals(catalogModel.Id, StringComparison.OrdinalIgnoreCase))) continue;
+            LocalLlmModels.Add(new LocalLlmModelViewModel(catalogModel));
+            if (!LocalModelIdOptions.Contains(catalogModel.Id, StringComparer.OrdinalIgnoreCase)) LocalModelIdOptions.Add(catalogModel.Id);
+        }
+        foreach (var runtime in LocalRuntimeProfiles)
+            runtime.Status = _localLlmService.RuntimeStatuses.FirstOrDefault(status => status.Id == runtime.Id)?.Status ?? "Not checked";
         foreach (var unknownModelId in result.UnknownInstalledModelIds)
         {
             if (LocalLlmModels.Any(model => string.Equals(model.Id, unknownModelId, StringComparison.OrdinalIgnoreCase)))
@@ -964,6 +972,7 @@ public sealed partial class ContextControlViewModel
 
     private string ResolveModelStorageLocation(LocalLlmModelViewModel model)
     {
+        if (model.IsConnectedRuntime) return $"Model storage and loading are managed by {model.Model.RuntimeLabel}.";
         if (model.IsInstalled
             && (model.UsesOllamaPull
                 || model.DependencyId.Equals("ollama", StringComparison.OrdinalIgnoreCase)

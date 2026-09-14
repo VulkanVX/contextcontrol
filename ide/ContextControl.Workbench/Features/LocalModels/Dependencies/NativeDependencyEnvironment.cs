@@ -30,8 +30,8 @@ internal static class NativeDependencyEnvironment
             "ggml-org/llama.cpp",
             ["llama-server.exe", "llama-server", "server.exe", "server"],
             [
-                Preference("bin-win-cpu-x64", ".zip"),
-                Preference("bin-win-vulkan-x64", ".zip")
+                Preference("bin-win-vulkan-x64", ".zip"),
+                Preference("bin-win-cpu-x64", ".zip")
             ],
             [],
             []),
@@ -191,6 +191,24 @@ internal static class NativeDependencyEnvironment
             ? tagElement.GetString() ?? "latest"
             : "latest";
         var asset = SelectAsset(root, preferences);
+        // Some projects mark a release-pointer tag as latest. Find the newest actual platform artifact.
+        if (asset is null)
+        {
+            using var candidatesResponse = await http.GetAsync($"https://api.github.com/repos/{spec.Repository}/releases?per_page=10", cancellationToken).ConfigureAwait(false);
+            if (candidatesResponse.IsSuccessStatusCode)
+            {
+                using var candidatesDocument = JsonDocument.Parse(await candidatesResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                foreach (var candidate in candidatesDocument.RootElement.EnumerateArray())
+                {
+                    if (candidate.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True) continue;
+                    asset = SelectAsset(candidate, preferences);
+                    if (asset is null) continue;
+                    tag = candidate.GetProperty("tag_name").GetString() ?? "latest";
+                    terminal.Report($"Using {spec.DisplayName} {tag}, the newest release with a compatible binary.");
+                    break;
+                }
+            }
+        }
         if (asset is null)
         {
             return new NativeDependencyInstallResult(false, $"{spec.DisplayName} latest release has no matching portable asset for this OS.");

@@ -49,7 +49,7 @@ public sealed partial class LocalLlmService
         IProgress<string>? terminal,
         CancellationToken cancellationToken = default)
     {
-        var result = await SendOllamaChatAsync(request, progress, terminal, cancellationToken).ConfigureAwait(false);
+        var result = await SendBackendChatAsync(request, progress, terminal, cancellationToken).ConfigureAwait(false);
         // Some reasoning models exhaust their context before producing any answer.
         // Retry once with explicit thinking disabled, retaining the original evidence.
         if (!result.Succeeded && result.Status.StartsWith(ThinkingOnlyStatus, StringComparison.Ordinal)
@@ -58,12 +58,16 @@ public sealed partial class LocalLlmService
             const string status = "The model stopped during thinking. Retrying once with thinking off…";
             terminal?.Report(status);
             progress?.Report(new LocalLlmGenerationProgress(status, null, null, null, null, null, null, null, false));
-            result = await SendOllamaChatAsync(request with { Think = false }, progress, terminal, cancellationToken).ConfigureAwait(false);
+            result = await SendBackendChatAsync(request with { Think = false }, progress, terminal, cancellationToken).ConfigureAwait(false);
         }
         return result;
     }
 
     private const string ThinkingOnlyStatus = "The model produced thinking but no answer.";
+
+    private Task<LocalLlmChatResult> SendBackendChatAsync(LocalLlmRequest request, IProgress<LocalLlmGenerationProgress>? progress,
+        IProgress<string>? terminal, CancellationToken cancellationToken) => request.ModelId?.StartsWith("runtime:", StringComparison.Ordinal) == true
+            ? SendCompatibleChatAsync(request, progress, terminal, cancellationToken) : SendOllamaChatAsync(request, progress, terminal, cancellationToken);
 
     private async Task<LocalLlmChatResult> SendOllamaChatAsync(
         LocalLlmRequest request,
@@ -190,7 +194,7 @@ public sealed partial class LocalLlmService
             if (string.Equals(finalResponse.DoneReason, "length", StringComparison.OrdinalIgnoreCase))
             {
                 const string status = "The model reached its context or output limit before finishing. Shorten the prompt or increase the context window, then retry.";
-                return new LocalLlmChatResult(false, status, answer + "\n\n**Response incomplete.** " + status, stats);
+                return new LocalLlmChatResult(false, status, answer + "\n\n**Response incomplete.** " + status, stats, OutputLimited: true);
             }
             progress?.Report(new LocalLlmGenerationProgress("Generation complete.", null, finalResponse.PromptEvalCount,
                 finalResponse.EvalCount, finalResponse.TotalDuration, finalResponse.LoadDuration, finalResponse.PromptEvalDuration,

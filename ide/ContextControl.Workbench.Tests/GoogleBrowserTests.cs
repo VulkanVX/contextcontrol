@@ -10,7 +10,7 @@ using Microsoft.Web.WebView2.Core;
 
 internal static class GoogleBrowserTests
 {
-    public static void Run(string? model, bool pizza = false)
+    public static void Run(string? model, bool pizza = false, bool photo = false, bool knowledge = false)
     {
         if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("This opt-in browser check requires Windows.");
         Exception? failure = null;
@@ -18,6 +18,8 @@ internal static class GoogleBrowserTests
         {
             GoogleBrowserTestApp.Model = model;
             GoogleBrowserTestApp.Pizza = pizza;
+            GoogleBrowserTestApp.Photo = photo;
+            GoogleBrowserTestApp.Knowledge = knowledge;
             GoogleBrowserTestApp.Failed = ex => failure = ex;
             try { AppBuilder.Configure<GoogleBrowserTestApp>().UsePlatformDetect().WithInterFont().StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown); }
             catch (Exception ex) { failure = ex; }
@@ -33,6 +35,8 @@ public sealed class GoogleBrowserTestApp : Application
 {
     internal static string? Model;
     internal static bool Pizza;
+    internal static bool Photo;
+    internal static bool Knowledge;
     internal static Action<Exception>? Failed;
     public override void Initialize() => Styles.Add(new FluentTheme());
 
@@ -95,11 +99,17 @@ public sealed class GoogleBrowserTestApp : Application
                     async Task<string> Ask(string prompt, CancellationToken token)
                     {
                         var response = await local.SendChatAsync(new LocalLlmRequest(Model!, prompt, "research-test", [], Pizza ? 4096 : 8192, Think: false, MaxOutputTokens: 256), null, null, token);
-                        if (!response.Succeeded) throw new InvalidOperationException(response.Status);
+                        token.ThrowIfCancellationRequested();
                         Console.WriteLine("MODEL PLAN: " + response.Message);
-                        return response.Message ?? "";
+                        return GoogleResearchService.PlannerText(response);
                     }
-                    var question = Pizza ? "Search for pizza places in Vilnius. Suggest three places with citations in under 150 words."
+                    if (Knowledge)
+                    {
+                        await CheckKnowledgeRecoveryAsync(local, researchBrowser, Ask, deadline.Token);
+                        return;
+                    }
+                    var question = Photo ? "Show me a photo of Nvidia 5090"
+                        : Pizza ? "Search for pizza places in Vilnius. Suggest three places with citations in under 150 words."
                         : "Search Google for the official Avalonia UI documentation. Open a result and briefly explain what Avalonia is, citing the source.";
                     var researchTask = GoogleResearchService.ResearchAsync(question, Ask, researchBrowser, Console.WriteLine, deadline.Token);
                     for (var tick = 0; tick < 15 && !researchTask.IsCompleted; tick++) await Task.Delay(1000, deadline.Token);
@@ -126,13 +136,14 @@ public sealed class GoogleBrowserTestApp : Application
                     if (string.IsNullOrWhiteSpace(message.VisibleText) || response.Stats?.OutputTokens is not > 0)
                         throw new InvalidOperationException("A research answer must have visible text and populated token counts.");
                     Console.WriteLine("FINAL ANSWER: " + response.Message);
-                    if (Pizza)
+                    if (Pizza || Photo)
                     {
                         var entryPhotos = new List<GoogleEntryPhoto>();
                         await GoogleEntryPhotoService.LoadAsync(response.Message!, research, researchBrowser, photo =>
                         {
                             entryPhotos.Add(photo);
                             Console.WriteLine($"ENTRY PHOTO: {photo.EntryTitle} <- {photo.SourceTitle} ({photo.SourceUrl})");
+                            Console.WriteLine("PHOTO FILE: " + photo.PreviewPath);
                         }, deadline.Token);
                         if (entryPhotos.Count == 0) throw new InvalidOperationException("The live entry-photo check did not find an individual place photo within its budget.");
                         Console.WriteLine($"Live per-entry photos passed: {entryPhotos.Count} matched and cached photos.");
@@ -143,5 +154,40 @@ public sealed class GoogleBrowserTestApp : Application
             catch (Exception ex) { Failed?.Invoke(ex); }
             finally { researchBrowser?.Dispose(); fixture.Close(); lifetime.Shutdown(); }
         };
+    }
+
+    private static async Task CheckKnowledgeRecoveryAsync(LocalLlmService local, IGoogleResearchBrowser browser,
+        Func<string, CancellationToken, Task<string>> ask, CancellationToken token)
+    {
+        const string question = "Show me a photo of Nvidia 5090";
+        GoogleResearchResult? research = null;
+        var generations = 0;
+        // Reproduce the user's already-observed knowledge gap, then use real Google pages and local generation.
+        var draft = new LocalLlmChatResult(true, "seeded unknown draft", "I don't have information about that product in my training data.");
+        Console.WriteLine("Knowledge recovery live check: seeded unknown draft; real Google, pages, model answer and photo follow.");
+        var answer = await GoogleKnowledgeRecovery.RecoverAsync(question, draft, true, false, async cancellation =>
+        {
+            research = await GoogleResearchService.ResearchAsync(question, ask, browser, Console.WriteLine, cancellation, knowledgeGap: true);
+            if (!research.DidSearch || !research.Pages.Any(page => page.FullPageRead)) throw new InvalidOperationException("No readable live evidence.");
+            return GoogleSearchContext.AugmentPrompt(question, research, 8192);
+        }, async (prompt, cancellation) =>
+        {
+            generations++;
+            return await local.SendChatAsync(new LocalLlmRequest(Model!, prompt, "research-test", [], 8192, Think: false, MaxOutputTokens: 600), null, null, cancellation);
+        }, token);
+        Console.WriteLine("RECOVERED ANSWER: " + answer.Message);
+        if (System.Text.RegularExpressions.Regex.IsMatch(answer.Message ?? "", @"(?:unable|cannot|can['’]t)\s+(?:to\s+)?(?:display|show|provide)\s+(?:the\s+|any\s+)?images?", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            throw new InvalidOperationException("The model still incorrectly denies the host's image display capability.");
+        if (!answer.Succeeded || generations != 1 || research is null || GoogleKnowledgeRecovery.NeedsLookup(question, answer.Message)
+            || string.IsNullOrWhiteSpace(answer.Message) || answer.Stats?.OutputTokens is not > 0)
+            throw new InvalidOperationException("Recovery did not produce one visible answer from real evidence.");
+        var photos = new List<GoogleEntryPhoto>();
+        await GoogleEntryPhotoService.LoadAsync(answer.Message!, research, browser, photo =>
+        {
+            photos.Add(photo);
+            Console.WriteLine($"RECOVERED PHOTO: {photo.EntryTitle} <- {photo.SourceTitle} ({photo.SourceUrl}); {photo.PreviewPath}");
+        }, token);
+        if (photos.Count == 0) throw new InvalidOperationException("Recovery did not produce a matched subject photo.");
+        Console.WriteLine($"Live knowledge recovery passed: {research.Search!.Sources.Count} results, {research.Pages.Count(page => page.FullPageRead)} pages read, {photos.Count} photos, one final generation.");
     }
 }

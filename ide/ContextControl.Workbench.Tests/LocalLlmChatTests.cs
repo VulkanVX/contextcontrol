@@ -60,7 +60,7 @@ internal static class LocalLlmChatTests
         using (var lengthHandler = new ReplyHandler(_ => new StringContent(Answer + Done.Replace("stop", "length"))))
         {
             var partial = await new LocalLlmService(lengthHandler).SendChatAsync(Request(), null, null);
-            Check(!partial.Succeeded && partial.Message!.Contains("Response incomplete") && partial.Message.Contains("Pizza answer"), "Keep partial text but explicitly flag truncation.");
+            Check(!partial.Succeeded && partial.OutputLimited && partial.Message!.Contains("Response incomplete") && partial.Message.Contains("Pizza answer"), "Keep partial text but explicitly flag truncation.");
         }
         await CheckStreamingAndCancellation();
         Console.WriteLine($"Local chat regression passed: {_checks} checks.");

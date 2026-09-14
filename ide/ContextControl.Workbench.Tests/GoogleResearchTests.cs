@@ -20,11 +20,18 @@ internal static class GoogleResearchTests
         _checks += await GoogleBlockedSourceTests.Run();
         _checks += await GooglePhotoPreviewTests.Run();
         _checks += await GoogleEntryPhotoTests.Run();
+        _checks += await GoogleKnowledgeRecoveryTests.Run();
+        var limitedPlanner = new LocalLlmChatResult(false, "output limit", "{\"open\":[2]}\nVerbose unfinished explanation", OutputLimited: true);
+        Check(GoogleResearchService.ParseSelection(GoogleResearchService.PlannerText(limitedPlanner), 3).SequenceEqual([2]), "A capped planner may still supply a valid bounded selection.");
+        Check(GoogleResearchService.ParseSelection(GoogleResearchService.PlannerText(limitedPlanner with { Message = "{\"open\":[" }), 3).SequenceEqual([1, 2]), "A truncated planner falls back to real result numbers instead of aborting research.");
+        try { GoogleResearchService.PlannerText(new LocalLlmChatResult(false, "connection failed")); Check(false, "Transport failures must remain failures."); } catch (InvalidOperationException) { _checks++; }
         Check(GoogleResearchService.ParseQuery("{\"search\":false}", "hello") is null, "Greetings must not search.");
         Check(GoogleResearchService.ParseQuery("{\"search\":true,\"query\":\"Google capabilities\"}", "Can you use google?") is null, "Capability questions must not become searches.");
         Check(GoogleResearchService.ParseQuery("```json\n{\"search\":true,\"query\":\"  Avalonia   release  \"}\n```", "latest version") == "Avalonia release", "Use the model's normalized query.");
         Check(GoogleResearchService.ParseQuery("I cannot browse", "Search Google for Avalonia") == "Search Google for Avalonia", "A small model's refusal must retain explicit search intent.");
         Check(GoogleResearchService.ParseQuery("bad JSON", "what is the current weather in Vilnius?") is not null, "Current requests need a fallback query.");
+        Check(GoogleResearchService.ParseQuery("{\"search\":false}", "What is the current state of RTX 5090 availability?") is not null, "Current facts must override a mistaken no-search plan.");
+        Check(GoogleResearchService.ParseQuery("{\"search\":false}", "Rewrite this sentence: my current job is interesting") is null, "Freshness words inside a text editing task must not force browsing.");
         Check(GoogleResearchService.ParseQuery("bad JSON", "Rewrite this text") is null, "Malformed planning must not search ordinary editing requests.");
         Check(GoogleResearchService.ParseQuery("{\"search\":false}", "search for C# examples") is not null, "Explicit searches override a mistaken no-search plan.");
         Check(GoogleResearchService.ParseQuery("<think>{\"search\":false}</think>{\"search\":true,\"query\":\"release date\"}", "latest release") == "release date", "Reasoning JSON must not override the visible plan.");
@@ -86,6 +93,11 @@ internal static class GoogleResearchTests
         var unusedBrowser = new FakeBrowser(search);
         var noResearch = await GoogleResearchService.ResearchAsync("hello", (_, _) => Task.FromResult("{\"search\":false}"), unusedBrowser, _ => { }, default);
         Check(!noResearch.DidSearch && unusedBrowser.Queries.Count == 0 && unusedBrowser.Reads.Count == 0, "No-search plans must never touch the browser.");
+        var gapBrowser = new FakeBrowser(search);
+        var recoveredResearch = await GoogleResearchService.ResearchAsync("What is NVIDIA RTX 5090?", (_, _) => Task.FromResult("{\"search\":false}"), gapBrowser, _ => { }, default, knowledgeGap: true);
+        Check(recoveredResearch.DidSearch && gapBrowser.Queries.Count == 1 && gapBrowser.Reads.Count > 0, "A knowledge-gap retry must search and read even when a small planner repeats its no-search decision.");
+        var photoPrompt = GoogleSearchContext.AugmentPrompt("Show me a photo of Nvidia 5090", recoveredResearch with { PhotoSubject = "Nvidia 5090" });
+        Check(photoPrompt.Contains("will attempt to attach a matching source photo") && photoPrompt.Contains("Do not invent image license"), "The answer must know the host can attach source photos without inventing attachment or license claims.");
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         try { await GoogleResearchService.ResearchAsync("search now", Ask, browser, _ => { }, cancellation.Token); Check(false, "Cancellation must stop planning."); } catch (OperationCanceledException) { _checks++; }
 

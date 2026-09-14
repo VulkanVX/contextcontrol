@@ -4,6 +4,17 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class WorkbenchViewModel
 {
+    public bool IsChatProgressPanelEnabled
+    {
+        get => _workbenchSettings.ChatProgressPanelEnabled;
+        set
+        {
+            if (_workbenchSettings.ChatProgressPanelEnabled == value) return;
+            _workbenchSettings.ChatProgressPanelEnabled = value;
+            OnPropertyChanged();
+            SaveAppearanceSettings();
+        }
+    }
     public bool IsChatMonitorEnabled
     {
         get => _workbenchSettings.ChatMonitorEnabled;

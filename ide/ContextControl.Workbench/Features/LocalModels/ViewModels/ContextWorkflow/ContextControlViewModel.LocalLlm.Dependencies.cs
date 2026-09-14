@@ -703,6 +703,8 @@ public sealed partial class ContextControlViewModel
         var terminal = CreateTerminalProgress();
         if (PythonDependencyEnvironment.TryGetSpec(dependency.Id, out var pythonSpec))
         {
+            if (PythonDependencyEnvironment.PlatformLimitation(dependency.Id) is { } limitation)
+                return new DependencyInstallResult(false, limitation);
             return await InstallPythonPackagesAsync(pythonSpec, terminal, progress, cancellationToken, forceManagedPython);
         }
 
@@ -895,7 +897,7 @@ public sealed partial class ContextControlViewModel
             }
         }
 
-        if (spec.Id.Equals("diffusers", StringComparison.OrdinalIgnoreCase))
+        if (spec.Id is "diffusers" or "transformers")
         {
             var torchResult = await InstallDiffusersCpuTorchAsync(spec, managedPython, managedDirectory, terminal, progress, cancellationToken).ConfigureAwait(false);
             if (!torchResult.Succeeded)
@@ -958,7 +960,7 @@ public sealed partial class ContextControlViewModel
 
     private static IReadOnlyList<string> ResolveManagedPipInstallArguments(PythonDependencySpec spec)
     {
-        return spec.Id.Equals("diffusers", StringComparison.OrdinalIgnoreCase)
+        return spec.Id is "diffusers" or "transformers"
             ? spec.InstallArguments
                 .Where(argument => !argument.Equals("torch", StringComparison.OrdinalIgnoreCase))
                 .ToArray()

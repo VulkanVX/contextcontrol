@@ -43,9 +43,10 @@ internal static class PythonDependencyEnvironment
         new(
             "transformers",
             "Hugging Face Transformers",
-            ["transformers", "accelerate", "safetensors", "sentencepiece", "protobuf"],
+            ["torch", "transformers", "accelerate", "safetensors", "sentencepiece", "protobuf"],
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
+                ["torch"] = "torch",
                 ["transformers"] = "transformers",
                 ["accelerate"] = "accelerate",
                 ["safetensors"] = "safetensors",
@@ -125,6 +126,12 @@ internal static class PythonDependencyEnvironment
         Specs.ToDictionary(spec => spec.Id, StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlyList<PythonDependencySpec> AllSpecs => Specs;
+    public static string? PlatformLimitation(string id) => id switch
+    {
+        "mlx_lm" when !OperatingSystem.IsMacOS() => "MLX LM needs Apple Silicon macOS. Connect to an MLX server in Local model servers instead.",
+        "vllm" or "sglang" or "tensorrt_llm" when OperatingSystem.IsWindows() => "Use this runtime on Linux / WSL with supported hardware, then connect its API in Local model servers. Native Windows installation is unavailable.",
+        _ => null
+    };
 
     public static string ManagedRoot
     {
