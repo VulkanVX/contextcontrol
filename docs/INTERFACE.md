@@ -26,6 +26,8 @@ Membership is saved in `.ccWorkbench.chat-monitor.json`; visibility and screen p
 
 ## Validation
 
+Local chats also expose **Google auto** in the composer and Chat Monitor quick reply. The model's planning, search and page-reading stages use the same progress and cancellation controls. See [Google research](GOOGLE_RESEARCH.md).
+
 Run the regular smoke checks and the isolated UI regression harness:
 
 ```powershell

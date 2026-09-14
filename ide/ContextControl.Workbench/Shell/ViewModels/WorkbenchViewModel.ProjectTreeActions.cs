@@ -337,6 +337,11 @@ public sealed partial class WorkbenchViewModel
 
     public void OpenAttachment(string? path)
     {
+        if (GoogleSearchContext.IsPublicWebUrl(path))
+        {
+            ExternalBrowserService.Open(null, path!);
+            return;
+        }
         if (!TryResolveAttachment(path, out var fullPath, out var displayPath))
         {
             return;

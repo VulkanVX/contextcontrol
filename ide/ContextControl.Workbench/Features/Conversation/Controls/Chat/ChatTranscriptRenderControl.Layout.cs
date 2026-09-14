@@ -1,4 +1,4 @@
-// CC-DESC: Draws the shared chat/image-generation transcript as one cached virtualized surface.
+﻿// CC-DESC: Draws the shared chat/image-generation transcript as one cached virtualized surface.
 
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -292,7 +292,7 @@ public sealed partial class ChatTranscriptRenderControl
 
     private static bool ShouldShowAttachmentsAfterText(LocalLlmChatMessageViewModel message)
     {
-        return false;
+        return !message.IsUser && message.AttachedFiles.Any(attachment => attachment.Kind == "web");
     }
 
     private void BuildHeader(MessageLayout layout, LocalLlmChatMessageViewModel message, Rect card, double y, double contentWidth)
@@ -355,6 +355,8 @@ public sealed partial class ChatTranscriptRenderControl
         double contentWidth)
     {
         var codeFontFamily = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
+        var sourceFontSize = Math.Max(9.0, ChatMetaFontSize);
+        var rowHeight = message.AttachedFiles.Any(attachment => attachment.Kind == "web") ? Math.Max(AttachmentHeight, sourceFontSize * 1.5 + 4) : AttachmentHeight;
         var left = x;
         var maxRight = x + contentWidth;
         var rowY = y;
@@ -365,7 +367,7 @@ public sealed partial class ChatTranscriptRenderControl
             {
                 if (left > x)
                 {
-                    bottom = Math.Max(bottom, rowY + AttachmentHeight);
+                    bottom = Math.Max(bottom, rowY + rowHeight);
                     rowY = bottom + AttachmentGap;
                     left = x;
                 }
@@ -380,16 +382,16 @@ public sealed partial class ChatTranscriptRenderControl
             }
 
             var title = CleanOneLine(attachment.DisplayTitle, 80);
-            var text = GetFormattedText(title, Resource("ChatMetaBrush", TextMutedFallbackBrush), codeFontFamily, FontWeight.Bold, FontStyle.Normal, 9.0);
-            var chipWidth = Math.Clamp(text.Width + 14.0, 42.0, Math.Min(180.0, contentWidth));
+            var text = GetFormattedText(title, Resource("ChatMetaBrush", TextMutedFallbackBrush), codeFontFamily, FontWeight.Bold, FontStyle.Normal, attachment.Kind == "web" ? sourceFontSize : 9.0);
+            var chipWidth = Math.Clamp(text.Width + 14.0, 42.0, Math.Min(attachment.Kind == "web" ? 400.0 : 180.0, contentWidth));
             if (left > x && left + chipWidth > maxRight)
             {
-                bottom = Math.Max(bottom, rowY + AttachmentHeight);
+                bottom = Math.Max(bottom, rowY + rowHeight);
                 left = x;
                 rowY = bottom + AttachmentGap;
             }
 
-            var rect = new Rect(left, rowY, chipWidth, AttachmentHeight);
+            var rect = new Rect(left, rowY, chipWidth, rowHeight);
             layout.Attachments.Add(new AttachmentLayout(rect, title, attachment, false));
             layout.Hits.Add(new HitRegion(rect, ChatTranscriptHitKind.OpenAttachment, attachment.Path));
             left += chipWidth + AttachmentGap;

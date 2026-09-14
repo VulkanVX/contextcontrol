@@ -40,7 +40,9 @@ public sealed partial class LocalLlmService
         OllamaChatOptions? Options = null,
         bool? Think = null);
 
-    private sealed record OllamaChatOptions([property: JsonPropertyName("num_ctx")] int NumContext);
+    private sealed record OllamaChatOptions(
+        [property: JsonPropertyName("num_ctx")] int? NumContext,
+        [property: JsonPropertyName("num_predict")] int? MaxOutputTokens = null);
 
     private sealed record OllamaChatMessage(
         string Role,

@@ -150,6 +150,7 @@ public sealed class WorkbenchSettings
     public bool ThemeAdaptBytesColor { get; set; }
     public double UiFontSize { get; set; }
     public bool ChatMonitorEnabled { get; set; } = true;
+    public bool GoogleSearchEnabled { get; set; } = true;
     public int? ChatMonitorX { get; set; }
     public int? ChatMonitorY { get; set; }
     public double CodeEditorFontSize { get; set; }
@@ -265,6 +266,7 @@ public sealed class WorkbenchSettings
             data.ProjectGraphGenerationColors ?? DefaultProjectGraphGenerationColors)
         {
             ChatMonitorEnabled = data.ChatMonitorEnabled ?? true,
+            GoogleSearchEnabled = data.GoogleSearchEnabled ?? true,
             ChatMonitorX = data.ChatMonitorX,
             ChatMonitorY = data.ChatMonitorY
         };
@@ -281,6 +283,7 @@ public sealed class WorkbenchSettings
         var data = new WorkbenchSettingsJson
         {
             ChatMonitorEnabled = ChatMonitorEnabled,
+            GoogleSearchEnabled = GoogleSearchEnabled,
             ChatMonitorX = ChatMonitorX,
             ChatMonitorY = ChatMonitorY,
             SkinKey = NormalizeSkinKey(SkinKey),
@@ -614,6 +617,7 @@ public sealed class WorkbenchSettings
         public bool? ThemeAdaptBytesColor { get; set; }
         public double? UiFontSize { get; set; }
         public bool? ChatMonitorEnabled { get; set; }
+        public bool? GoogleSearchEnabled { get; set; }
         public int? ChatMonitorX { get; set; }
         public int? ChatMonitorY { get; set; }
         public double? CodeEditorFontSize { get; set; }

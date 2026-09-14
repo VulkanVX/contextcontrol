@@ -6,6 +6,7 @@ namespace ContextControl.Workbench.Views;
 public sealed partial class MainWindow
 {
     private ChatMonitorWindow? _chatMonitorWindow;
+    private ContextControl.Workbench.Services.GoogleResearchBrowser? _googleResearchBrowser;
 
     private void UpdateChatMonitor()
     {
@@ -32,6 +33,8 @@ public sealed partial class MainWindow
 
     protected override void OnClosed(EventArgs e)
     {
+        _googleResearchBrowser?.Dispose();
+        _googleResearchBrowser = null;
         _chatMonitorWindow?.CloseWithWorkbench();
         _chatMonitorWindow = null;
         ViewModel?.FlushAppearanceSettings();

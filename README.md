@@ -60,6 +60,14 @@ The monitor follows chats in the running ContextControl instance, including whil
 
 See [the interface guide](docs/INTERFACE.md) and [v0.4.0 release notes](docs/releases/v0.4.0.md).
 
+## Google research with local models
+
+With **Google auto** enabled, any installed Ollama chat model can decide to search, write a Google query, choose results to open, read page excerpts, and answer with source links. It works without native tool calling or an API key. The switch is in the Local composer, Chat Monitor quick reply, and **Settings → Prompt Window**.
+
+For example: “Search Google for the official Avalonia documentation.” Research progress appears alongside your chat. Complete any Google consent or verification in the browser window when needed.
+
+See [Google research](docs/GOOGLE_RESEARCH.md) and [v0.4.1 release notes](docs/releases/v0.4.1.md).
+
 ## What Is Bundled
 
 Bundled inside the installer:

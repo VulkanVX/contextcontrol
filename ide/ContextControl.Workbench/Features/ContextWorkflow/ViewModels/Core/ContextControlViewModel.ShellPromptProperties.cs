@@ -1,4 +1,4 @@
-// CC-DESC: Prompt, dock, timeline, install, transfer, and terminal bindable properties.
+﻿// CC-DESC: Prompt, dock, timeline, install, transfer, and terminal bindable properties.
 
 // CC-DESC: Owns Context Control workflow state, prompt bar state, and DIR/CC/GO commands.
 
@@ -127,7 +127,7 @@ public sealed partial class ContextControlViewModel
     public string AutopilotModeLabel => IsAutopilotEnabled ? "CC flow on" : "Raw on";
 
     public string AutopilotModeToolTip => IsAutopilotEnabled
-        ? "CC flow is active. Click to switch to raw chat, which sends only your text."
+        ? "CC flow is active. Click to switch to raw chat. Google research is controlled separately."
         : "Raw chat is active. Click to switch to CC flow, which sends ContextControl capsules with DIR/CC attachments and workflow instructions.";
 
     public bool IsRefreshingLocalModels
@@ -398,6 +398,7 @@ public sealed partial class ContextControlViewModel
                 OnPropertyChanged(nameof(IsContextPromptMode));
                 OnPropertyChanged(nameof(IsChatPromptMode));
                 OnPropertyChanged(nameof(IsLocalPromptMode));
+                OnPropertyChanged(nameof(CanUseGoogleSearch));
                 OnPropertyChanged(nameof(IsImageGenPromptMode));
                 OnPropertyChanged(nameof(IsLocalOrImageGenPromptMode));
                 OnPropertyChanged(nameof(IsCodexPromptMode));

@@ -503,6 +503,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
             IsCcTimelineExpanded = !IsCcTimelineExpanded;
         });
         ToggleAutopilotCommand = new RelayCommand<object>(_ => ToggleAutopilotMode());
+        ToggleGoogleSearchCommand = new RelayCommand<object>(_ => IsGoogleSearchEnabled = !IsGoogleSearchEnabled);
 
         Log("info", $"Context root: {_processService.ContextRoot}");
         LoadChatHistory();

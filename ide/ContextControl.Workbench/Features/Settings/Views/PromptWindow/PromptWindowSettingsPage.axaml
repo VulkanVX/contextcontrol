@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="ContextControl.Workbench.Views.ThemeSettingsWindowParts.PromptWindowSettingsPage"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -28,6 +28,15 @@
           <TextBlock Classes="muted" Text="New chats and replies appear automatically. Right-click a chat in history to add or remove it. Removing a monitor row keeps the conversation." TextWrapping="Wrap" />
         </StackPanel>
         <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsChatMonitorEnabled, Mode=TwoWay}" OnContent="On" OffContent="Off" VerticalAlignment="Top" />
+      </Grid>
+    </Border>
+    <Border Classes="rule-card" Padding="14,12">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="field-label" Text="Google research for local models" />
+          <TextBlock Classes="muted" Text="Let any installed chat model decide when to search, write a Google query, choose pages to read, and answer with sources. Google may ask for consent or verification in the browser window." TextWrapping="Wrap" />
+        </StackPanel>
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding ContextControl.IsGoogleSearchEnabled, Mode=TwoWay}" OnContent="Auto" OffContent="Off" VerticalAlignment="Top" />
       </Grid>
     </Border>
   </StackPanel>

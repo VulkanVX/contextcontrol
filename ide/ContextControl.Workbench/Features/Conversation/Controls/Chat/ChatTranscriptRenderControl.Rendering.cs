@@ -179,7 +179,8 @@ public sealed partial class ChatTranscriptRenderControl
             5);
 
         var font = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
-        var text = GetFormattedText(attachment.Label, Resource("ChatMetaBrush", TextMutedFallbackBrush), font, FontWeight.Bold, FontStyle.Normal, 9.0);
+        var text = GetFormattedText(attachment.Label, Resource("ChatMetaBrush", TextMutedFallbackBrush), font, FontWeight.Bold, FontStyle.Normal,
+            attachment.Attachment.Kind == "web" ? Math.Max(9.0, ChatMetaFontSize) : 9.0);
         DrawClippedText(context, text, new Rect(rect.X + 6.0, rect.Y, Math.Max(0.0, rect.Width - 12.0), rect.Height), new Point(rect.X + 6.0, CenterTextY(rect, text)));
     }
 

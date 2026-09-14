@@ -357,7 +357,7 @@ public sealed class ChatSessionViewModel : ObservableObject
     {
         return message.HasSentAttachments
             || (!message.IsUser
-                && message.AttachedFiles.Any(attachment => string.Equals(attachment.Kind, "image", StringComparison.OrdinalIgnoreCase)));
+                && message.AttachedFiles.Any(attachment => attachment.Kind is "image" or "web"));
     }
 
     private static string BuildTitle(string text)

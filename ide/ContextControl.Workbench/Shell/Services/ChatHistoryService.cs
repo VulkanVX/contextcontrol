@@ -188,7 +188,7 @@ public sealed class ChatHistoryService
                 .Select(attachment => new ChatHistoryAttachmentData
                 {
                     Label = TrimText(attachment.Label, 120),
-                    Path = TrimText(attachment.Path, 520),
+                    Path = TrimText(attachment.Path, attachment.Kind == "web" ? 1600 : 520),
                     Kind = TrimText(attachment.Kind, 32),
                     IncludeInPrompt = attachment.IncludeInPrompt
                 })

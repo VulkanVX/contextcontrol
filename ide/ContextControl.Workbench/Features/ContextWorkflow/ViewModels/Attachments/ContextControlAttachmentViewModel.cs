@@ -56,11 +56,11 @@ public sealed class ContextControlAttachmentViewModel(string label, string path,
         }
     }
 
-    public string FileName => string.IsNullOrWhiteSpace(Path)
+    public string FileName => Kind == "web" || string.IsNullOrWhiteSpace(Path)
         ? Label
         : System.IO.Path.GetFileName(Path);
 
-    public string ExtensionTagText => ResolveExtensionKey(Path, Label);
+    public string ExtensionTagText => Kind == "web" ? "WEB" : ResolveExtensionKey(Path, Label);
 
     public string DisplayTitle => string.IsNullOrWhiteSpace(FileName) ? Label : FileName;
 

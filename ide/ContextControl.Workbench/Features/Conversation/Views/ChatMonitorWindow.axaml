@@ -74,6 +74,9 @@
             <Button x:Name="ReplySendButton" Grid.Column="2" Content="Send" Classes="monitor-send" Click="OnSendReply" IsEnabled="False" />
           </Grid>
           <TextBlock x:Name="ReplyNotice" Classes="monitor-hint" TextWrapping="Wrap" />
+          <Button Content="{Binding ContextControl.GoogleSearchLabel}" Command="{Binding ContextControl.ToggleGoogleSearchCommand}"
+                  IsVisible="{Binding ContextControl.CanUseGoogleSearch}" ToolTip.Tip="{Binding ContextControl.GoogleSearchToolTip}"
+                  HorizontalAlignment="Left" Classes="monitor-attachment" />
         </StackPanel>
       </Border>
       </StackPanel>

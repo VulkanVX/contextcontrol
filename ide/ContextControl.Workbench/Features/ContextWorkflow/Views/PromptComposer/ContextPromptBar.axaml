@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <UserControl
     x:Class="ContextControl.Workbench.Views.MainWindowParts.ContextPromptBar"
     xmlns="https://github.com/avaloniaui"
@@ -212,6 +212,12 @@
                     </Grid>
   
                     <StackPanel Grid.Row="1" Spacing="3">
+                      <Button Classes="cc-prompt-mode" HorizontalAlignment="Left"
+                              IsVisible="{Binding ContextControl.CanUseGoogleSearch}"
+                              Classes.active="{Binding ContextControl.IsGoogleSearchEnabled}"
+                              Content="{Binding ContextControl.GoogleSearchLabel}"
+                              ToolTip.Tip="{Binding ContextControl.GoogleSearchToolTip}"
+                              Command="{Binding ContextControl.ToggleGoogleSearchCommand}" />
                       <Border Classes="cc-transfer-progress" IsVisible="{Binding ContextControl.IsCodexPromptAuthBlocked}">
                         <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                           <StackPanel>

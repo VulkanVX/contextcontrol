@@ -76,8 +76,8 @@ public sealed partial class LocalLlmService
             request.ModelId,
             [new OllamaChatMessage("user", request.Prompt.Trim(), encodedImages)],
             Stream: true,
-            Options: request.ContextWindowTokens is > 0
-                ? new OllamaChatOptions(request.ContextWindowTokens.Value)
+            Options: request.ContextWindowTokens is > 0 || request.MaxOutputTokens is > 0
+                ? new OllamaChatOptions(request.ContextWindowTokens, request.MaxOutputTokens)
                 : null,
             Think: requestThinking ? true : null);
 

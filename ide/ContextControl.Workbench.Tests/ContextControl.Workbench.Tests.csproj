@@ -4,6 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>..\ContextControl.Workbench\app.manifest</ApplicationManifest>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <DefaultItemExcludes>$(DefaultItemExcludes);.tmp\**</DefaultItemExcludes>
   </PropertyGroup>

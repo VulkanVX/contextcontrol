@@ -26,6 +26,19 @@ public sealed class WebView2Host : NativeControlHost
     private string? _pendingUrl = "https://chatgpt.com";
     private bool _isDisposed;
 
+    // Optional restrictions for the research reader; ordinary browser panes keep their existing behavior.
+    public Func<string, bool>? NavigationFilter { get; set; }
+    public bool AllowDownloads { get; set; } = true;
+    public bool IsReady => _webView is not null;
+    public bool IsNavigating { get; private set; }
+    public ulong StartedNavigationId { get; private set; }
+    public ulong CompletedNavigationId { get; private set; }
+    public bool LastNavigationSucceeded { get; private set; }
+    public string? InitializationError { get; private set; }
+    public Task<string> ExecuteScriptAsync(string script) => _webView?.ExecuteScriptAsync(script)
+        ?? throw new InvalidOperationException("The embedded browser is still starting.");
+    public void Stop() => _webView?.Stop();
+
     public event EventHandler<WebView2NavigationStartingEventArgs>? NavigationStarted;
     public event EventHandler<WebView2NavigationCompletedEventArgs>? NavigationCompleted;
     public event EventHandler<WebView2InitializationFailedEventArgs>? InitializationFailed;
@@ -50,6 +63,7 @@ public sealed class WebView2Host : NativeControlHost
         }
 
         _pendingUrl = url;
+        IsNavigating = true;
         if (_webView is not null)
         {
             _webView.Navigate(url);
@@ -79,6 +93,8 @@ public sealed class WebView2Host : NativeControlHost
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
+        _isDisposed = false;
+        InitializationError = null;
         if (!OperatingSystem.IsWindows())
         {
             Dispatcher.UIThread.Post(() =>
@@ -150,6 +166,7 @@ public sealed class WebView2Host : NativeControlHost
         }
         catch (Exception ex) when (ex is COMException or Win32Exception or InvalidOperationException or UnauthorizedAccessException)
         {
+            InitializationError = $"Embedded browser unavailable: {ex.Message}";
             Dispatcher.UIThread.Post(() =>
                 InitializationFailed?.Invoke(this, new WebView2InitializationFailedEventArgs($"Embedded browser unavailable: {ex.Message}")));
         }
@@ -173,13 +190,31 @@ public sealed class WebView2Host : NativeControlHost
         webView.NavigationStarting += (_, args) =>
         {
             var url = args.Uri;
+            StartedNavigationId = args.NavigationId;
+            if (NavigationFilter is not null && !NavigationFilter(url))
+            {
+                args.Cancel = true;
+                return;
+            }
+            IsNavigating = true;
             _pendingUrl = url;
             Dispatcher.UIThread.Post(() =>
                 NavigationStarted?.Invoke(this, new WebView2NavigationStartingEventArgs(url)));
         };
 
         webView.NavigationCompleted += (_, args) =>
+        {
+            CompletedNavigationId = args.NavigationId;
+            LastNavigationSucceeded = args.IsSuccess;
+            if (args.NavigationId == StartedNavigationId) IsNavigating = false;
             Dispatcher.UIThread.Post(() => RaiseNavigationCompleted(args.IsSuccess));
+        };
+
+        webView.DownloadStarting += (_, args) => { if (!AllowDownloads) args.Cancel = true; };
+        webView.PermissionRequested += (_, args) =>
+        {
+            if (!AllowDownloads) args.State = CoreWebView2PermissionState.Deny;
+        };
 
         webView.HistoryChanged += (_, _) =>
             Dispatcher.UIThread.Post(() => RaiseNavigationCompleted(succeeded: true));

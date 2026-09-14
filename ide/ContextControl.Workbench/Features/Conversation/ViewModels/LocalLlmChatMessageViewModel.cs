@@ -54,6 +54,11 @@ public sealed partial class LocalLlmChatMessageViewModel : ObservableObject
         DiagnosticPrompt = diagnosticPrompt ?? "";
         _canShowLiveThinkingPlaceholder = canShowLiveThinkingPlaceholder;
         AttachedFiles = new ObservableCollection<ContextControlAttachmentViewModel>(attachments ?? []);
+        AttachedFiles.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasAttachments));
+            OnPropertyChanged(nameof(HasSentAttachments));
+        };
         CreatedUtc = createdUtc ?? DateTime.UtcNow;
         Time = CreatedUtc.ToLocalTime().ToString("HH:mm");
         _liveTypingTimer = new DispatcherTimer

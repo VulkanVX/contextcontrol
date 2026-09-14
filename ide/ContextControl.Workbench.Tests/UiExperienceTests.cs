@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Reflection;
 using Avalonia;
@@ -99,7 +99,7 @@ internal static class UiExperienceTests
         double previousHeader = 0, previousTime = 0;
         foreach (var size in new[] { 8d, 11d, 22d })
         {
-            var message = new LocalLlmChatMessageViewModel("assistant", "The header, timestamp and message now share a consistent type scale.\n\nLarge text stays readable without squeezing the header.", "gpt-5-codex", "Codex response");
+            var message = new LocalLlmChatMessageViewModel("assistant", "The header, timestamp and message now share a consistent type scale.\n\nLarge text stays readable without squeezing the header.", "gpt-5-codex", "Codex response", attachments: [new ContextControlAttachmentViewModel("[1] Official documentation", "https://docs.avaloniaui.net/docs/welcome", "web")]);
             var user = new LocalLlmChatMessageViewModel("user", "Make the whole interface easier to read.", "You", "");
             var transcript = new ChatTranscriptRenderControl { ChatFontSize = size, Items = [user, message] };
             var layout = Call(transcript, "BuildMessageLayout", message, 680d)!;
@@ -195,6 +195,17 @@ internal static class UiExperienceTests
         Check(context.IsChatMonitored(session), "Continuing an existing unmonitored chat must add it automatically.");
         var main = new MainWindow { DataContext = workbench };
         Snapshot(main, 1360, 840, Path.Combine(output, "workbench-studio.png"));
+        context.SwitchPromptToContextCommand.Execute(null);
+        context.IsGoogleSearchEnabled = true;
+        var sources = new[] { new ContextControlAttachmentViewModel("[1] Official Avalonia documentation", "https://docs.avaloniaui.net/docs/overview", "web") };
+        Call(context, "AppendChatMessageToSession", session, new LocalLlmChatMessageViewModel("assistant", "Avalonia builds desktop applications with .NET [1].", "granite3.3:2b", "raw", attachments: sources));
+        Snapshot(main, 1360, 840, Path.Combine(output, "google-research-chat.png"));
+        var google = main.GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Content, "Google auto") && button.IsEffectivelyVisible);
+        Check(google.Command == context.ToggleGoogleSearchCommand, "Google control must use the live local chat setting.");
+        google.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Check(Equals(google.Content, "Google off") && !context.IsGoogleSearchEnabled, "Clicking the composer research switch must update its real binding.");
+        context.IsGoogleSearchEnabled = true;
         var accent = main.Resources["AccentBrush"];
         var watch = Stopwatch.StartNew();
         for (var i = 0; i < 300; i++) workbench.UiFontSize = 8 + (i % 29) * .5;
@@ -205,6 +216,7 @@ internal static class UiExperienceTests
         Thread.Sleep(120); Dispatcher.UIThread.RunJobs();
         Check(Math.Abs(WorkbenchTypography.GetScale(main) - 1.5) < .001, "Debounced scale must settle to the final value.");
         Snapshot(main, 1360, 840, Path.Combine(output, "workbench-150.png"));
+        Check(google.TranslatePoint(new Point(0, google.Bounds.Height), main)?.Y <= main.Bounds.Height, "Research control must remain inside the scaled composer.");
         var send = main.GetVisualDescendants().OfType<Button>().First(button => button.Classes.Contains("cc-prompt-send") && button.IsEffectivelyVisible);
         Check(send.TranslatePoint(new Point(0, send.Bounds.Height), main)?.Y <= main.Bounds.Height,
             "Wrapping navigation at large scale must leave the Send button inside the window.");

@@ -150,7 +150,8 @@ public sealed record LocalLlmRequest(
     IReadOnlyList<string> AttachmentLabels,
     int? ContextWindowTokens = null,
     IReadOnlyList<string>? ImagePaths = null,
-    bool? Think = null);
+    bool? Think = null,
+    int? MaxOutputTokens = null);
 
 public sealed record LocalLlmChatResult(
     bool Succeeded,

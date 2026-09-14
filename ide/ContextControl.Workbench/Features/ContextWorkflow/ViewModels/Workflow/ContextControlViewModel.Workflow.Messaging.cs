@@ -1,4 +1,4 @@
-// CC-DESC: Extracted ContextControlViewModel system slice.
+﻿// CC-DESC: Extracted ContextControlViewModel system slice.
 // CC-DESC: Owns Context Control workflow state, prompt bar state, and DIR/CC/GO commands.
 
 using System.Collections.ObjectModel;
@@ -1402,6 +1402,7 @@ public sealed partial class ContextControlViewModel
             return;
         }
 
+        var useGoogle = IsGoogleSearchEnabled;
         var targetSession = EnsureSelectedChatSession();
         var phase = ResolveCapsulePhase(message);
         var capsuleMessage = phase is ContextCapsulePhase.PatchWrite or ContextCapsulePhase.PatchReview
@@ -1485,11 +1486,13 @@ public sealed partial class ContextControlViewModel
                 terminal.Report($"image: {imageAttachment.Path}");
             }
 
+            var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, capsule.Text, useGoogle,
+                targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
             var result = await _localLlmService.SendChatAsync(
                 new LocalLlmRequest(
                     model.Id,
-                    capsule.Text,
+                    preparedPrompt,
                     FormatCapsulePhase(phase),
                     displayedAttachmentSnapshot.Select(attachment => attachment.DisplayTitle).ToArray(),
                     capsule.RequestedContextTokens,
@@ -1508,7 +1511,7 @@ public sealed partial class ContextControlViewModel
                 result = await _localLlmService.SendChatAsync(
                     new LocalLlmRequest(
                         model.Id,
-                        capsule.Text,
+                        preparedPrompt,
                         FormatCapsulePhase(phase),
                         displayedAttachmentSnapshot.Select(attachment => attachment.DisplayTitle).ToArray(),
                         capsule.RequestedContextTokens,
@@ -1587,6 +1590,7 @@ public sealed partial class ContextControlViewModel
 
     private async Task SendRawLocalChatAsync(string message)
     {
+        var useGoogle = IsGoogleSearchEnabled;
         var targetSession = EnsureSelectedChatSession();
         var model = ResolveModelForPhase(ContextCapsulePhase.Chat);
         if (model is not { IsInstalled: true })
@@ -1630,11 +1634,13 @@ public sealed partial class ContextControlViewModel
             terminal.Report("No ContextControl capsule, attachments, skillbook, or workflow instructions included.");
             terminal.Report($"Requested Ollama context window: {requestedContextTokens:N0} tokens.");
 
+            var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, message, useGoogle,
+                targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
             var result = await _localLlmService.SendChatAsync(
                 new LocalLlmRequest(
                     model.Id,
-                    message,
+                    preparedPrompt,
                     "raw",
                     [],
                     requestedContextTokens,
@@ -1652,7 +1658,7 @@ public sealed partial class ContextControlViewModel
                 result = await _localLlmService.SendChatAsync(
                     new LocalLlmRequest(
                         model.Id,
-                        message,
+                        preparedPrompt,
                         "raw",
                         [],
                         requestedContextTokens,

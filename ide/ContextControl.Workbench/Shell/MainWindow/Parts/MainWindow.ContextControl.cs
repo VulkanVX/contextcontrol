@@ -500,6 +500,8 @@ public sealed partial class MainWindow
             }
         });
         viewModel.ContextControl.SetSnippetFileSaver(SaveSnippetAsFileAsync);
+        _googleResearchBrowser ??= new ContextControl.Workbench.Services.GoogleResearchBrowser();
+        viewModel.ContextControl.SetGoogleResearchBrowser(_googleResearchBrowser);
     }
 
     private async Task<string?> SaveSnippetAsFileAsync(ChatSnippetViewModel snippet)

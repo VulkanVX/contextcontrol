@@ -10,6 +10,18 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--google-browser-smoke"))
+{
+    GoogleBrowserTests.Run(args.SkipWhile(arg => arg != "--google-browser-smoke").Skip(1).FirstOrDefault());
+    return;
+}
+
+if (args.Contains("--google-research-regression"))
+{
+    await GoogleResearchTests.Run();
+    return;
+}
+
 if (args.Contains("--ui-experience-regression"))
 {
     UiExperienceTests.Run(args.SkipWhile(arg => arg != "--ui-experience-regression").Skip(1).FirstOrDefault());
