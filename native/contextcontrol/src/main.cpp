@@ -74,10 +74,10 @@ struct FileRules {
 
 const std::vector<std::string> DirIgnoredDirectories = {
     ".git", ".vs", ".vscode", ".idea", ".cache", ".godot", ".import", "node_modules",
-    "dist", "build", "build-debug", "build-release", "cmake-build-debug",
+    "dist", "build", "build-debug", "build-release", "build_verify_vs", "cmake-build-debug",
     "cmake-build-release", "CMakeFiles", "out", "bin", "obj", "x64", "Debug", "Release",
     "RelWithDebInfo", "MinSizeRel", "vcpkg_installed", "packages", "PackageCache",
-    "external", "extern", "third_party", "thirdparty", "vendor", "deps", "dependencies",
+    "vcpkg", "external", "extern", "third_party", "thirdparty", "vendor", "deps", "dependencies",
     "__pycache__"
 };
 
@@ -121,12 +121,12 @@ const std::vector<std::string> DefaultIgnoredDirectories = {
     ".m2", ".next", ".nuxt", ".nuget", ".parcel-cache", ".pnpm-store", ".serverless",
     ".svelte-kit", ".terraform", ".tmp", ".tmp-build", ".turbo", ".venv", ".vs",
     ".vscode", ".yarn", "__pycache__", "_build", "_deps", "bin", "build",
-    "build-debug", "build-release", "cmake-build-debug", "cmake-build-release",
+    "build-debug", "build-release", "build_verify_vs", "cmake-build-debug", "cmake-build-release",
     "CMakeFiles", "codex-harness", "coverage", "DerivedData", "deps", "dist",
     "dotnet-obj", "dotnet-out", "external", "extern", "generated", "node_modules",
     "Debug", "MinSizeRel", "Release", "RelWithDebInfo", "PackageCache", "dependencies",
     "obj", "out", "packages", "Pods", "ps1_nat", "ps1_nat_gist_review", "test-harness",
-    "test-results", "third_party", "thirdparty", "vendor", "venv", "vcpkg_installed", "x64"
+    "test-results", "third_party", "thirdparty", "vendor", "venv", "vcpkg", "vcpkg_installed", "x64"
 };
 
 const std::vector<std::string> DefaultIgnoredExtensions = {
@@ -148,11 +148,11 @@ const std::vector<std::string> DefaultIgnoredFileNames = {
 
 const std::vector<std::string> DefaultSupportedExtensions = {
     ".axaml", ".bat", ".c", ".cc", ".cmd", ".comp", ".cpp", ".cs", ".csproj", ".css",
-    ".cxx", ".frag", ".fs", ".fsproj", ".geom", ".glsl", ".h", ".hh", ".hpp", ".html",
+    ".cxx", ".fc", ".fif", ".frag", ".fs", ".fsproj", ".func", ".geom", ".glsl", ".h", ".hh", ".hpp", ".html",
     ".hlsl", ".hxx", ".inc", ".ini", ".inl", ".ipp", ".go", ".gradle", ".java", ".js",
     ".json", ".jsx", ".kt", ".kts", ".lock", ".lua", ".m", ".md", ".mesh", ".metal",
     ".mm", ".mod", ".props", ".ps1", ".psd1", ".psm1", ".py", ".rs", ".shader", ".sh",
-    ".slang", ".sum", ".targets", ".task", ".tesc", ".tese", ".toml", ".ts", ".tsx",
+    ".slang", ".sum", ".targets", ".task", ".td", ".tesc", ".tese", ".tl", ".tlb", ".tolk", ".toml", ".ts", ".tsx",
     ".txt", ".vert", ".wgsl", ".xaml", ".xml", ".yaml", ".yml"
 };
 
@@ -1075,6 +1075,18 @@ std::string KindOf(const std::string& relSlash) {
     if (ext == ".go") {
         return "go";
     }
+    if (ext == ".fc" || ext == ".func") {
+        return "func";
+    }
+    if (ext == ".fif") {
+        return "fift";
+    }
+    if (ext == ".tolk") {
+        return "tolk";
+    }
+    if (ext == ".tl" || ext == ".tlb" || ext == ".td") {
+        return "ton-schema";
+    }
 
     return ext.empty() ? "file" : ext.substr(1);
 }
@@ -1082,7 +1094,7 @@ std::string KindOf(const std::string& relSlash) {
 bool IsFunctionKind(const std::string& kind) {
     static const std::set<std::string> kinds = {
         "csharp", "cpp", "c", "cpp-header", "powershell", "typescript", "typescript-react",
-        "javascript", "python", "rust", "go"
+        "javascript", "python", "rust", "go", "func", "tolk"
     };
     return kinds.count(kind) > 0;
 }
@@ -1091,11 +1103,16 @@ bool IsDirFunctionExportKind(const std::string& kind) {
     return IsFunctionKind(kind) && kind != "cpp-header";
 }
 
+bool IsDirCodingKind(const std::string& kind) {
+    return IsDirFunctionExportKind(kind) || kind == "avalonia-xaml" || kind == "cpp-header" ||
+        kind == "css" || kind == "html" || kind == "shader" || kind == "xaml";
+}
+
 bool IsTextKind(const std::string& kind) {
     static const std::set<std::string> kinds = {
         "csharp", "cpp", "c", "cpp-header", "powershell", "typescript", "typescript-react",
         "javascript", "python", "rust", "go", "avalonia-xaml", "xaml", "shader", "markdown",
-        "json", "cmake", "file"
+        "json", "cmake", "file", "func", "fift", "tolk", "ton-schema"
     };
     return kinds.count(kind) > 0 || !kind.empty();
 }
@@ -1926,10 +1943,6 @@ std::vector<std::string> SelectRoots(const std::vector<FileInfo>& files, const s
 
     auto rootPriority = [&](const std::string& root) {
         const auto lower = ToLower(root);
-        if (StartsWith(lower, "src/") || StartsWith(lower, "source/") || StartsWith(lower, "sources/")) {
-            return 0;
-        }
-
         bool hasSource = false;
         bool hasShader = false;
         bool hasDocs = lower.find("doc") != std::string::npos;
@@ -1937,7 +1950,7 @@ std::vector<std::string> SelectRoots(const std::vector<FileInfo>& files, const s
             if (!StartsWith(ToLower(file.relSlash), lower)) {
                 continue;
             }
-            if (IsFunctionKind(file.kind) || file.kind == "cpp-header" || file.kind == "csharp") {
+            if (IsDirCodingKind(file.kind) && file.kind != "shader") {
                 hasSource = true;
             }
             if (file.kind == "shader") {
@@ -1959,14 +1972,22 @@ std::vector<std::string> SelectRoots(const std::vector<FileInfo>& files, const s
         return 4;
     };
 
+    auto rootCodingCount = [&](const std::string& root) {
+        const auto lower = ToLower(root);
+        return std::count_if(files.begin(), files.end(), [&](const FileInfo& file) {
+            return StartsWith(ToLower(file.relSlash), lower) &&
+                IsDirCodingKind(file.kind);
+        });
+    };
+
     std::sort(result.begin(), result.end(), [&](const std::string& left, const std::string& right) {
         const int leftPriority = rootPriority(left);
         const int rightPriority = rootPriority(right);
         if (leftPriority != rightPriority) {
             return leftPriority < rightPriority;
         }
-        const int leftCount = counts.count(left) > 0 ? counts[left] : 0;
-        const int rightCount = counts.count(right) > 0 ? counts[right] : 0;
+        const auto leftCount = rootCodingCount(left);
+        const auto rightCount = rootCodingCount(right);
         if (leftCount != rightCount) {
             return leftCount > rightCount;
         }
@@ -2567,7 +2588,16 @@ std::string NormalizeScope(std::string scope) {
 std::string BuildDirManifest(const std::vector<FileInfo>& files, const Options& options) {
     const bool scoped = options.lod == 1;
     const std::string scope = scoped ? NormalizeScope(options.scope) : "";
-    const auto selectableFiles = WithoutDirManifestArtifacts(files);
+    auto selectableFiles = WithoutDirManifestArtifacts(files);
+    if (scoped && !scope.empty()) {
+        selectableFiles.clear();
+        for (const auto& file : files) {
+            if (!IsDirManifestArtifactPath(file.relSlash) &&
+                StartsWith(ToLower(file.relSlash), ToLower(scope))) {
+                selectableFiles.push_back(file);
+            }
+        }
+    }
     const auto roots = SelectRoots(selectableFiles, scope);
     const auto anchors = SelectAnchors(selectableFiles, scoped, scope);
     std::vector<FileInfo> familyFiles;
@@ -3034,11 +3064,15 @@ void AddGlobalFunction(std::ostringstream& out, const std::vector<FileInfo>& fil
     }
 }
 
-void AddFind(std::ostringstream& out, const std::vector<FileInfo>& files, const std::string& pattern) {
+void AddFind(std::ostringstream& out, const std::vector<FileInfo>& files, const std::string& pattern, const Options& options) {
     out << "\n## FIND: " << pattern << "\n\n";
     std::vector<const FileInfo*> matches;
     for (const auto& file : files) {
         if (!IsTextKind(file.kind)) {
+            continue;
+        }
+        const auto sizeKb = static_cast<int>((file.size + 1023) / 1024);
+        if (!options.forceLargeFiles && sizeKb > options.maxFileKB) {
             continue;
         }
         std::string text;
@@ -3141,7 +3175,22 @@ std::vector<std::string> ExpandAutoDependencies(const fs::path& root, const std:
 int RunDir(const std::vector<std::string>& args) {
     const auto root = ResolveProjectRoot();
     const auto options = ParseOptions(args, "cc_project_dir.md");
-    const auto rules = LoadFileRules(root, true, options.includeArtifacts);
+    auto rules = LoadFileRules(root, true, options.includeArtifacts);
+    if (options.lod == 1 && !options.scope.empty()) {
+        std::string scope = NormalizeScope(options.scope);
+        std::size_t begin = 0;
+        while (begin < scope.size()) {
+            const auto end = scope.find('/', begin);
+            const auto component = scope.substr(begin, end - begin);
+            if (!component.empty()) {
+                rules.ignoredDirectories.erase(ToLower(component));
+            }
+            if (end == std::string::npos) {
+                break;
+            }
+            begin = end + 1;
+        }
+    }
     const auto resolvedProfile = DetectDirProfile(root, options.profile);
     const auto files = ScanFiles(root, rules, false, options.maxDepth, resolvedProfile, options.includeAllTopLevel);
 
@@ -3176,6 +3225,7 @@ int RunCc(const std::vector<std::string>& args) {
 
     const std::regex scopedRegex(R"(^(FUNC|FUNCTION|FIND|SYMBOL)\s+(.+?)\s+::\s*(.+?)\s*$)", std::regex::icase);
     const std::regex colonRegex(R"(^(FUNC|FUNCTION|FIND|SYMBOL)\s*:\s*(.+?)\s*$)", std::regex::icase);
+    const std::regex expandRegex(R"(^EXPAND\s*:\s*(.+?)\s*$)", std::regex::icase);
     const std::regex lenientRegex(R"(^(FUNC|FUNCTION)\s+(.+?)\s*$)", std::regex::icase);
 
     for (const auto& clean : requestLines) {
@@ -3207,6 +3257,11 @@ int RunCc(const std::vector<std::string>& args) {
             continue;
         }
 
+        if (std::regex_match(clean, match, expandRegex)) {
+            paths.push_back(match[1].str());
+            continue;
+        }
+
         if (std::regex_match(clean, match, lenientRegex) && match.size() > 2) {
             const std::string value = match[2].str();
             if (value.find('/') == std::string::npos && value.find('\\') == std::string::npos) {
@@ -3215,9 +3270,23 @@ int RunCc(const std::vector<std::string>& args) {
             }
         }
 
-        if (StartsWith(ToLower(clean), "func") || StartsWith(ToLower(clean), "function") ||
-            StartsWith(ToLower(clean), "find") || StartsWith(ToLower(clean), "symbol")) {
-            throw std::runtime_error("Malformed request: " + clean);
+        const auto lowerClean = ToLower(clean);
+        const auto startsReservedRequest = [&](const std::string& keyword) {
+            if (!StartsWith(lowerClean, keyword)) {
+                return false;
+            }
+            if (lowerClean.size() == keyword.size()) {
+                return true;
+            }
+            const char next = lowerClean[keyword.size()];
+            return next == ':' || next == ' ' || next == '\t';
+        };
+        if (startsReservedRequest("func") || startsReservedRequest("function") ||
+            startsReservedRequest("find") || startsReservedRequest("symbol") || startsReservedRequest("expand")) {
+            throw std::runtime_error(
+                "Malformed request: " + clean +
+                ". CC input is request grammar, not natural language; use FIND: text, EXPAND: directory, "
+                "FUNC: symbol, FUNCTION path :: symbol, or an exact relative path.");
         }
 
         paths.push_back(clean);
@@ -3255,7 +3324,7 @@ int RunCc(const std::vector<std::string>& args) {
         AddGlobalFunction(out, files, symbol, options);
     }
     for (const auto& find : finds) {
-        AddFind(out, files, find);
+        AddFind(out, files, find, options);
     }
 
     WriteFile(options.outputFile, out.str());

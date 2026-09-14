@@ -134,13 +134,17 @@ internal static void RunCcDirManifestScriptSmoke()
         Directory.CreateDirectory(Path.Combine(projectRoot, "lib"));
         Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Setup"));
         Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench.Tests"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services", "ContextControl"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "ViewModels"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views", "MainWindowParts", "WorkspacePages"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "MainWindow"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "ViewModels"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "FileResolution"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "Execution"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "ContextPackaging"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "ViewModels", "Core"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ProjectInspection", "Controls"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Settings", "Views"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Skillbook", "Views", "WorkspacePages"));
         Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Styles", "WorkbenchDesign", "ContextControlDock"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Controls", "Workspace"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Skillbook", "Controls"));
         File.WriteAllText(Path.Combine(projectRoot, "src", "app", "main.cpp"), "int main() { return 0; }\nint helper() { return 1; }\n");
         File.WriteAllText(Path.Combine(projectRoot, "src", "app", "helper.cpp"), "int helperTwo() { return 2; }\n");
         File.WriteAllText(Path.Combine(projectRoot, "README.md"), "# Smoke\n");
@@ -156,23 +160,23 @@ internal static void RunCcDirManifestScriptSmoke()
         File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench.Tests", "ContextControl.Workbench.Tests.csproj"), "<Project />\n");
         File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench.Tests", "Program.cs"), "public static class TestsProgram { public static void Main() { } }\n");
         File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "ContextControl.Workbench.csproj"), "<Project />\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services", "ContextControl", "ContextDirManifestParser.cs"), "public sealed class ContextDirManifestParser { }\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services", "ContextControl", "ContextControlProcessService.cs"), "public sealed class ContextControlProcessService { }\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services", "ContextControlProcessService.cs"), "public sealed class ContextControlProcessService { }\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "ViewModels", "WorkbenchViewModel.cs"), "public sealed class WorkbenchViewModel { }\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views", "MainWindow.axaml"), "<Window />\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views", "MainWindow.axaml.cs"), "public sealed class MainWindow { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "FileResolution", "ContextDirManifestParser.cs"), "public sealed class ContextDirManifestParser { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "Execution", "ContextControlProcessService.cs"), "public sealed class ContextControlProcessService { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", "ContextPackaging", "ContextPromptBuilder.cs"), "public sealed class ContextPromptBuilder { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "ViewModels", "WorkbenchViewModel.cs"), "public sealed class WorkbenchViewModel { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "MainWindow", "MainWindow.axaml"), "<Window />\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "MainWindow", "MainWindow.axaml.cs"), "public sealed class MainWindow { }\n");
         File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Styles", "WorkbenchDesign.axaml"), "<Styles />\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views", "MainWindowParts", "WorkspacePages", "SkillbookPage.axaml"), "<UserControl />\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Skillbook", "Views", "WorkspacePages", "SkillbookPage.axaml"), "<UserControl />\n");
         File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Styles", "WorkbenchDesign", "ContextControlDock", "ConversationAndSkillbook.axaml"), "<Styles />\n");
-        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Controls", "Workspace", "SkillbookRenderControl.cs"), "public sealed class SkillbookRenderControl { }\n");
+        File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Skillbook", "Controls", "SkillbookRenderControl.cs"), "public sealed class SkillbookRenderControl { }\n");
         for (var index = 0; index < 4; index++)
         {
-            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Controls", $"SmokeControl{index}.cs"), $"public sealed class SmokeControl{index} {{ }}\n");
-            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Services", $"SmokeService{index}.cs"), $"public sealed class SmokeService{index} {{ }}\n");
+            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ProjectInspection", "Controls", $"SmokeControl{index}.cs"), $"public sealed class SmokeControl{index} {{ }}\n");
+            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "ContextWorkflow", "Services", $"SmokeService{index}.cs"), $"public sealed class SmokeService{index} {{ }}\n");
             File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Styles", $"SmokeStyle{index}.axaml"), "<Styles />\n");
-            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "ViewModels", $"SmokeViewModel{index}.cs"), $"public sealed class SmokeViewModel{index} {{ }}\n");
-            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Views", $"SmokeView{index}.axaml"), "<UserControl />\n");
+            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Shell", "ViewModels", $"SmokeViewModel{index}.cs"), $"public sealed class SmokeViewModel{index} {{ }}\n");
+            File.WriteAllText(Path.Combine(projectRoot, "ide", "ContextControl.Workbench", "Features", "Settings", "Views", $"SmokeView{index}.axaml"), "<UserControl />\n");
         }
 
         File.WriteAllText(Path.Combine(projectRoot, "patch.txt"), "artifact\n");
@@ -226,17 +230,16 @@ internal static void RunCcDirManifestScriptSmoke()
         RequireTextContains(l0, "lib/Cc.Dir.Export.ps1");
         RequireTextContains(l0, "lib/Cc.Export.Source.ps1");
         RequireTextContains(l0, "ROOT path=\"src/\"");
-        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Views/\" role=\"workbench views\"");
-        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Controls/\" role=\"workbench custom controls\"");
-        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Services/\" role=\"workbench services\"");
-        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Services/ContextControl/\"");
+        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Shell/\" role=\"workbench shell\"");
+        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Features/\" role=\"workbench feature modules\"");
+        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Features/ContextWorkflow/Services/\"");
         RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/Styles/\" role=\"workbench styling resources\"");
-        RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench/ViewModels/\" role=\"workbench viewmodels\"");
+        RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Features/Skillbook/Controls/SkillbookRenderControl.cs\"");
         RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Setup/\"");
         RequireTextContains(l0, "ROOT path=\"ide/ContextControl.Workbench.Tests/\"");
         RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/ContextControl.Workbench.csproj\" tier=L0 kind=\"csharp-project\" role=\"dotnet project file\" exports=\"full,find\"");
-        RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Views/MainWindow.axaml\" tier=L0 kind=\"avalonia-xaml\" role=\"main UI\" exports=\"full,find\"");
-        RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Views/MainWindow.axaml.cs\" tier=L0 kind=\"csharp\" role=\"main UI\" exports=\"full,function,find\"");
+        RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Shell/MainWindow/MainWindow.axaml\" tier=L0 kind=\"avalonia-xaml\" role=\"main UI\" exports=\"full,find\"");
+        RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Shell/MainWindow/MainWindow.axaml.cs\" tier=L0 kind=\"csharp\" role=\"main UI\" exports=\"full,function,find\"");
         RequireTextContains(l0, "FILE path=\"ide/ContextControl.Workbench/Styles/WorkbenchDesign.axaml\" tier=L0 kind=\"avalonia-xaml\" role=\"styling resource\" exports=\"full,find\"");
         RequireTextContains(l0, "FIND: ");
         RequireTextContains(l0, "FIND lines may repeat before END; do not mix FIND with source or EXPAND lines.");
@@ -294,11 +297,11 @@ internal static void RunCcDirManifestScriptSmoke()
         RequireTextNotContains(l1, "```");
 
         var ideScopedOutput = Path.Combine(projectRoot, "cc_project_dir_ide_l1.md");
-        RunCcDir(repoRoot, projectRoot, ideScopedOutput, ["-Lod", "1", "-Scope", "ide/ContextControl.Workbench/Views/MainWindowParts/WorkspacePages"]);
+        RunCcDir(repoRoot, projectRoot, ideScopedOutput, ["-Lod", "1", "-Scope", "ide/ContextControl.Workbench/Features/Skillbook/Views/WorkspacePages"]);
         var ideL1 = File.ReadAllText(ideScopedOutput);
         RequireTextContains(ideL1, "LOD: L1_SCOPED");
-        RequireTextContains(ideL1, "SCOPE: ide/ContextControl.Workbench/Views/MainWindowParts/WorkspacePages/");
-        RequireTextContains(ideL1, "FILE path=\"ide/ContextControl.Workbench/Views/MainWindowParts/WorkspacePages/SkillbookPage.axaml\" tier=L1 kind=\"avalonia-xaml\" role=\"skillbook page layout\"");
+        RequireTextContains(ideL1, "SCOPE: ide/ContextControl.Workbench/Features/Skillbook/Views/WorkspacePages/");
+        RequireTextContains(ideL1, "FILE path=\"ide/ContextControl.Workbench/Features/Skillbook/Views/WorkspacePages/SkillbookPage.axaml\" tier=L1 kind=\"avalonia-xaml\" role=\"skillbook page layout\"");
         RequireTextNotContains(ideL1, "ConversationAndSkillbook.axaml");
 
         var beforeProfileCount = (int?)profileJson["VisibleFileCount"] ?? 0;
@@ -416,8 +419,8 @@ internal static void RunCcDirManifestScriptSmoke()
                 ("ide/ContextControl.Workbench.Tests/ContextControl.Workbench.Tests.csproj", "<Project />\n"),
                 ("ide/ContextControl.Workbench.Tests/Program.cs", "public static class TestsProgram { public static void Main() { } }\n"),
                 ("ide/ContextControl.Workbench/ContextControl.Workbench.csproj", "<Project />\n"),
-                ("ide/ContextControl.Workbench/Services/ProjectService.cs", "public sealed class ProjectService { }\n"),
-                ("ide/ContextControl.Workbench/Views/MainWindow.axaml", "<Window />\n")
+                ("ide/ContextControl.Workbench/Features/ProjectInspection/Services/Projects/ProjectService.cs", "public sealed class ProjectService { }\n"),
+                ("ide/ContextControl.Workbench/Shell/MainWindow/MainWindow.axaml", "<Window />\n")
             ],
             [
                 "ROOT path=\"ide/ContextControl.Setup/\"",

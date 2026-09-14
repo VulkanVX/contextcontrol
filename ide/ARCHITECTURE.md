@@ -50,6 +50,29 @@ The existing scripts remain the source of truth:
 
 The desktop app is a native orchestration layer over that core, not a replacement for it.
 
+## Workbench Source Layout
+
+The Avalonia workbench is organized by feature ownership instead of broad layer buckets.
+Namespaces intentionally remain stable (`ContextControl.Workbench.Controls`,
+`ContextControl.Workbench.Services`, `ContextControl.Workbench.ViewModels`, and
+`ContextControl.Workbench.Views`) so XAML bindings and existing references stay low-risk
+while the physical layout is easier to navigate.
+
+- `Shell/` owns the application window, shell chrome, app-level view model, theme services, updates, and history/project-tab orchestration.
+- `Features/ContextWorkflow/` owns DIR/CC/GO workflow orchestration, prompt/capsule building, file resolution, instruction auditing, attachments, patch plans, and prompt composer/browser-routing UI.
+- `Features/LocalModels/` owns Local LLM catalogs, runtime/process integration, dependency environments, model view models, catalog rendering, settings, and local-model workspace pages.
+- `Features/ProjectInspection/` owns project loading, file rules, stack scanning, project tree/graph controls, project workspace view models, scanner pages, graph pages, and navigation panes.
+- `Features/Editing/` owns the custom code editor, text-surface rendering, minimap/navigation, syntax helpers, editor workspace page, and external-change tracking.
+- `Features/Conversation/` owns chat transcript rendering, chat view models, conversation page, and chat-history integration.
+- `Features/Browser/` owns the WebView2 host, browser service, browser pane/tab view models, and browser workspace page.
+- `Features/Skillbook/` owns Skillbook rendering, service, view models, workspace page, rename dialog, and Context Control Skillbook workflow partials.
+- `Features/Settings/` owns the settings window, settings page parts, dialog windows, and small settings view models.
+- `Shared/` owns generic controls and infrastructure view-model primitives that are not feature-specific.
+- `Styles/` and `Assets/` remain centralized because Avalonia resource URIs are path-sensitive and shared across features.
+
+New files should usually land inside the owning feature. Add to `Shared/` only when at
+least two features already need the same primitive.
+
 ## LLM Navigation
 
 - Use `LLM_PROJECT_GUIDE.md` for a quick map of source folders and edit boundaries.

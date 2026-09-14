@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ContextControl.Workbench.Views.ThemeSettingsWindowParts.LlmsSettingsPage"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+>
+          <Grid x:Name="LlmsPageRoot" RowDefinitions="Auto,*" RowSpacing="8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <StackPanel>
+                <TextBlock Classes="settings-title" Text="Local LLM roles" />
+                <TextBlock Classes="muted" Text="Defaults used by the CC-native chat capsule builder" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="muted" Text="{Binding ContextControl.LocalLlmStatus}" VerticalAlignment="Center" />
+            </Grid>
+
+            <ScrollViewer
+                Grid.Row="1"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled"
+                controls:HoverScrollbarBehavior.IsEnabled="True"
+                controls:HoverScrollbarBehavior.ReserveRight="12">
+              <StackPanel Spacing="8">
+                <Border Classes="rule-card">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                      <StackPanel>
+                        <TextBlock Classes="settings-title" Text="Ollama model storage" />
+                        <TextBlock Classes="muted" Text="{Binding ContextControl.OllamaModelsDirectoryStatus}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="rule-mini" MinHeight="24" Content="Browse" Click="OnOllamaModelsBrowseClick" />
+                      <Button Grid.Column="2" Classes="rule-mini primary" MinHeight="24" Content="Apply" Command="{Binding ContextControl.ApplyOllamaModelsDirectoryCommand}" />
+                    </Grid>
+                    <Grid Grid.Row="1" ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="Models directory" VerticalAlignment="Center" />
+                      <TextBox
+                          Grid.Column="1"
+                          Classes="rule-add"
+                          Text="{Binding ContextControl.OllamaModelsDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Watermark="D:\Ollama\models" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Row="2"
+                        Classes="path-text"
+                        TextWrapping="Wrap"
+                        Text="Sets OLLAMA_MODELS for future downloads. Restart Ollama after changing this path." />
+                  </Grid>
+                </Border>
+
+                <Border Classes="rule-card">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                      <StackPanel>
+                        <TextBlock Classes="settings-title" Text="Hugging Face token" />
+                        <TextBlock Classes="muted" Text="{Binding ContextControl.HuggingFaceTokenStatus}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Button
+                          Grid.Column="1"
+                          Classes="rule-mini primary"
+                          MinHeight="24"
+                          MinWidth="64"
+                          Content="Tutorial"
+                          Click="OnHuggingFaceTokenTutorialClick" />
+                      <Button
+                          Grid.Column="2"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          MinWidth="64"
+                          Content="Tokens"
+                          Click="OnHuggingFaceTokenPageClick" />
+                      <Button
+                          Grid.Column="3"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          MinWidth="64"
+                          Content="Docs"
+                          Click="OnHuggingFaceTokenDocsClick" />
+                    </Grid>
+                    <Grid Grid.Row="1" ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="HF token" VerticalAlignment="Center" />
+                      <TextBox
+                          Grid.Column="1"
+                          Classes="rule-add"
+                          Text="{Binding ContextControl.HuggingFaceToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Watermark="hf_..." />
+                    </Grid>
+                    <TextBlock
+                        Grid.Row="2"
+                        Classes="path-text"
+                        TextWrapping="Wrap"
+                        Text="Used as HF_TOKEN/HUGGINGFACE_HUB_TOKEN for Diffusers model downloads and first-run generation." />
+                  </Grid>
+                </Border>
+
+                <Border Classes="rule-card">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                      <StackPanel>
+                        <TextBlock Classes="settings-title" Text="Codex CLI" />
+                        <TextBlock Classes="muted" Text="{Binding ContextControl.CodexSetupSummary}" />
+                      </StackPanel>
+                      <Button
+                          Grid.Column="1"
+                          Classes="rule-mini primary"
+                          MinHeight="24"
+                          MinWidth="64"
+                          Content="{Binding ContextControl.CodexInstallButtonLabel}"
+                          Command="{Binding ContextControl.InstallCodexCommand}" />
+                      <Button
+                          Grid.Column="2"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          Content="Guide"
+                          Command="{Binding ContextControl.OpenCodexGuideCommand}" />
+                      <Button
+                          Grid.Column="3"
+                          Classes="rule-mini primary"
+                          MinHeight="24"
+                          MinWidth="64"
+                          Content="{Binding ContextControl.CodexLoginButtonLabel}"
+                          Command="{Binding ContextControl.OpenCodexLoginCommand}" />
+                      <Button
+                          Grid.Column="4"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          Content="Logout"
+                          Command="{Binding ContextControl.LogoutCodexCommand}" />
+                      <Button
+                          Grid.Column="5"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          Content="Refresh"
+                          Command="{Binding ContextControl.RefreshCodexStatusCommand}" />
+                      <Button
+                          Grid.Column="6"
+                          Classes="rule-mini"
+                          MinHeight="24"
+                          Content="Doctor"
+                          Command="{Binding ContextControl.RunCodexDoctorCommand}" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Row="1"
+                        Classes="path-text"
+                        Text="{Binding ContextControl.CodexStatus}" />
+                  </Grid>
+                </Border>
+
+                <Border Classes="rule-card">
+                  <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                    <Grid ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="File request model" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" Classes="theme-picker" ItemsSource="{Binding ContextControl.LocalModelIdOptions}" SelectedItem="{Binding ContextControl.FileRequestModelId, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid Grid.Row="1" ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="Patch write model" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" Classes="theme-picker" ItemsSource="{Binding ContextControl.LocalModelIdOptions}" SelectedItem="{Binding ContextControl.PatchWriteModelId, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid Grid.Row="2" ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="Patch review model" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" Classes="theme-picker" ItemsSource="{Binding ContextControl.LocalModelIdOptions}" SelectedItem="{Binding ContextControl.PatchReviewModelId, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid Grid.Row="3" ColumnDefinitions="180,*" ColumnSpacing="10">
+                      <TextBlock Classes="field-label" Text="General chat model" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" Classes="theme-picker" ItemsSource="{Binding ContextControl.LocalModelIdOptions}" SelectedItem="{Binding ContextControl.ChatModelId, Mode=TwoWay}" />
+                    </Grid>
+                  </Grid>
+                </Border>
+
+                <Border Classes="rule-card">
+                  <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                    <TextBlock Classes="settings-title" Text="Skillbook roots" />
+                    <TextBlock Grid.Row="1" Classes="path-text" Text="{Binding ContextControl.SkillbookGlobalPath}" />
+                    <TextBlock Grid.Row="2" Classes="path-text" Text="{Binding ContextControl.SkillbookProjectPath}" />
+                  </Grid>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+</UserControl>

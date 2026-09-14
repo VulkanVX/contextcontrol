@@ -20,11 +20,37 @@
 
   <Style Selector="ListBox.attachment-list">
     <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="Transitions">
       <Transitions>
         <ThicknessTransition Property="Padding" Duration="0:0:0.12" />
       </Transitions>
     </Setter>
+  </Style>
+
+  <Style Selector="ListBox.attachment-list > ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="ListBox.attachment-list > ListBoxItem:pointerover">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ListBox.attachment-list > ListBoxItem:selected">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ListBox.attachment-list > ListBoxItem:selected:pointerover">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
   <Style Selector="TextBlock.cc-attachment-title">

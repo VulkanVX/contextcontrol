@@ -6,11 +6,11 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Main window | `Views/MainWindow.axaml` | Top-level desktop window. |
-| Main title bar | `Views/MainWindowParts/Shell/MainTitleBar.axaml` | Custom drag bar with EDIT, VIEW, and window controls. |
+| Main window | `Shell/MainWindow/MainWindow.axaml` | Top-level desktop window. |
+| Main title bar | `Shell/Views/MainTitleBar.axaml` | Custom drag bar with EDIT, VIEW, and window controls. |
 | Edit menu | `EditMenuButton` in `MainTitleBar.axaml` | Project actions flyout with Open Project, New Project, Settings. |
 | View menu | `ViewMenuButton` in `MainTitleBar.axaml` | Visibility flyout for Project files tree, Browser routing window, Prompt window. |
-| Project tabs bar | `Views/MainWindowParts/Shell/ProjectTabsBar.axaml` | Top row of open project tiles and pane toggles. |
+| Project tabs bar | `Shell/Views/ProjectTabsBar.axaml` | Top row of open project tiles and pane toggles. |
 | Workspace root | `WorkspaceRoot` in `MainWindow.axaml` | Main three-column work area. |
 | Workspace mode bar | `WorkspaceHeaderBar.axaml` | Mode switcher row for Code, Chat, Browser, Local LLMs, Dependencies, Skillbook, Graph, Scanner. |
 | Workspace header | `WorkspaceHeaderBar.axaml` | Second header row whose controls change by active workspace mode. |
@@ -20,11 +20,11 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Project files pane | `ProjectFilesPane` in `ProjectFilesPane.axaml` | Left sidebar containing project tree controls. |
+| Project files pane | `ProjectFilesPane` in `Features/ProjectInspection/Views/ProjectNavigation/ProjectFilesPane.axaml` | Left sidebar containing project tree controls. |
 | Project file tree | `ProjectTreeView` in `ProjectFilesPane.axaml` | Rendered tree of folders/files. |
 | Project tree search | `ProjectTreeSearchPanel`, `ProjectTreeSearchBox` | Search box overlay for the project file tree. |
 | History pane | `HistoryPaneRoot` in `HistoryPane.axaml` | Narrow version/history gutter beside the editor area. |
-| Browser routing pane | `BrowserRoutingPane.axaml` | Right sidebar for Context Control route, patch plan, log, and attachments. |
+| Browser routing pane | `Features/ContextWorkflow/Views/BrowserRouting/BrowserRoutingPane.axaml` | Right sidebar for Context Control route, patch plan, log, and attachments. |
 | Routing log | log `ItemsControl` in `BrowserRoutingPane.axaml` | Context Control log entries shown in the routing pane. |
 | Patch plan summary | `PatchPlanActions` binding in `BrowserRoutingPane.axaml` | Apply effective/all patch controls and patch action list. |
 | Attachment region | `AttachmentRegion`, `AttachmentListHost`, `AttachmentList` | Pending prompt attachment list in the routing pane. |
@@ -33,7 +33,7 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Prompt window | `ContextPromptBar` in `ContextPromptBar.axaml` | Bottom docked prompt surface. |
+| Prompt window | `ContextPromptBar` in `Features/ContextWorkflow/Views/PromptComposer/ContextPromptBar.axaml` | Bottom docked prompt surface. |
 | Prompt bar root | `PromptBarRoot` | Animated prompt container. |
 | Prompt composer | `ContextPromptComposer` | Inner composer panel with mode controls, input, footer, send button. |
 | Prompt input | `ContextPromptTextBox` | Main multi-line text input for chat/context/image prompts. |
@@ -50,40 +50,40 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Code editor page | `CodeEditorPage.axaml` | Workspace page for the active source file. |
+| Code editor page | `Features/Editing/Views/WorkspacePages/CodeEditorPage.axaml` | Workspace page for the active source file. |
 | File editor | `FileEditor` in `CodeEditorPage.axaml` | Custom code editor control. |
-| Conversation page | `ConversationPage.axaml` | Chat transcript workspace page. |
+| Conversation page | `Features/Conversation/Views/WorkspacePages/ConversationPage.axaml` | Chat transcript workspace page. |
 | Chat history hover rail | `ChatHistoryHoverShell` | Narrow hover target that opens chat history. |
 | Chat history panel | `ChatHistoryPanel` | Session list with Export and New buttons. |
 | Chat transcript | `ChatTranscriptRenderControl` in `ConversationPage.axaml` | Rendered chat messages and code snippets. |
-| Browser page | `BrowserSurface.axaml` | Embedded browser workspace page. |
+| Browser page | `Features/Browser/Views/WorkspacePages/BrowserSurface.axaml` | Embedded browser workspace page. |
 | Browser web view | `BrowserWebView` | Native WebView2 host. |
 | Browser address bar | `browser-url-input` in `WorkspaceHeaderBar.axaml` | URL input shown in browser mode. |
 | Browser tabs | `browser-tab` template in `WorkspaceHeaderBar.axaml` | Browser tab strip shown in browser mode. |
-| Local LLM page | `LocalLlmPage.axaml` | Model catalog workspace page. |
+| Local LLM page | `Features/LocalModels/Views/WorkspacePages/LocalLlmPage.axaml` | Model catalog workspace page. |
 | Local LLM filters | `llm-filter-bar` in `LocalLlmPage.axaml` | Sort/provider/run/purpose/base/context/hardware filters. |
 | Local LLM search | `LlmSearchBox` | Overlay search box for model catalog. |
 | Local LLM catalog | `LocalLlmCatalogRenderControl` | Rendered local model cards. |
-| Dependencies page | `DependenciesPage.axaml` | Backend dependency workspace page. |
+| Dependencies page | `Features/LocalModels/Views/WorkspacePages/DependenciesPage.axaml` | Backend dependency workspace page. |
 | Dependency search | `DependencySearchBox` | Overlay search box for dependencies. |
 | Dependency list | `DependencyListRenderControl` | Rendered dependency install/status cards. |
-| Skillbook page | `SkillbookPage.axaml` | Flow library workspace page for CC Flow, project/global flows, sections, skills, and markdown editing. |
+| Skillbook page | `Features/Skillbook/Views/WorkspacePages/SkillbookPage.axaml` | Flow library workspace page for CC Flow, project/global flows, sections, skills, and markdown editing. |
 | Skillbook flow rail | `SkillbookPage.axaml` | Flow selector for Context Control and editable project/global/custom flows. |
 | Skillbook section/skill list | `SkillbookPage.axaml` | Grouped section and skill selector for large Skillbook collections. |
 | Skillbook editor | `SkillbookPage.axaml` | Native selectable markdown editor/read-only detail pane. |
 | CC Flow inspector | `SkillbookPage.axaml` | Prompt-call map showing trigger, source, recipient, attachments, and Skillbook injection state. |
-| Project graph page | `ProjectGraphPage.axaml` | Architecture graph workspace page. |
+| Project graph page | `Features/ProjectInspection/Views/WorkspacePages/ProjectGraphPage.axaml` | Architecture graph workspace page. |
 | Project graph view | `ProjectGraphView` | Custom rendered architecture graph canvas. |
 | Project graph search | `ProjectGraphSearchPanel`, `ProjectGraphSearchBox` | Graph node search overlay. |
 | Project graph tree pane | `graph-tree-sidebar` | Optional current project tree text pane on graph page. |
-| Project scanner page | `ProjectScannerPage.axaml` | Project scanner diagnostics workspace page. |
+| Project scanner page | `Features/ProjectInspection/Views/WorkspacePages/ProjectScannerPage.axaml` | Project scanner diagnostics workspace page. |
 | Project scanner report | `ProjectScannerRenderControl` | Rendered scanner metrics, identity, files, rules, diagnostics. |
 
 ## Settings Window
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Settings window | `Views/ThemeSettingsWindow.axaml` | Preferences window. |
+| Settings window | `Features/Settings/Views/ThemeSettingsWindow.axaml` | Preferences window. |
 | Settings navigation rail | `AppearanceNavButton`, `FileRulesNavButton`, `LlmsNavButton` | Left navigation buttons. |
 | Appearance settings page | `AppearancePage` / `AppearanceSettingsPage.axaml` | Skin, theme, syntax, font, and editor style settings. |
 | Skin picker | `SkinPicker` | Workbench skin selector. |
@@ -108,7 +108,7 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| File rule list editor | `Views/Settings/FileRuleListEditorWindow.cs` | Modal editor for full file-rule lists. |
+| File rule list editor | `Features/Settings/Views/Dialogs/FileRuleListEditorWindow.cs` | Modal editor for full file-rule lists. |
 | Project graph export dialog | `ProjectGraphExportOptionsWindow.cs` | Format/resolution dialog for graph export. |
 | Project graph color dialog | `GraphGenerationColorWindow.cs` | Color picker for graph generation swatches. |
 | Ollama setup modal | modal block in `MainWindowOverlays.axaml` | In-app Ollama setup message with OK/close buttons. |
@@ -117,13 +117,13 @@ Use these canonical names when prompting an LLM about the ContextControl Workben
 
 | Canonical name | Code anchor | Meaning |
 |---|---|---|
-| Code editor control | `Controls/CodeEditor/**` | Syntax highlighting, folding, minimap, find, selection, rendering. |
-| Project tree render control | `Controls/ProjectTree/**` | Virtual-looking project tree rendering and hit testing. |
-| Project graph render control | `Controls/ProjectGraph/**` | Graph layout, drawing, hit testing, viewport, export. |
-| Chat transcript render control | `Controls/Chat/ChatTranscriptRenderControl.cs` | Chat message and snippet rendering. |
-| Local LLM catalog render control | `Controls/LocalLlmCatalog/**` | Model card rendering, badges, tooltips, pull action hit areas. |
-| Dependency list render control | `Controls/Workspace/DependencyListRenderControl.cs` | Backend dependency cards. |
-| Project scanner render control | `Controls/Workspace/ProjectScannerRenderControl.cs` | Scanner report sections. |
-| Skillbook render control | `Controls/Workspace/SkillbookRenderControl.cs` | Legacy rendered Skillbook surface retained for compatibility. |
-| Prompt dock host | `Controls/Common/PromptDockHost.cs` | Hosts workspace content and bottom prompt dock sizing. |
-| Hover scrollbar behavior | `Controls/Common/HoverScrollbarBehavior.cs` | Shared hover/spacing behavior for scrollbars. |
+| Code editor control | `Features/Editing/Controls/CodeEditor/**` | Syntax highlighting, folding, minimap, find, selection, rendering. |
+| Project tree render control | `Features/ProjectInspection/Controls/ProjectTree/**` | Virtual-looking project tree rendering and hit testing. |
+| Project graph render control | `Features/ProjectInspection/Controls/ProjectGraph/**` | Graph layout, drawing, hit testing, viewport, export. |
+| Chat transcript render control | `Features/Conversation/Controls/Chat/ChatTranscriptRenderControl.cs` | Chat message and snippet rendering. |
+| Local LLM catalog render control | `Features/LocalModels/Controls/LocalLlmCatalog/**` | Model card rendering, badges, tooltips, pull action hit areas. |
+| Dependency list render control | `Shared/Controls/Workspace/DependencyListRenderControl.cs` | Backend dependency cards. |
+| Project scanner render control | `Features/ProjectInspection/Controls/Workspace/ProjectScannerRenderControl.cs` | Scanner report sections. |
+| Skillbook render control | `Features/Skillbook/Controls/SkillbookRenderControl.cs` | Legacy rendered Skillbook surface retained for compatibility. |
+| Prompt dock host | `Shared/Controls/PromptDockHost.cs` | Hosts workspace content and bottom prompt dock sizing. |
+| Hover scrollbar behavior | `Shared/Controls/HoverScrollbarBehavior.cs` | Shared hover/spacing behavior for scrollbars. |

@@ -52,7 +52,7 @@ Bundled inside the installer:
 
 - ContextControl Workbench native desktop app
 - PowerShell ContextControl CLI scripts
-- ContextControl `lib/` modules and default `skillbook/` file
+- ContextControl `lib/` modules and PowerShell-based `skillbook/` instructions
 - Release appearance defaults
 - Full Windows app folder with runtime files beside the EXE
 - Setup UI with install folder picker, shortcut options, uninstall registration, logs, and quiet install mode
@@ -87,7 +87,7 @@ Stable enough to test:
 Work in progress:
 
 - Context Control prompting flow in the desktop app
-- Full Skillbook prompt customization beyond the read-only built-in CC Flow contracts
+- Full per-phase activation of custom Skillbook flows
 - Non-Windows packaged releases
 - Some advanced GPU/server model backends
 
@@ -177,6 +177,7 @@ Windows SmartScreen may warn on new unsigned installers even when the file is cl
 - **Project Graph**: visualize project structure and export graph views.
 - **Scanner**: summarize project stack, languages, manifests, and important files.
 - **Conversation**: use local model chat with ContextControl context where supported.
+- **Skillbook**: inspect and edit the CC Main and CC Flow instructions, or organize custom flows, sections, and skills.
 - **Browser**: embedded WebView2 surface on Windows.
 
 ## Context Control Prompting Flow
@@ -187,13 +188,25 @@ The original ContextControl pipeline is deterministic:
 2. `cc.ps1` exports selected files or functions.
 3. `ccReplace.ps1` applies explicit `CC-REPLACE` patch blocks.
 
-The desktop app is being built around the same idea, but the prompting flow is still WIP. Treat generated request lines, prompt capsules, and Skillbook-assisted instructions as active development areas.
+The desktop app uses the same sequence: **DIR -> Send -> CC -> Send -> GO -> Apply**. GO previews a plan with `ccReplace.ps1 -PlanOnly -Json`; Apply executes the selected actions locally. The prompting flow is still under active development.
 
 ## Skillbook
 
-`skillbook/` is the v1 flow library. The desktop Skillbook page shows the built-in read-only Context Control flow, project/global legacy markdown entries, and editable markdown-folder flows under `skillbook/flows/<flow-id>/...`.
+The Skillbook section turns the PowerShell workflow into visible model instructions. Open **Skillbook -> Context Control** to inspect **CC Main**, the shared operating rules, and **CC Flow**, the instructions for each kind of attached context.
 
-Editable project flows support adding flows, sections, and skills, renaming them, enabling/disabling skills, and saving markdown bodies. The built-in **CC Flow** contracts stay locked in v1, and the page includes a CC Flow inspector that shows when DIR, CC, file-request, source-audit, patch-write, patch-review, GO preview, apply, and raw/image/browser routes exist and whether Skillbook instructions are injected.
+| Skill or step | PowerShell basis | Expected result |
+|---|---|---|
+| [CC Main](skillbook/built-in-overrides/cc-main/cc-main.md) | The complete DIR/CC/GO pipeline | The model reasons from attached exports; ContextControl runs local file operations. |
+| [DIR + Request](skillbook/built-in-overrides/cc-flow/cc-flow-01-dir-request.md) | [ccDir.ps1](ccDir.ps1) | A minimal file/function request ending with `END`, or a focused `FIND:` / `EXPAND:` request. |
+| [CC Export + Patch](skillbook/built-in-overrides/cc-flow/cc-flow-02-cc-patch.md) | [cc.ps1](cc.ps1) and [ccReplace.ps1](ccReplace.ps1) | Another narrow context request, or raw `CC-REPLACE` blocks ready for GO. |
+| [Chat](skillbook/built-in-overrides/cc-flow/cc-flow-03-chat.md) | No DIR/CC source attachment | A normal conversational answer; project code work starts with DIR. |
+| GO / Apply | [ccReplace.ps1](ccReplace.ps1); [ccStart.ps1](ccStart.ps1) starts its terminal watcher | A local patch preview and application, with no model prompt. |
+
+Built-in skills open read-only. Select **Edit** to change an instruction, then **Save** to persist its markdown override under `skillbook/built-in-overrides/`. Custom flows support adding and renaming flows, sections, and skills, enabling/disabling skills, and saving markdown under `skillbook/flows/<flow-id>/sections/<section-id>/skills/`.
+
+CC Main and the active CC Flow instruction are included in ContextControl model turns. Raw mode sends the prompt without Skillbook instructions. The page's flow inspector shows the attachments and instruction injection for each step. Full per-phase activation of arbitrary custom flows remains work in progress.
+
+See the [Skillbook guide](docs/SKILLBOOK.md) for file layout, editing, and a PowerShell walkthrough, and the [flow reference](CONTEXT_CONTROL_FLOW_REFERENCE.md) for the complete request and patch contracts.
 
 ## Build From Source
 
@@ -202,6 +215,7 @@ Requirements:
 - Windows for the release installer EXE
 - .NET 9 SDK
 - PowerShell
+- CMake and a C++17 compiler for the native exporter (optional; the app can fall back to PowerShell)
 
 Run the tests:
 
@@ -233,11 +247,14 @@ The GitHub Actions workflow in `.github/workflows/contextcontrol-release.yml` pu
 
 ```text
 .github/workflows/                 Release workflow
+docs/SKILLBOOK.md                  Skills and PowerShell workflow guide
 ide/ContextControl.Workbench/       Avalonia desktop app
 ide/ContextControl.Workbench.Tests/ Focused smoke tests
 lib/                                Shared PowerShell pipeline modules
+native/contextcontrol/             Native DIR/CC exporter
 packaging/                          Release and installer scripts
-skillbook/                          Draft local-model instruction material
+skillbook/built-in-overrides/        CC Main and CC Flow markdown instructions
+skillbook/flows/                     User-created flows, sections, and skills
 cc*.ps1, cc*.cmd                    CLI entry points
 ```
 

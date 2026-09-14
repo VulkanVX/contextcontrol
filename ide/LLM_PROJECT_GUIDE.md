@@ -7,22 +7,24 @@ Use this file as the first stop when asking an LLM to modify the desktop IDE. It
 | Area | Main files | Purpose |
 |---|---|---|
 | App startup | `App.axaml`, `App.axaml.cs`, `Program.cs` | Avalonia app bootstrapping and desktop lifetime. |
-| Main shell | `Views/MainWindow.axaml`, `Views/MainWindow.axaml.cs`, `Views/MainWindowParts/**` | Top-level workbench layout and view-specific event bridges. |
-| Settings shell | `Views/ThemeSettingsWindow.axaml`, `Views/ThemeSettingsWindowParts/**`, `Views/Settings/**` | Appearance, local LLM, and project rule settings UI. |
-| Custom controls | `Controls/**` | Render-heavy controls for code, project tree, graph, chat transcript, model catalog, and dependency lists. |
-| Workbench view model | `ViewModels/Workbench/**` | App-level state, project tabs, workspace mode, project tree actions, graph state, settings state. |
-| Context Control view model | `ViewModels/ContextControl/**` | Prompt workflow, DIR/CC/GO orchestration, local LLM chat, attachments, terminal output, progress. |
-| Project data | `Services/Projects/**`, `Services/ProjectStackScanning/**` | Project loading, file rules, stack detection, scanner output, tree rows. |
-| Context pipeline services | `Services/ContextControl/**` | Context request resolution, prompt/capsule building, patch process integration, skillbook. |
-| Local LLM services | `Services/LocalLlm/**`, `ViewModels/LocalLlm/**` | Model catalog, Ollama integration, dependency detection/install progress, chat/image protocol. |
-| Browser services | `Controls/Browser/**`, `Services/Browser/**`, `ViewModels/Browser/**` | WebView2 host, browser tabs, external browser routing. |
+| Main shell | `Shell/MainWindow/**`, `Shell/Views/**`, `Shell/ViewModels/**`, `Shell/Services/**` | Top-level workbench layout, shell chrome, app-level state, project tabs, updates, themes, and history. |
+| Context workflow | `Features/ContextWorkflow/**` | DIR/CC/GO orchestration, context request resolution, prompt/capsule building, instruction auditing, attachments, patch plans, prompt composer, and browser-routing workflow UI. |
+| Local models | `Features/LocalModels/**` | Model catalogs, Ollama/runtime integration, dependency environments, model view models, catalog rendering, settings, and local-model workspace pages. |
+| Project inspection | `Features/ProjectInspection/**` | Project loading, file rules, stack detection, scanner output, tree rows, project graph/tree controls, scanner pages, graph pages, and project navigation. |
+| Editing | `Features/Editing/**` | Custom code editor, text-surface rendering, minimap/navigation, syntax helpers, editor page, and external-change tracking. |
+| Conversation | `Features/Conversation/**` | Chat transcript rendering, chat state, conversation page, snippets, request progress, and chat-history integration. |
+| Browser | `Features/Browser/**` | WebView2 host, browser tabs, browser pane view models, external browser routing, and browser workspace page. |
+| Skillbook | `Features/Skillbook/**` | Skillbook rendering, service, flow view models, workspace page, rename dialog, and Context Control Skillbook workflow partials. |
+| Settings shell | `Features/Settings/**` | Appearance, prompt-window, project-rule, local-model, and dialog settings UI plus small settings view models. |
+| Shared primitives | `Shared/**` | Generic controls and infrastructure view-model primitives used across features. |
 | Styling | `Styles/WorkbenchDesign.axaml`, `Styles/WorkbenchDesign/**` | Theme resources and control styling split by feature area. |
 | Tests | `ContextControl.Workbench.Tests/Program.cs` | Focused smoke checks for resolver behavior, markdown parsing, and model catalog state. |
 
 ## Edit Rules
 
 - Keep UI layout in XAML/user controls and behavior in the matching `.axaml.cs` bridge or view model partial.
-- Prefer extending the existing partial class files instead of creating another large monolithic file.
+- Prefer extending the existing partial class files inside the owning feature instead of creating another large monolithic file.
+- Keep namespaces stable unless a dedicated namespace migration is part of the task. The current feature folders are a physical architecture refactor; many public types intentionally still use the existing `ContextControl.Workbench.*` namespaces.
 - Do not put long-running work on the UI thread. Project scans, PowerShell calls, model refreshes, and network/process checks belong in services.
 - Treat `lib/**` PowerShell scripts as the CLI/core pipeline. The desktop app orchestrates them; it should not silently fork their behavior.
 - Treat `.tmp/`, `bin/`, `obj/`, `.ccReplace.versions/`, `.ccWorkbench.browser-data/`, chat exports, code exports, and `patch.txt` as runtime output.

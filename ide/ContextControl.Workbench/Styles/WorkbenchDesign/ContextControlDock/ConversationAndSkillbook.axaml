@@ -67,6 +67,39 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
   </Style>
 
+  <Style Selector="Button.chat-session-row.generating">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+  </Style>
+
+  <Style Selector="Button.chat-session-row.new-response">
+    <Setter Property="Background" Value="{DynamicResource CommandPrimaryBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+  </Style>
+
+  <Style Selector="Button.chat-session-row.active.new-response">
+    <Setter Property="Background" Value="{DynamicResource CommandPrimaryBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+  </Style>
+
+  <Style Selector="controls|LoadingRingControl.chat-session-loader">
+    <Setter Property="Width" Value="11" />
+    <Setter Property="Height" Value="11" />
+    <Setter Property="TrackBrush" Value="{DynamicResource CommandBorderBrush}" />
+    <Setter Property="RingBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Opacity" Value="0.95" />
+  </Style>
+
+  <Style Selector="Border.chat-session-unread-dot">
+    <Setter Property="Width" Value="9" />
+    <Setter Property="Height" Value="9" />
+    <Setter Property="CornerRadius" Value="4.5" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
   <Style Selector="TextBlock.chat-session-title">
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     <Setter Property="FontSize" Value="10.5" />
@@ -501,6 +534,28 @@
     <Setter Property="FontSize" Value="10.5" />
     <Setter Property="LineHeight" Value="15" />
     <Setter Property="Padding" Value="7" />
+    <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="Border.skillbook-codex-capsule">
+    <Setter Property="MaxHeight" Value="168" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" />
+  </Style>
+
+  <Style Selector="TextBox.skillbook-codex-capsule-text">
+    <Setter Property="MinHeight" Value="84" />
+    <Setter Property="MaxHeight" Value="128" />
+    <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
+    <Setter Property="FontSize" Value="9.5" />
+    <Setter Property="LineHeight" Value="13" />
+    <Setter Property="Padding" Value="6" />
     <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />

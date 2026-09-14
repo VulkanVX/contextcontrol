@@ -230,7 +230,7 @@ $manifest = [ordered]@{
     Notes = @(
         'No .NET runtime install required.',
         'No LLM weights are bundled.',
-        'ContextControl CLI scripts, lib modules, and the v1 Skillbook flow library UI are included; built-in CC Flow contracts remain read-only.',
+        'ContextControl CLI scripts, lib modules, and Skillbook are included; CC Main and CC Flow skills support saved markdown overrides through Edit and Save.',
         'The installer registers a per-user Windows uninstall entry and Start Menu uninstaller.',
         'Use the app Dependencies and Local LLM pages to install runtimes and download models.',
         'The Workbench checks GitHub releases on startup and can download/start the newest setup EXE.',

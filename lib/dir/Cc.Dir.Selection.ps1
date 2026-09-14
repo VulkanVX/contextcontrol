@@ -440,6 +440,12 @@ function Get-CcDirRootRoleCore {
 
     if ($lower -eq ".github") { return "release automation" }
     if ($lower -eq "packaging") { return "release packaging" }
+    if ($lower -eq "shell" -or $lower.EndsWith("/shell")) { return "workbench shell" }
+    if ($lower -eq "features" -or $lower.EndsWith("/features")) { return "workbench feature modules" }
+    if ($lower -eq "shared" -or $lower.EndsWith("/shared")) { return "workbench shared primitives" }
+    if ($lower.Contains("contextworkflow")) { return "context workflow feature" }
+    if ($lower.Contains("localmodels")) { return "local model feature" }
+    if ($lower.Contains("projectinspection")) { return "project inspection feature" }
     if ($lower -eq "views" -or $lower.EndsWith("/views")) { return "workbench views" }
     if ($lower -eq "controls" -or $lower.EndsWith("/controls")) { return "workbench custom controls" }
     if ($lower -eq "services" -or $lower.EndsWith("/services")) { return "workbench services" }

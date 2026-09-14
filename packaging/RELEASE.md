@@ -64,6 +64,6 @@ Fresh Windows Python bootstrap: managed Python dependencies ignore the Microsoft
 
 SmartScreen/reputation note: the release script can Authenticode-sign the setup EXE when `CONTEXTCONTROL_SIGNING_PFX_BASE64` and `CONTEXTCONTROL_SIGNING_PFX_PASSWORD` are configured. Unsigned public builds can still show Windows reputation warnings.
 
-Skillbook now ships as the v1 flow library UI. The built-in Context Control flow is shown as read-only **CC Flow**, project/global legacy markdown still loads, and editable project markdown-folder flows can be created, renamed, enabled/disabled, saved, and reloaded. Full per-phase custom prompt activation remains a later customization pass.
+Skillbook includes **CC Main** and **CC Flow** instructions based on the PowerShell DIR/CC/GO pipeline. Built-in skills open read-only; Edit and Save persist markdown overrides under `skillbook/built-in-overrides/`. Project/global legacy markdown still loads, and custom flows, sections, and skills can be created, renamed, enabled/disabled, saved, and reloaded. Full per-phase custom prompt activation remains a later customization pass. See the [Skillbook guide](../docs/SKILLBOOK.md).
 
 The GitHub Actions workflow `.github/workflows/contextcontrol-release.yml` builds the installer on `workflow_dispatch` and attaches the setup EXE plus checksum to releases when a `v*` tag is pushed. The zip is not required for end-user install.

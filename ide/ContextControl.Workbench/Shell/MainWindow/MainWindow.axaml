@@ -1,0 +1,155 @@
+<!-- CC-DESC: Defines the Context Control Workbench shell and project info header. -->
+<Window
+    x:Class="ContextControl.Workbench.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+    xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+    xmlns:parts="clr-namespace:ContextControl.Workbench.Views.MainWindowParts"
+    Width="1280"
+    Height="800"
+    MinWidth="720"
+    MinHeight="460"
+    CanResize="True"
+    SystemDecorations="None"
+    Title="Context Control"
+    Icon="avares://ContextControl.Workbench/Assets/Icons/contextcontrol64x64.png"
+    Background="Transparent"
+    TransparencyLevelHint="Transparent"
+    KeyDown="OnKeyDown">
+<Border Classes="main-window-shell" ClipToBounds="True">
+  <Grid MinHeight="0">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="31" />
+      <RowDefinition Height="*" MinHeight="0" />
+    </Grid.RowDefinitions>
+    <parts:MainTitleBar x:Name="MainTitleBar" />
+
+    <Grid Grid.Row="1" RowSpacing="4" Margin="6" MinHeight="0">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="24" />
+      <RowDefinition Height="*" MinHeight="0" />
+    </Grid.RowDefinitions>
+    <parts:ProjectTabsBar />
+
+    <Grid
+        x:Name="WorkspaceRoot"
+        Grid.Row="1"
+        MinHeight="0"
+        ClipToBounds="True"
+        Focusable="True"
+        ColumnSpacing="8"
+        PointerMoved="OnWorkspacePointerMoved">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="{Binding ProjectFilesPaneWidth}" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <parts:ProjectFilesPane x:Name="ProjectFilesPane" Grid.Column="0" MinHeight="0" ClipToBounds="True" />
+      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="{Binding HistoryGutter}" MinHeight="0" ClipToBounds="True">
+        <parts:HistoryPane Grid.Column="0" MinHeight="0" ClipToBounds="True" />
+
+        <Border Grid.Column="1" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True" Margin="0,0,1,0" MinHeight="0">
+          <Grid MinHeight="0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="22" />
+              <RowDefinition Height="40" />
+              <RowDefinition Height="*" MinHeight="0" />
+            </Grid.RowDefinitions>
+            <parts:WorkspaceHeaderBar Grid.Row="0" Grid.RowSpan="2" />
+
+            <controls:PromptDockHost
+                Grid.Row="2"
+                MinHeight="0"
+                ClipToBounds="True"
+                IsPromptOpen="{Binding ContextControl.IsPromptOpen}"
+                PromptHeight="{Binding ContextControl.PromptBarHeight}">
+              <Grid MinHeight="0" ClipToBounds="True">
+                <parts:CodeEditorPage MinHeight="0" ClipToBounds="True" />
+
+                <parts:ConversationPage MinHeight="0" ClipToBounds="True" />
+
+                <parts:BrowserSurface x:Name="BrowserSurface" MinHeight="0" ClipToBounds="True" />
+
+                <parts:LocalLlmPage x:Name="LocalLlmPage" MinHeight="0" ClipToBounds="True" />
+
+                <parts:DependenciesPage x:Name="DependenciesPage" MinHeight="0" ClipToBounds="True" />
+
+                <parts:MyStackPage x:Name="MyStackPage" MinHeight="0" ClipToBounds="True" />
+
+                <parts:SkillbookPage MinHeight="0" ClipToBounds="True" />
+
+                <parts:ProjectGraphPage x:Name="ProjectGraphPage" MinHeight="0" ClipToBounds="True" />
+
+                <parts:ProjectScannerPage MinHeight="0" ClipToBounds="True" />
+              </Grid>
+
+              <parts:ContextPromptBar
+                  x:Name="ContextPromptBar"
+                  MinHeight="0"
+                  ClipToBounds="True" />
+
+              <Border
+                  Classes="cc-usage-overlay"
+                  ClipToBounds="True"
+                  IsVisible="{Binding ContextControl.IsCodexUsagePanelVisible}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                  <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
+                    <TextBlock Classes="cc-usage-label" Text="5h % left" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Classes="cc-usage-value"
+                        Text="{Binding ContextControl.CodexFiveHourPercentLeftLabel}" />
+                    <Border
+                        Grid.Row="2"
+                        Classes="cc-usage-bar-track">
+                      <Border
+                          Classes="cc-usage-bar-fill"
+                          Classes.depleted="{Binding ContextControl.IsCodexFiveHourLimitDepleted}"
+                          Width="{Binding ContextControl.CodexFiveHourUsageBarFillWidth}" />
+                    </Border>
+                    <TextBlock
+                        Grid.Row="3"
+                        Classes="cc-usage-reset"
+                        Text="{Binding ContextControl.CodexFiveHourResetLabel}" />
+                  </Grid>
+                  <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
+                    <TextBlock Classes="cc-usage-label" Text="Weekly % left" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Classes="cc-usage-value"
+                        Text="{Binding ContextControl.CodexWeeklyPercentLeftLabel}" />
+                    <Border
+                        Grid.Row="2"
+                        Classes="cc-usage-bar-track">
+                      <Border
+                          Classes="cc-usage-bar-fill"
+                          Classes.depleted="{Binding ContextControl.IsCodexWeeklyLimitDepleted}"
+                          Width="{Binding ContextControl.CodexWeeklyUsageBarFillWidth}" />
+                    </Border>
+                    <TextBlock
+                        Grid.Row="3"
+                        Classes="cc-usage-reset"
+                        Text="{Binding ContextControl.CodexWeeklyResetLabel}" />
+                  </Grid>
+                </Grid>
+              </Border>
+            </controls:PromptDockHost>
+
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+    </Grid>
+    <parts:AttachmentBridgePane
+        x:Name="AttachmentBridgePane"
+        Grid.Row="1"
+        Width="0"
+        Height="0"
+        IsVisible="False"
+        IsHitTestVisible="False" />
+    <parts:MainWindowOverlays x:Name="MainWindowOverlays" Grid.RowSpan="2" />
+  </Grid>
+</Border>
+</Window>
+

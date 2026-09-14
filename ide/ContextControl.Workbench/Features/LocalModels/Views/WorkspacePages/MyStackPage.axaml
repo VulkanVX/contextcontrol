@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ContextControl.Workbench.Views.MainWindowParts.MyStackPage"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+>
+            <Border
+                Grid.Row="2"
+                Classes="editor-body llm-page"
+                Padding="8"
+                ClipToBounds="True"
+                MinHeight="0"
+                IsVisible="{Binding IsMyStackMode}">
+              <Grid RowDefinitions="Auto,Auto,2*,Auto,Auto,3*" RowSpacing="6" MinHeight="0">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <TextBlock
+                      Text="Dependencies"
+                      FontSize="11"
+                      FontWeight="ExtraBold"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      VerticalAlignment="Center" />
+                  <TextBlock
+                      Grid.Column="1"
+                      Text="{Binding ContextControl.DependencySummary}"
+                      Classes="editor-meta"
+                      FontWeight="Bold"
+                      VerticalAlignment="Center" />
+                </Grid>
+
+                <Border
+                    Grid.Row="1"
+                    Classes="llm-filter-bar">
+                  <WrapPanel HorizontalAlignment="Center">
+                    <StackPanel Spacing="2" Width="180" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="find" />
+                      <TextBox
+                          Classes="graph-search-input llm-filter-find"
+                          Watermark="Find dependency"
+                          Text="{Binding ContextControl.DependencySearchText, Mode=TwoWay}" />
+                    </StackPanel>
+                  </WrapPanel>
+                </Border>
+
+                <ScrollViewer
+                    Grid.Row="2"
+                    controls:HoverScrollbarBehavior.IsEnabled="True"
+                    controls:HoverScrollbarBehavior.ReserveRight="12"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    AllowAutoHide="True">
+                  <controls:DependencyListRenderControl
+                      Items="{Binding ContextControl.VisibleStackBackendDependencies}"
+                      InstallCommand="{Binding ContextControl.InstallBackendDependencyCommand}"
+                      UninstallCommand="{Binding ContextControl.UninstallBackendDependencyCommand}"
+                      ThemeKey="{Binding ThemeKey}"
+                      UiFontFamily="{Binding UiFontFamily}"
+                      CodeFontFamily="{Binding CodeFontFamily}" />
+                </ScrollViewer>
+
+                <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <TextBlock
+                      Text="LLMs"
+                      FontSize="11"
+                      FontWeight="ExtraBold"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      VerticalAlignment="Center" />
+                  <TextBlock
+                      Grid.Column="1"
+                      Text="{Binding ContextControl.MyStackModelSummary}"
+                      Classes="editor-meta"
+                      FontWeight="Bold"
+                      VerticalAlignment="Center" />
+                </Grid>
+
+                <Border
+                    Grid.Row="4"
+                    Classes="llm-filter-bar llm-collapsible-panel"
+                    Opacity="{Binding ContextControl.LlmFiltersPanelOpacity}"
+                    IsVisible="{Binding ContextControl.IsLlmFiltersExpanded}">
+                  <WrapPanel HorizontalAlignment="Center">
+                    <StackPanel Spacing="2" Width="156" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="find" />
+                      <TextBox
+                          x:Name="StackLlmSearchBox"
+                          Classes="graph-search-input llm-filter-find"
+                          Watermark="Find stack model"
+                          Text="{Binding ContextControl.LocalLlmSearchText, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="98" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="sort" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmSortOptions}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmSortOption, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="150" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="provider" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmProviderFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmProviderFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="72" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="run" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmSourceFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmSourceFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="90" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="purpose" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmPurposeFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmPurposeFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="92" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="base" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmBaseFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmBaseFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="110" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="context" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmContextFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmContextFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="130" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="hardware" />
+                      <ComboBox
+                          Classes="theme-picker llm-filter-picker"
+                          ItemsSource="{Binding ContextControl.LocalLlmRequirementFilters}"
+                          SelectedItem="{Binding ContextControl.SelectedLocalLlmRequirementFilter, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="2" Width="76" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="fit" />
+                      <CheckBox
+                          Content="usable"
+                          FontSize="9"
+                          FontWeight="Bold"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding ContextControl.ShowOnlyHardwareUsableLocalLlms, Mode=TwoWay}" />
+                    </StackPanel>
+                  </WrapPanel>
+                </Border>
+
+                <ScrollViewer
+                    Grid.Row="5"
+                    controls:HoverScrollbarBehavior.IsEnabled="True"
+                    controls:HoverScrollbarBehavior.ReserveRight="12"
+                    AllowAutoHide="True"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+                  <controls:LocalLlmCatalogRenderControl
+                      Items="{Binding ContextControl.VisibleStackLocalLlmModels}"
+                      PullModelCommand="{Binding ContextControl.PullLocalModelCommand}"
+                      ThemeKey="{Binding ThemeKey}"
+                      UiFontFamily="{Binding UiFontFamily}"
+                      CodeFontFamily="{Binding CodeFontFamily}"
+                      HasHuggingFaceToken="{Binding ContextControl.HasHuggingFaceToken}"
+                      ShowLocation="True" />
+                </ScrollViewer>
+              </Grid>
+            </Border>
+</UserControl>

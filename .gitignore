@@ -19,10 +19,14 @@ TestResults/
 # ContextControl generated exports and transient patch files
 cc_code_export.md
 cc_project_dir.md
+cc_directory_tree.md
+cc_project_dir_tree.md
 cc_semantic_map.md
 cc_chat_export_*.md
 mainwindow_axaml.txt
 patch.txt
+/image-gen/
+/terminals/
 
 # Local scratch and research notes
 README_COPY.txt

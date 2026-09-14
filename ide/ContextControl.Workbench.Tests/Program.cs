@@ -364,9 +364,12 @@ try
         || !document.PromptFlowSteps.Any(step => step.Key.Equals("request-dir", StringComparison.OrdinalIgnoreCase))
         || document.PromptFlowSteps.Any(step => step.Key.Equals("request", StringComparison.OrdinalIgnoreCase))
         || document.PromptFlowSteps.Any(step => step.Key.Equals("dir", StringComparison.OrdinalIgnoreCase))
+        || !document.PromptFlowSteps.Any(step =>
+            step.Key.Equals("raw-image-browser", StringComparison.OrdinalIgnoreCase)
+            && step.SkillbookInjection.Contains("No ContextControl harness", StringComparison.OrdinalIgnoreCase))
         || !document.PromptFlowSteps.Any(step => step.Key.Equals("go-apply", StringComparison.OrdinalIgnoreCase)))
     {
-        throw new InvalidOperationException("Skillbook document should expose the built-in Context Control flow and a paired Request + DIR prompt flow map.");
+        throw new InvalidOperationException("Skillbook document should expose Raw plus the built-in Context Control flow and paired Request + DIR prompt flow map.");
     }
 
     var createdFlow = skillbook.CreateProjectFlow("Smoke Flow");
@@ -590,6 +593,13 @@ try
             "clean chat",
             "context",
             isAutopilotEnabled: false,
+            isPatchPlanReady: false).Equals(PromptFlowStepResolver.RawImageBrowser, StringComparison.Ordinal)
+        || !PromptFlowStepResolver.Resolve(
+            ContextCapsulePhase.Chat,
+            "Raw Codex chat",
+            "only your prompt text",
+            "codex",
+            isAutopilotEnabled: false,
             isPatchPlanReady: false).Equals(PromptFlowStepResolver.RawImageBrowser, StringComparison.Ordinal))
     {
         throw new InvalidOperationException("Prompt flow resolver should map DIR, CC, patch, GO, apply, and raw states.");
@@ -612,6 +622,39 @@ try
         || !HasAdjacentArguments(configuredCodexPlan.Arguments, "-c", "model_reasoning_effort=\"xhigh\""))
     {
         throw new InvalidOperationException("Codex harness execution plan should pass selected model and reasoning overrides.");
+    }
+
+    var rawCodexPrompt = CodexHarnessService.BuildPrompt(new CodexHarnessRequest(
+        "create a single-file playable 3D FPS shooter HTML.",
+        ContextCapsulePhase.Chat,
+        root,
+        [],
+        "harness instructions must not appear",
+        "skillbook instructions must not appear",
+        IsRawPrompt: true,
+        WorkingDirectory: root));
+    if (!rawCodexPrompt.Equals("create a single-file playable 3D FPS shooter HTML.", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("Raw Codex prompts should be exactly the user prompt text.");
+    }
+
+    RequireTextNotContains(rawCodexPrompt, "ContextControl Codex harness capsule");
+    RequireTextNotContains(rawCodexPrompt, "harness instructions must not appear");
+    RequireTextNotContains(rawCodexPrompt, "skillbook instructions must not appear");
+
+    var rawCodexPlan = CodexHarnessService.BuildRawExecutionPlan(root, root, "gpt-5.5", "high");
+    if (!rawCodexPlan.WorkingDirectory.Equals(Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase)
+        || !rawCodexPlan.LastMessagePath.Contains(Path.Combine(".tmp", "codex-raw"), StringComparison.OrdinalIgnoreCase)
+        || rawCodexPlan.LastMessagePath.Contains("codex-harness", StringComparison.OrdinalIgnoreCase)
+        || !rawCodexPlan.Arguments.Contains("--json", StringComparer.Ordinal)
+        || !rawCodexPlan.Arguments.Contains("--ephemeral", StringComparer.Ordinal)
+        || rawCodexPlan.Arguments.Contains("--ignore-rules", StringComparer.Ordinal)
+        || rawCodexPlan.Arguments.Contains("--sandbox", StringComparer.Ordinal)
+        || !HasAdjacentArguments(rawCodexPlan.Arguments, "-C", rawCodexPlan.WorkingDirectory)
+        || !HasAdjacentArguments(rawCodexPlan.Arguments, "--model", "gpt-5.5")
+        || !HasAdjacentArguments(rawCodexPlan.Arguments, "-c", "model_reasoning_effort=\"high\""))
+    {
+        throw new InvalidOperationException("Raw Codex execution plan should use the selected working directory without the ContextControl harness route.");
     }
 
     var timelineStage = new CcTimelineStageViewModel("dir", "DIR", "Attach project tree", "DIR sends the tree capsule.");
@@ -1148,6 +1191,9 @@ try
         Title = "Task memory",
         CreatedUtc = DateTime.UtcNow,
         UpdatedUtc = DateTime.UtcNow,
+        DraftPromptText = "half typed prompt",
+        DraftPromptModeKey = "codex",
+        DraftIsAutopilotEnabled = true,
         WorkflowTaskText = "Fix the prompt send button color"
     };
     historyService.Save(
@@ -1164,6 +1210,12 @@ try
     if (!reloadedHistory.Sessions.Single().WorkflowTaskText.Equals(savedSession.WorkflowTaskText, StringComparison.Ordinal))
     {
         throw new InvalidOperationException("Workflow task memory should persist through chat history save/load.");
+    }
+    if (!reloadedHistory.Sessions.Single().DraftPromptText.Equals(savedSession.DraftPromptText, StringComparison.Ordinal)
+        || !reloadedHistory.Sessions.Single().DraftPromptModeKey.Equals(savedSession.DraftPromptModeKey, StringComparison.Ordinal)
+        || reloadedHistory.Sessions.Single().DraftIsAutopilotEnabled != savedSession.DraftIsAutopilotEnabled)
+    {
+        throw new InvalidOperationException("Chat prompt drafts should persist text, prompt mode, and raw/CC mode.");
     }
 
     var fenced = new LocalLlmChatMessageViewModel(

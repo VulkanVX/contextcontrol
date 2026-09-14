@@ -310,6 +310,21 @@
       <Setter Property="Padding" Value="4,0" />
     </Style>
 
+    <Style Selector="TextBox.llm-filter-find">
+      <Setter Property="Height" Value="20" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}" />
+      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="Background" Value="{DynamicResource DropdownBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DropdownBorderBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
     <Style Selector="TextBlock.llm-filter-summary">
       <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />

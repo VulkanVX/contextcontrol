@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ContextControl.Workbench.Views.MainWindowParts.AttachmentBridgePane"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels">
+  <Grid
+      x:Name="AttachmentRegion"
+      MinHeight="0"
+      ClipToBounds="True"
+      SizeChanged="OnAttachmentRegionSizeChanged">
+    <Grid RowDefinitions="Auto,Auto" RowSpacing="6" MinHeight="126" VerticalAlignment="Bottom" IsVisible="{Binding ContextControl.HasAttachments}">
+      <TextBlock Text="Pending attachments:" Classes="cc-attachment-title" />
+      <Border x:Name="AttachmentListHost" Grid.Row="1" Classes="cc-attachment-host">
+        <ListBox
+            x:Name="AttachmentList"
+            Classes="attachment-list"
+            HorizontalAlignment="Stretch"
+            Background="Transparent"
+            BorderThickness="0"
+            ItemsSource="{Binding ContextControl.Attachments}"
+            SelectionMode="Single"
+            controls:HoverScrollbarBehavior.IsEnabled="True"
+            controls:HoverScrollbarBehavior.ReserveRight="12"
+            ScrollViewer.AllowAutoHide="True"
+            ScrollViewer.VerticalScrollBarVisibility="Auto"
+            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="{x:Type vm:ContextControlAttachmentViewModel}">
+              <Border
+                  Classes="cc-attachment-row"
+                  HorizontalAlignment="Stretch"
+                  Tapped="OnAttachmentRowTapped"
+                  ToolTip.Tip="{Binding Path}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7">
+                  <Border
+                      Classes="cc-attachment-ext-tag"
+                      Background="{Binding ExtensionTagBackground}"
+                      BorderBrush="{Binding ExtensionTagBorder}">
+                    <TextBlock
+                        Text="{Binding ExtensionTagText}"
+                        Foreground="{Binding ExtensionTagForeground}"
+                        Classes="cc-attachment-ext-tag-text" />
+                  </Border>
+                  <TextBlock
+                      Grid.Column="1"
+                      Text="{Binding DisplayTitle}"
+                      Classes="path-text"
+                      VerticalAlignment="Center" />
+                  <Border
+                      Grid.Column="2"
+                      Classes="cc-attachment-remove"
+                      Tapped="OnAttachmentRemoveTapped"
+                      ToolTip.Tip="Remove attachment">
+                    <TextBlock Text="x" Classes="cc-attachment-remove-text" />
+                  </Border>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ContextControl.Workbench.Views.MainWindowParts.DependenciesPage"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+    xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+>
+            <Border
+                Grid.Row="2"
+                Classes="editor-body dependencies-page"
+                Padding="8"
+                ClipToBounds="True"
+                MinHeight="0"
+                IsVisible="{Binding IsDependenciesMode}">
+              <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                <Border
+                    Grid.Row="0"
+                    Classes="llm-filter-bar">
+                  <WrapPanel HorizontalAlignment="Center">
+                    <StackPanel Spacing="2" Width="180" Margin="0,0,5,3">
+                      <TextBlock Classes="llm-filter-label" Text="find" />
+                      <TextBox
+                          x:Name="DependencySearchBox"
+                          Classes="graph-search-input llm-filter-find"
+                          Watermark="Find dependency"
+                          Text="{Binding ContextControl.DependencySearchText, Mode=TwoWay}" />
+                    </StackPanel>
+                  </WrapPanel>
+                </Border>
+                <ScrollViewer
+                    Grid.Row="1"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    AllowAutoHide="False">
+                  <controls:DependencyListRenderControl
+                      Items="{Binding ContextControl.VisibleLlmBackendDependencies}"
+                      InstallCommand="{Binding ContextControl.InstallBackendDependencyCommand}"
+                      UninstallCommand="{Binding ContextControl.UninstallBackendDependencyCommand}"
+                      ThemeKey="{Binding ThemeKey}"
+                      UiFontFamily="{Binding UiFontFamily}"
+                      CodeFontFamily="{Binding CodeFontFamily}" />
+                </ScrollViewer>
+              </Grid>
+            </Border>
+</UserControl>
