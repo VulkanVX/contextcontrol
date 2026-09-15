@@ -28,37 +28,8 @@ public sealed partial class LocalLlmService
             return new LocalLlmChatResult(false, "No model selected.");
         }
 
-        var ollamaPath = ResolveOllamaExecutable();
-        if (ollamaPath is null)
-        {
-            return new LocalLlmChatResult(false, "Ollama command was not found. Install Ollama first.");
-        }
-
-        var parser = new OllamaPullProgressParser($"Downloading {modelId}", progress);
-        terminal?.Report($"> {ollamaPath} pull {modelId}");
-        var result = await RunProcessStreamingAsync(
-            ollamaPath,
-            ["pull", modelId],
-            TimeSpan.FromMinutes(30),
-            chunk =>
-            {
-                parser.Append(chunk);
-                var clean = CleanProgressText(chunk);
-                if (!string.IsNullOrWhiteSpace(clean))
-                {
-                    terminal?.Report(clean);
-                }
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
-
-        return result.ExitCode == 0
-            ? new LocalLlmChatResult(true, $"Downloaded {modelId}.")
-            : new LocalLlmChatResult(false, FirstLine(result.StandardError) ?? FirstLine(result.StandardOutput) ?? $"ollama pull exited {result.ExitCode}.");
+        using var http = _chatHandler is null ? CreateHttpClient(Timeout.InfiniteTimeSpan) : new HttpClient(_chatHandler, false) { Timeout = Timeout.InfiniteTimeSpan };
+        return await new OllamaModelDownloader(http).PullAsync(modelId.Trim(), progress, terminal, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<LocalLlmChatResult> UninstallModelAsync(

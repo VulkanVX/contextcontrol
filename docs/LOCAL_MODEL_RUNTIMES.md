@@ -4,6 +4,12 @@ ContextControl 0.5.0 includes 544 catalog entries and discovers additional model
 
 New coverage includes Granite 4.2, Qwen 3.8 and Flash Next, Ornith 1.5, Nemotron 3.5 Lightning, Muse Glimmer, Laguna 2.1, North Mini Code, LFM 2.5, and MiniCPM V4.6. Hosted-only tags remain labeled as cloud models. Source pages and published download sizes accompany discovered entries; memory estimates include overhead and do not assume that MoE active parameter counts equal weight memory.
 
+## Large downloads and resuming
+
+From 0.5.7, Ollama downloads use the local daemon's structured `/api/pull` stream. There is no total-duration cutoff while bytes or download stages advance. Five minutes without progress is treated as a stall, with up to two automatic resume attempts. Network interruptions and transient server failures also resume; cancellation and permanent errors stop immediately. Cached partial blobs remain owned by Ollama and are never deleted by ContextControl.
+
+The UI shows the actual server error instead of the CLI's initial spinner output. Download speed is calculated from new bytes, excluding data already cached before resuming. Retry the same model to continue an interrupted download; ensure the local Ollama service is running. A success response is required before the app marks the model ready. See [Ollama's pull API](https://github.com/ollama/ollama/blob/main/docs/api.md#pull-a-model).
+
 ## Measured speed tuning
 
 In 0.5.6, choose an installed local Ollama chat model in **Settings → LLMs → Resources** (also in the LLM catalog), enable **Auto adapt**, **Auto CPU threads** and **Auto GPU**, then click **Tune speed**. Use **Cancel** to stop. Tuning can take up to 15 minutes; it refuses active chats/downloads and stops when this app starts a chat or transfer. It does not detect requests made by unrelated applications, so keep other inference clients idle while measuring.
