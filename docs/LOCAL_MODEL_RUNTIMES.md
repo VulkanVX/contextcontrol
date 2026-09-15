@@ -21,6 +21,14 @@ With Auto on, **Adapted fit** includes estimated CPU/RAM and CPU+GPU operation. 
 
 Auto mode is a conservative allocation policy, not an autotuning benchmark. CPU/RAM offload can enable larger models but can be slower than full GPU execution. A runtime can still reject an unsupported architecture or allocate more memory than estimated. Disabling Auto permits manual configuration. Ollama chooses its exact GPU split internally, so its actual allocation may differ from the catalog estimate. Existing loaded models and other apps can reduce the reported free memory; a filtered-out model remains selectable with **Show all**.
 
+In 0.5.5, the explicit **Adapted GPU fit** and **Adapted CPU / RAM** filters also preview fit when Auto launch mode is off. Quantization suffixes and published download sizes are recognized throughout the catalog; ranges use their upper bound. The CPU-safe filter checks CPU-only capacity with Auto enabled, even if GPU offload is also possible.
+
+**Headroom** is the former "Keep free" setting: available memory minus headroom gives the planner's budget. For example, 40 GiB available minus 4 GiB headroom gives 36 GiB. It does not reserve physical memory or enforce a hard allocation limit in every runtime.
+
+The **Resources** panel in Settings and LLMs reads current RAM/VRAM every five seconds while visible. Its model picker previews any catalog entry without changing the chat model or downloading it. Runtime readings and next-allocation estimates are shown separately. Ollama reports total model allocation, VRAM and active context; its displayed CPU allocation is derived by subtraction, not process RAM. Managed servers report resident process RAM and their running context/threads/layers. Missing measurements are labeled unreported. Each loaded Ollama candidate's own reported allocation is credited toward its fit estimate; it is not credited to other models. Per-device attribution is unknown on multi-GPU systems, so aggregate VRAM is not credited there.
+
+**Estimated maximum context** is independent of the chosen Auto target. It searches in 1K steps after headroom and respects known model limits and the runtime ceiling (currently 32K for managed starts; Ollama is checked up to the reported model limit, at most 1M). Unknown model limits are stated explicitly. More context uses additional memory and may shift work to CPU; the estimate is not a runtime allocation or compatibility guarantee. No active model is resized by opening or refreshing this panel.
+
 The runtime arguments follow the upstream [llama.cpp server options](https://github.com/ggml-org/llama.cpp/tree/master/tools/server), [KoboldCpp options](https://github.com/LostRuins/koboldcpp), and [Ollama runner options](https://github.com/ollama/ollama/blob/main/api/types.go). No model weights are downloaded by toggling Auto or previewing an allocation.
 
 ## Connect a model server

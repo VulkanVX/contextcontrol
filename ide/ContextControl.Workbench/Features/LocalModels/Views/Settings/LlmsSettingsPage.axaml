@@ -39,15 +39,17 @@
                           <NumericUpDown Value="{Binding ContextControl.AutoModelMaxContext, Mode=TwoWay}" Minimum="1024" Maximum="32768" Increment="1024" Width="170" />
                         </StackPanel>
                         <StackPanel Spacing="3" Margin="0,0,16,0">
-                          <TextBlock Classes="field-label" Text="Keep free RAM (GiB)" />
+                          <TextBlock Classes="field-label" Text="RAM headroom (GiB)" />
                           <NumericUpDown Value="{Binding ContextControl.AutoModelRamReserve, Mode=TwoWay}" Minimum="1" Maximum="64" Increment="1" Width="170" />
                         </StackPanel>
                         <StackPanel Spacing="3">
-                          <TextBlock Classes="field-label" Text="Keep free VRAM (GiB)" />
+                          <TextBlock Classes="field-label" Text="VRAM headroom (GiB)" />
                           <NumericUpDown Value="{Binding ContextControl.AutoModelVramReserve, Mode=TwoWay}" Minimum="0.25" Maximum="32" Increment="0.25" Width="170" />
                         </StackPanel>
                       </WrapPanel>
                     </StackPanel>
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Headroom (previously Keep free) leaves memory for Windows and other apps. The planner subtracts it from available memory; it does not allocate memory or enforce a hard runtime limit. For example, 40 GiB available minus 4 GiB headroom gives a 36 GiB budget." />
+                    <controls:LocalResourceStatusPanel />
                     <TextBlock Classes="muted" TextWrapping="Wrap" Text="Manual values are kept when Auto is off. Ollama adapts new requests; managed servers adapt on Start. External servers and specialized image runtimes keep their own allocation settings. Estimates do not guarantee model compatibility or speed." />
                   </StackPanel>
                 </Border>

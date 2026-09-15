@@ -5,7 +5,7 @@ using System.Text.Json;
 using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 
-internal static class LocalResourceTests
+internal static partial class LocalResourceTests
 {
     private static int _checks;
     private static void Check(bool value, string message) { if (!value) throw new Exception(message); _checks++; }
@@ -41,7 +41,7 @@ internal static class LocalResourceTests
         Check(LocalResourcePlanner.Plan(large, Hardware(freeGpu: 0.1), auto).GpuLayers == 0, "A busy GPU should fall back to CPU.");
         Check(!LocalResourcePlanner.Plan(large with { CpuSupported = false }, hardware, auto).Fits, "Do not invent CPU support for GPU-only runtimes.");
         Check(LocalResourcePlanner.Plan(large with { Layers = null }, hardware, auto).GpuLayers == 0, "Missing layer count must not invent launch layers.");
-        foreach (var bad in new[] { "", "Unknown", "3-7 GB", "1 GB / 40 GB", "Runtime managed", "0 GB" })
+        foreach (var bad in new[] { "", "Unknown", "1 GB / 40 GB", "Runtime managed", "0 GB", "1 GB MB", "3", "5 GB + projector" })
             Check(LocalResourcePlanner.ParseWeightGiB(bad) is null, "Ambiguous size must not produce a positive fit.");
         Check(Math.Abs(LocalResourcePlanner.ParseWeightGiB("1024 MiB")!.Value - 1) < 0.0001, "Binary units parse correctly.");
         Check(Math.Abs(LocalResourcePlanner.ParseWeightGiB("1 GB")!.Value - 0.9313226) < 0.0001, "Decimal GB differs from GiB.");
@@ -111,6 +111,7 @@ internal static class LocalResourceTests
         await service.SendChatAsync(request with { ModelId = "model:cloud" }, null, null);
         using (var sent = JsonDocument.Parse(handler.Body))
             Check(!sent.RootElement.GetProperty("options").TryGetProperty("num_thread", out _), "Cloud models do not inherit local CPU limits.");
+        await ResourceStatusAndCatalog();
         Console.WriteLine($"Resource adaptation regression passed: {_checks} checks.");
     }
 
@@ -148,6 +149,20 @@ internal static class LocalResourceTests
             null, new ProgressNow<string>(Console.WriteLine), token);
         Console.WriteLine(JsonSerializer.Serialize(new { runtime, reply.Succeeded, reply.Message, reply.Status, reply.Stats, Seconds = watch.Elapsed.TotalSeconds }));
         Check(reply.Succeeded && (runtime == "transformers" ? reply.Message?.Contains("pineapple", StringComparison.OrdinalIgnoreCase) == true : reply.Message?.Contains('4') == true), "Live adapted model must return the correct answer, not merely load.");
+        if (runtime == "ollama")
+        {
+            var reported = await service.ReadOllamaResourcesAsync(modelId, 1.44, token);
+            Console.WriteLine(JsonSerializer.Serialize(reported));
+            Check(reported.Allocation.Running && reported.Allocation.TotalBytes is > 0
+                && reported.Allocation.ContextTokens == context, "Runtime report matches actual loaded context and memory.");
+        }
+        else
+        {
+            var reported = managed.ReadAllocation(runtime);
+            Console.WriteLine(JsonSerializer.Serialize(reported));
+            Check(reported.Running && reported.ResidentRamBytes is > 0 && reported.ContextTokens == context,
+                "Managed resource report matches actual process and loaded context.");
+        }
         Console.WriteLine("LIVE RESOURCE PASS: " + runtime);
     }
 

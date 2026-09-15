@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+    x:Class="ContextControl.Workbench.Controls.LocalResourceStatusPanel">
+  <StackPanel Spacing="5">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+      <TextBlock Text="Resources" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="1" x:Name="ResourceModelPicker" ItemsSource="{Binding ContextControl.LocalLlmModels}"
+          SelectedItem="{Binding ContextControl.SelectedResourceModel, Mode=TwoWay}" HorizontalAlignment="Stretch"
+          MaxDropDownHeight="300" ToolTip.Tip="Preview any catalog model without downloading or changing the chat model.">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:LocalLlmModelViewModel"><TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" /></DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button Grid.Column="2" Classes="rule-mini" Content="Refresh" Click="OnRefreshClick" />
+    </Grid>
+    <TextBlock Classes="muted" Text="{Binding ContextControl.ResourceBudgetSummary}" TextWrapping="Wrap" />
+    <TextBlock x:Name="ActualAllocation" Text="{Binding ContextControl.ResourceAllocationSummary}" TextWrapping="Wrap" />
+    <TextBlock Classes="muted" Text="{Binding ContextControl.ResourceEstimateSummary}" TextWrapping="Wrap" />
+    <TextBlock Classes="muted" x:Name="ContextCapacity" Text="{Binding ContextControl.ResourceContextSummary}" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

@@ -596,15 +596,15 @@ public sealed partial class ContextControlViewModel
                 SelectedLocalLlmSortOption)
             .ToList();
 
-        VisibleLocalLlmModels.Clear();
-        if (visible.Count > 0)
+        if (!VisibleLocalLlmModels.SequenceEqual(visible))
         {
+            VisibleLocalLlmModels.Clear();
             VisibleLocalLlmModels.AddRange(visible);
         }
 
-        VisibleStackLocalLlmModels.Clear();
-        if (stackVisible.Count > 0)
+        if (!VisibleStackLocalLlmModels.SequenceEqual(stackVisible))
         {
+            VisibleStackLocalLlmModels.Clear();
             VisibleStackLocalLlmModels.AddRange(stackVisible);
         }
 
@@ -626,7 +626,8 @@ public sealed partial class ContextControlViewModel
             .Where(model => MatchesBaseFilter(model, SelectedLocalLlmBaseFilter))
             .Where(model => MatchesContextFilter(model, SelectedLocalLlmContextFilter))
             .Where(model => MatchesRequirementFilter(model, SelectedLocalLlmRequirementFilter))
-            .Where(model => !ShowOnlyHardwareUsableLocalLlms || model.CanRunOnDetectedHardware);
+            .Where(model => !ShowOnlyHardwareUsableLocalLlms || (SelectedLocalLlmRequirementFilter.StartsWith("Adapted ", StringComparison.Ordinal)
+                ? model.AdaptedFitPlan?.Fits == true : model.CanRunOnDetectedHardware));
     }
 
     private static bool MatchesSearchFilter(LocalLlmModelViewModel model, string filter)
@@ -801,10 +802,10 @@ public sealed partial class ContextControlViewModel
     {
         return filter switch
         {
-            "CPU-safe" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, Label: "CPU / RAM" } : model.WorksOnCpu,
-            "Adapted GPU fit" => model.ResourcePlan is { Fits: true, Label: "GPU fit" },
-            "Adapted CPU / RAM" => model.ResourcePlan is { Fits: true, Label: "CPU / RAM" or "CPU + GPU" },
-            "Adapted memory short" => model.ResourcePlan is { Fits: false },
+            "CPU-safe" => model.UsesAdaptedFit ? model.FitsOnCpuWithAdaptation : model.WorksOnCpu,
+            "Adapted GPU fit" => model.AdaptedFitPlan is { Fits: true, Label: "GPU fit" },
+            "Adapted CPU / RAM" => model.AdaptedFitPlan is { Fits: true, Label: "CPU / RAM" or "CPU + GPU" },
+            "Adapted memory short" => model.AdaptedFitPlan is { Label: "Memory short" },
             "4 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 4 } : model.RecommendedVramGiB <= 4,
             "8 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 8 } : model.RecommendedVramGiB <= 8,
             "16 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 16 } : model.RecommendedVramGiB <= 16,

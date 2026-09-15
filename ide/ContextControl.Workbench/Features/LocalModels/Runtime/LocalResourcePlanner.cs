@@ -20,30 +20,90 @@ public sealed record LocalModelMemory(double? WeightGiB, int? Layers = null, dou
     int? MaxContext = null, bool CpuSupported = true, bool EstimateSplitWithoutLayers = false);
 
 public sealed record LocalResourcePlan(bool Fits, string Label, string Detail, int ContextTokens,
-    int CpuThreads, int GpuLayers, double? RamGiB, double? VramGiB);
+    int CpuThreads, int GpuLayers, double? RamGiB, double? VramGiB,
+    int? MaximumContextTokens = null, string MaximumContextDetail = "");
+
+public sealed record LocalContextCapacity(int? Tokens, string Detail);
 
 /// <summary>Conservative estimates, not a benchmark or a promise of runtime/architecture support.</summary>
 public static class LocalResourcePlanner
 {
+    public static LocalLlmHardwareProfile CreditLoadedAllocation(LocalLlmHardwareProfile hardware, LocalRuntimeAllocation? allocation)
+    {
+        if (allocation?.Running != true) return hardware;
+        // Only credit the candidate's own allocation; other loaded models still consume the budget.
+        var host = allocation.TotalBytes is >= 0 && allocation.VramBytes is >= 0
+            && allocation.VramBytes <= allocation.TotalBytes ? allocation.TotalBytes - allocation.VramBytes : null;
+        long? Add(long? free, long? total, long? credit) => free is >= 0 && total is > 0 && credit is > 0
+            ? (long)Math.Min(total.Value, (double)free.Value + credit.Value) : free;
+        return hardware with
+        {
+            AvailableRamBytes = Add(hardware.AvailableRamBytes, hardware.TotalRamBytes, host),
+            // Ollama reports aggregate VRAM without device attribution. Do not assign it to the wrong GPU.
+            Gpus = hardware.Gpus.Count == 1 ? hardware.Gpus.Select(g => g with {
+                AvailableRamBytes = Add(g.AvailableRamBytes, g.AdapterRamBytes, allocation.VramBytes)
+            }).ToArray() : hardware.Gpus
+        };
+    }
+
     public static double? ParseWeightGiB(string? size)
     {
-        // Ranges and unknown sizes must not turn into a confident fit for the smallest variant.
-        var match = Regex.Match(size ?? "", @"^\s*[~≈]?\s*(\d+(?:\.\d+)?)\s*(GiB|GB|MiB|MB|TiB|TB)\s*$", RegexOptions.IgnoreCase);
+        // Accept explicit quantization labels; use the larger end of ranges. Never guess from arbitrary prose.
+        var match = Regex.Match(size ?? "", @"^\s*[~≈]?\s*(\d+(?:\.\d+)?)\s*(?:(GiB|GB|MiB|MB|TiB|TB)\s*)?(?:[-–—]\s*(\d+(?:\.\d+)?)\s*)?(GiB|GB|MiB|MB|TiB|TB)?\s*(?:\(?\s*(?:I?Q\d[\w.]*|I\d[\w.]*|MXFP4|F(?:P)?(?:16|32)|BF16|published download)\s*\)?)?\s*$", RegexOptions.IgnoreCase);
         if (!match.Success || !double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) || value <= 0)
             return null;
-        return match.Groups[2].Value.ToUpperInvariant() switch
+        static double Convert(double value, string unit) => unit.ToUpperInvariant() switch
         {
             "MIB" => value / 1024, "MB" => value * 1e6 / 1073741824d,
             "TB" => value * 1e12 / 1073741824d, "TIB" => value * 1024,
             "GB" => value * 1e9 / 1073741824d, _ => value
         };
+        var unit = match.Groups[4].Success ? match.Groups[4].Value : match.Groups[2].Value;
+        if (unit.Length == 0 || match.Groups[2].Success && match.Groups[4].Success && !match.Groups[3].Success) return null;
+        var first = Convert(value, match.Groups[2].Success ? match.Groups[2].Value : unit);
+        if (!match.Groups[3].Success) return first;
+        if (!double.TryParse(match.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var last) || last <= 0) return null;
+        return Math.Max(first, Convert(last, unit));
     }
 
     public static int Threads(LocalLlmHardwareProfile hardware) =>
         Math.Clamp(hardware.PhysicalCores is > 0 ? hardware.PhysicalCores.Value - 1 : hardware.LogicalProcessors / 2, 1, 64);
 
     public static LocalResourcePlan Plan(LocalModelMemory model, LocalLlmHardwareProfile hardware,
-        LocalResourceSettings preferences, int manualContext = 4096, int manualGpuLayers = 0, int manualThreads = 0)
+        LocalResourceSettings preferences, int manualContext = 4096, int manualGpuLayers = 0, int manualThreads = 0,
+        bool includeCapacity = false, int runtimeContextLimit = 32768)
+    {
+        var plan = PlanCore(model, hardware, preferences, manualContext, manualGpuLayers, manualThreads);
+        if (!includeCapacity) return plan;
+        var capacity = EstimateMaximumContext(model, hardware, preferences, runtimeContextLimit, manualGpuLayers, manualThreads);
+        return plan with { MaximumContextTokens = capacity.Tokens, MaximumContextDetail = capacity.Detail };
+    }
+
+    public static LocalContextCapacity EstimateMaximumContext(LocalModelMemory model, LocalLlmHardwareProfile hardware,
+        LocalResourceSettings preferences, int runtimeContextLimit = 32768, int manualGpuLayers = 0, int manualThreads = 0)
+    {
+        if (model.WeightGiB is not > 0 || hardware.AvailableRamGiB is null)
+            return new(null, "Maximum context is unknown until model size and available RAM are known.");
+        var ceiling = Math.Clamp(runtimeContextLimit, 1024, 1048576);
+        if (model.MaxContext is > 0) ceiling = Math.Min(ceiling, model.MaxContext.Value);
+        // Search independently of the user's Auto target, in 1K increments, under the same offload policy.
+        var low = 1; var high = ceiling / 1024; var best = 0;
+        var settings = preferences with { AutoContext = false };
+        while (low <= high)
+        {
+            var middle = low + (high - low) / 2;
+            if (PlanCore(model, hardware, settings, middle * 1024, manualGpuLayers, manualThreads).Fits)
+            { best = middle * 1024; low = middle + 1; }
+            else high = middle - 1;
+        }
+        var limit = model.MaxContext is { } maximum ? $"Model limit {maximum:N0}; checked up to {ceiling:N0} tokens."
+            : $"Model limit unknown; checked up to {ceiling:N0} tokens.";
+        return new(best, best == 0 ? "Even 1,024 tokens do not fit this memory estimate. " + limit
+            : $"Estimated maximum {best:N0} tokens after reserves, in 1K steps. {limit} Larger contexts may move more work onto CPU. This is not a runtime allocation guarantee.");
+    }
+
+    private static LocalResourcePlan PlanCore(LocalModelMemory model, LocalLlmHardwareProfile hardware,
+        LocalResourceSettings preferences, int manualContext, int manualGpuLayers, int manualThreads)
     {
         var settings = preferences.Normalize();
         var threads = settings.Enabled && settings.AutoThreads ? Threads(hardware) : Math.Clamp(manualThreads, 0, 1024);

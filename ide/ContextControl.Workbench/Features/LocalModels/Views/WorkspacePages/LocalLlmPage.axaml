@@ -19,6 +19,7 @@
                     Classes="scanner-metric-strip llm-collapsible-panel"
                     Opacity="{Binding ContextControl.LlmInfoPanelOpacity}"
                     IsVisible="{Binding ContextControl.IsLlmInfoExpanded}">
+                  <StackPanel Spacing="6">
                   <WrapPanel HorizontalAlignment="Center">
                     <Border Classes="llm-info-pill" ToolTip.Tip="{Binding ContextControl.HardwareSummary}" MinWidth="320">
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -27,6 +28,8 @@
                       </Grid>
                     </Border>
                   </WrapPanel>
+                  <controls:LocalResourceStatusPanel Margin="8,0" />
+                  </StackPanel>
                 </Border>
 
                 <Border

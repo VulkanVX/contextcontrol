@@ -14,6 +14,16 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
     private string _lastOutput = "";
     public LocalRuntimeProfile? ActiveProfile { get; private set; }
     public LocalResourcePlan? LastPlan { get; private set; }
+    internal LocalRuntimeAllocation ReadAllocation(string id)
+    {
+        if (!Owns(id) || ActiveProfile is not { } profile) return new(false, "Runtime is not managed by this app");
+        long? ram = null;
+        try { _process!.Refresh(); ram = _process.WorkingSet64; }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        return new(true, "Managed runtime", ResidentRamBytes: ram, ContextTokens: profile.ContextTokens,
+            CpuThreads: profile.CpuThreads > 0 ? profile.CpuThreads : null, GpuLayers: profile.GpuLayers,
+            RamSource: "Process resident RAM (includes runtime)");
+    }
 
     internal static (LocalRuntimeProfile Profile, LocalResourcePlan? Plan) AdaptProfile(LocalRuntimeProfile profile,
         LocalResourceSettings settings, LocalLlmHardwareProfile hardware)
@@ -23,7 +33,7 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
             : GgufResourceMetadata.Read(Path.GetFullPath(profile.ModelPath.Trim()));
         var plan = LocalResourcePlanner.Plan(metadata, hardware,
             profile.Id == "transformers" ? settings with { AutoGpuLayers = false } : settings,
-            profile.ContextTokens, profile.GpuLayers, profile.CpuThreads);
+            profile.ContextTokens, profile.GpuLayers, profile.CpuThreads, includeCapacity: true);
         return (profile with
         {
             ContextTokens = settings.AutoContext ? plan.ContextTokens : profile.ContextTokens,

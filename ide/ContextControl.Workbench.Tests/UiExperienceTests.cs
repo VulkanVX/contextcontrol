@@ -27,7 +27,7 @@ internal static partial class UiExperienceTests
         .Single(method => method.Name == name && method.GetParameters().Length == args.Length).Invoke(target, args);
     private static T Read<T>(object target, string name) => (T)target.GetType().GetProperty(name, Private | BindingFlags.Public)!.GetValue(target)!;
 
-    public static void Run(string? output)
+    public static void Run(string? output, bool liveResources = false)
     {
         AppBuilder.Configure<App>().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false }).UseSkia().WithInterFont().SetupWithoutStarting();
         var root = Path.Combine(Path.GetTempPath(), "ContextControlUiTests", Guid.NewGuid().ToString("N"));
@@ -60,6 +60,7 @@ internal static partial class UiExperienceTests
         LiveDeliveryAndCatalog(context, workbench, root, output);
         ThinkingScroll(output);
         ResourceAdaptationUi(workbench, root, output);
+        if (liveResources) ResourcePanelLive(workbench, output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;
         workbench.IsChatProgressPanelEnabled = false;

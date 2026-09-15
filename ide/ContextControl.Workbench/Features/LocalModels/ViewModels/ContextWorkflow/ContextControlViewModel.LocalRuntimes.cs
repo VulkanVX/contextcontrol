@@ -55,7 +55,7 @@ public sealed partial class ContextControlViewModel
                 vm.Status = "Estimating allocation…";
                 var hardware = await LocalLlmService.DetectHardwareAsync(cancellation.Token);
                 var adapted = await Task.Run(() => ManagedLocalRuntimeService.AdaptProfile(profile, _settings.LocalResources, hardware), cancellation.Token);
-                vm.AdaptationSummary = adapted.Plan is { } plan ? $"{plan.Label} · {plan.GpuLayers} GPU layers · " + plan.Detail
+                vm.AdaptationSummary = adapted.Plan is { } plan ? $"{plan.Label} · {plan.GpuLayers} GPU layers · " + plan.Detail + " " + plan.MaximumContextDetail
                     : "Manual settings: " + profile.ContextTokens + " context, " + profile.GpuLayers + " GPU layers, " + profile.CpuThreads + " threads (0 = runtime default).";
                 vm.Status = "Preview ready";
             }
