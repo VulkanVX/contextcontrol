@@ -1,4 +1,4 @@
-# ContextControl
+# ContextControl (ALPHA)
 
 ContextControl is a native desktop workbench for keeping local code context, local models, and patch workflows under the user's control.
 
