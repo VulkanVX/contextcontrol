@@ -246,6 +246,8 @@ public sealed partial class ContextControlViewModel
 
     private void ApplyLocalModelRefresh(LocalLlmRefreshResult result, bool preserveBackendModelStates = false)
     {
+        _resourceHardware = result.Hardware;
+        _localLlmService.ConfigureResources(_settings.LocalResources, result.Hardware);
         _isOllamaReachable = result.OllamaReachable;
         foreach (var catalogModel in result.Catalog)
         {
@@ -291,6 +293,12 @@ public sealed partial class ContextControlViewModel
             var isAvailable = isInstalled
                 || (model.IsCloudModel && result.OllamaReachable)
                 || (model.IsImageGenerationModel && model.RequiresManualBackend && isBackendDependencyReady);
+            model.ConfigureResources(_settings.LocalResources);
+            if (model.IsConnectedRuntime)
+            {
+                var fresh = result.Catalog.FirstOrDefault(m => m.Id == model.Id);
+                model.ApplyServerContext(fresh is null ? null : ContextCapsuleBuilder.EstimateContextTokens(fresh.ComfortableContext));
+            }
             model.ApplyState(isInstalled, isAvailable, result.Hardware, isBackendDependencyReady, isBackendModelReady);
             model.ApplyOllamaCapabilities(ResolveInstalledModelCapabilities(result.InstalledModelCapabilities, model.Id));
             model.ApplyStorageLocation(ResolveModelStorageLocation(model));
@@ -528,6 +536,7 @@ public sealed partial class ContextControlViewModel
     private static string NormalizeLocalLlmRequirementFilter(string? value)
     {
         var clean = CleanLocalLlmFilter(value, LlmRequirementAny);
+        if (clean is "Adapted GPU fit" or "Adapted CPU / RAM" or "Adapted memory short") return clean;
         if (clean.Equals("CPU-safe", StringComparison.OrdinalIgnoreCase))
         {
             return "CPU-safe";
@@ -792,11 +801,14 @@ public sealed partial class ContextControlViewModel
     {
         return filter switch
         {
-            "CPU-safe" => model.WorksOnCpu,
-            "4 GB VRAM or less" => model.RecommendedVramGiB <= 4,
-            "8 GB VRAM or less" => model.RecommendedVramGiB <= 8,
-            "16 GB VRAM or less" => model.RecommendedVramGiB <= 16,
-            "24 GB VRAM or less" => model.RecommendedVramGiB <= 24,
+            "CPU-safe" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, Label: "CPU / RAM" } : model.WorksOnCpu,
+            "Adapted GPU fit" => model.ResourcePlan is { Fits: true, Label: "GPU fit" },
+            "Adapted CPU / RAM" => model.ResourcePlan is { Fits: true, Label: "CPU / RAM" or "CPU + GPU" },
+            "Adapted memory short" => model.ResourcePlan is { Fits: false },
+            "4 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 4 } : model.RecommendedVramGiB <= 4,
+            "8 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 8 } : model.RecommendedVramGiB <= 8,
+            "16 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 16 } : model.RecommendedVramGiB <= 16,
+            "24 GB VRAM or less" => model.UsesAdaptedFit ? model.ResourcePlan is { Fits: true, VramGiB: <= 24 } : model.RecommendedVramGiB <= 24,
             "Workstation/server" => model.RecommendedVramGiB > 24,
             _ => true
         };

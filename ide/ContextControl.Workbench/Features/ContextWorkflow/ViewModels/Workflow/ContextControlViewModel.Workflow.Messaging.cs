@@ -1437,6 +1437,7 @@ public sealed partial class ContextControlViewModel
         ContextControlAttachmentViewModel[] imageAttachmentSnapshot = model.IsImageModel
             ? BuildPendingAttachmentSnapshotForKinds("image")
             : [];
+        model.RefreshAvailableMemory();
         var requestedContextTokens = ResolveRequestedContextTokens(model, phase);
         var capsule = _capsuleBuilder.Build(new ContextCapsuleBuildRequest(
             capsuleMessage,
@@ -1632,6 +1633,7 @@ public sealed partial class ContextControlViewModel
         PhaseDetail = $"Sending clean chat to {model.DisplayName}.";
         ProviderStatus = $"Local: {model.DisplayName}";
 
+        model.RefreshAvailableMemory();
         var requestedContextTokens = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat);
         var chatCancellation = new CancellationTokenSource();
         var generationProgress = CreateGenerationProgress(targetSession, model.DisplayName, "raw", isCancellable: true);

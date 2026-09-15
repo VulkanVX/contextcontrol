@@ -50,6 +50,7 @@ public sealed partial class ContextControlViewModel
             return comfortable;
         }
 
+        if (model.AdaptsContext && model.ResourcePlan is not null) return comfortable;
         var advertised = ContextCapsuleBuilder.EstimateContextTokens(model.AdvertisedContext, comfortable);
         return Math.Max(comfortable, advertised);
     }

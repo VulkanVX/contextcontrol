@@ -12,10 +12,35 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
     private Process? _process;
     private string? _profileId;
     private string _lastOutput = "";
+    public LocalRuntimeProfile? ActiveProfile { get; private set; }
+    public LocalResourcePlan? LastPlan { get; private set; }
+
+    internal static (LocalRuntimeProfile Profile, LocalResourcePlan? Plan) AdaptProfile(LocalRuntimeProfile profile,
+        LocalResourceSettings settings, LocalLlmHardwareProfile hardware)
+    {
+        if (!settings.Enabled || !profile.AdaptToHardware || profile.Id is not ("llama-cpp" or "koboldcpp" or "transformers")) return (profile, null);
+        var metadata = profile.Id == "transformers" ? new LocalModelMemory(null)
+            : GgufResourceMetadata.Read(Path.GetFullPath(profile.ModelPath.Trim()));
+        var plan = LocalResourcePlanner.Plan(metadata, hardware,
+            profile.Id == "transformers" ? settings with { AutoGpuLayers = false } : settings,
+            profile.ContextTokens, profile.GpuLayers, profile.CpuThreads);
+        return (profile with
+        {
+            ContextTokens = settings.AutoContext ? plan.ContextTokens : profile.ContextTokens,
+            GpuLayers = profile.Id != "transformers" && settings.AutoGpuLayers ? plan.GpuLayers : profile.GpuLayers,
+            CpuThreads = settings.AutoThreads ? plan.CpuThreads : profile.CpuThreads
+        }, plan);
+    }
 
     public ManagedLocalRuntimeService() => AppDomain.CurrentDomain.ProcessExit += OnExit;
     private void OnExit(object? sender, EventArgs args) => StopOwned();
     public bool Owns(string id) => _profileId == id && _process is { HasExited: false };
+
+    internal static LocalRuntimeProfile ConnectionProfile(LocalRuntimeProfile saved, LocalRuntimeProfile? active)
+    {
+        if (!saved.Enabled || active is null || saved.Id != active.Id || saved.ApiUri("models") != active.ApiUri("models")) return saved;
+        return saved with { ContextTokens = active.ContextTokens };
+    }
 
     internal static ProcessStartInfo BuildStartInfo(LocalRuntimeProfile profile)
     {
@@ -61,15 +86,28 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
             info.Environment["HF_HUB_DISABLE_PROGRESS_BARS"] = "1";
         }
         else throw new InvalidOperationException("Start this server in its own runtime, then use Apply and connect.");
+        if (profile.CpuThreads > 0) Add("--threads", Math.Clamp(profile.CpuThreads, 1, 1024).ToString(System.Globalization.CultureInfo.InvariantCulture));
         return info;
     }
 
-    public async Task<string> StartAsync(LocalRuntimeProfile profile, IProgress<string> progress, CancellationToken cancellationToken)
+    public async Task<string> StartAsync(LocalRuntimeProfile profile, IProgress<string> progress, CancellationToken cancellationToken, LocalResourceSettings? resources = null)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (_process is { HasExited: false }) return Owns(profile.Id) ? "Already running" : "Stop the other managed model first to release its memory.";
+            if (resources is { Enabled: true } && profile.AdaptToHardware)
+            {
+                progress.Report("Checking available RAM and VRAM…");
+                var hardware = await LocalLlmService.DetectHardwareAsync(cancellationToken).ConfigureAwait(false);
+                var adapted = await Task.Run(() => AdaptProfile(profile, resources, hardware), cancellationToken).ConfigureAwait(false);
+                LastPlan = adapted.Plan;
+                if (LastPlan is { Fits: false, RamGiB: not null })
+                    return "Auto adaptation: " + LastPlan.Detail;
+                profile = adapted.Profile;
+                if (LastPlan is { } plan) progress.Report($"Auto: {plan.Label} · {plan.ContextTokens:N0} context · {plan.CpuThreads} threads · {plan.GpuLayers} GPU layers");
+            }
+            else LastPlan = null;
             var info = BuildStartInfo(profile);
             var endpoint = profile.ApiUri("models");
             using (var probe = new TcpClient())
@@ -85,6 +123,7 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
             _lastOutput = "";
             _process = process;
             _profileId = profile.Id;
+            ActiveProfile = profile;
             if (!process.Start()) throw new InvalidOperationException("Could not start the runtime.");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -98,7 +137,8 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
                 try
                 {
                     using var response = await http.GetAsync(endpoint, deadline.Token).ConfigureAwait(false);
-                    if (response.IsSuccessStatusCode) return "Running · model ready";
+                    if (response.IsSuccessStatusCode) return LastPlan is { } plan
+                        ? $"Running · {plan.ContextTokens:N0} context · {plan.CpuThreads} threads · {plan.GpuLayers} GPU layers (auto estimate)" : "Running · model ready";
                 }
                 catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException) { }
                 await Task.Delay(500, deadline.Token).ConfigureAwait(false);
@@ -112,6 +152,7 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
     public void Stop(string profileId) { if (_profileId == profileId) StopOwned(); }
     private void StopOwned()
     {
+        ActiveProfile = null;
         try { if (_process is { HasExited: false }) _process.Kill(entireProcessTree: true); }
         catch (InvalidOperationException) { }
         catch (System.ComponentModel.Win32Exception) { }

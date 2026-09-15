@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Reflection;
 using Avalonia;
@@ -59,6 +59,7 @@ internal static partial class UiExperienceTests
         Presentation(context, root, output);
         LiveDeliveryAndCatalog(context, workbench, root, output);
         ThinkingScroll(output);
+        ResourceAdaptationUi(workbench, root, output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;
         workbench.IsChatProgressPanelEnabled = false;

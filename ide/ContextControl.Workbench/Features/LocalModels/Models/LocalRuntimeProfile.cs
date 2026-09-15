@@ -2,7 +2,7 @@ namespace ContextControl.Workbench.Services;
 
 /// <summary>User-configured OpenAI-compatible model server. Secrets stay in environment variables.</summary>
 public sealed record LocalRuntimeProfile(string Id, string Name, string Endpoint, bool Enabled = true,
-    string ApiKeyEnvironmentVariable = "", int ContextTokens = 4096, string ModelPath = "", int GpuLayers = 0)
+    string ApiKeyEnvironmentVariable = "", int ContextTokens = 4096, string ModelPath = "", int GpuLayers = 0, int CpuThreads = 0, bool AdaptToHardware = true)
 {
     public static IReadOnlyList<LocalRuntimeProfile> Defaults =>
     [

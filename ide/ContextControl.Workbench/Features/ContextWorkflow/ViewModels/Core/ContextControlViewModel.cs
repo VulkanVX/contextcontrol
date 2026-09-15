@@ -325,6 +325,9 @@ public sealed partial class ContextControlViewModel : ObservableObject
             {
                 LlmRequirementAny,
                 "CPU-safe",
+                "Adapted GPU fit",
+                "Adapted CPU / RAM",
+                "Adapted memory short",
                 "4 GB VRAM or less",
                 "8 GB VRAM or less",
                 "16 GB VRAM or less",
@@ -334,7 +337,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
         RefreshLocalLlmProviderFilters();
         RefreshLocalLlmPurposeFilters();
         RefreshLocalLlmBaseFilters();
-        ApplyLocalLlmFilters();
+        ApplyResourceMode();
         LocalModelIdOptions = new ObservableCollection<string>(LocalLlmService.Catalog.Select(model => model.Id));
         CodexModelOptions = new ObservableCollection<string>(
             new[]

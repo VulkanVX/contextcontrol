@@ -310,6 +310,14 @@ public sealed partial class LocalLlmCatalogRenderControl
             return;
         }
 
+        if (model.UsesAdaptedFit)
+        {
+            var allocation = model.ResourcePlan is { RamGiB: { } ram, VramGiB: { } gpu }
+                ? $"~{ram:0.0}G RAM + {gpu:0.0}G VRAM" : "Memory unverified";
+            DrawRightAlignedSegments(context, [(allocation, Resource("TextMutedBrush", TextMutedFallbackBrush))],
+                new Rect(rect.X, rect.Y + 22.0, rect.Width, 10.0), codeFontFamily, 7.8);
+            return;
+        }
         DrawRightAlignedSegments(
             context,
             [
@@ -340,6 +348,11 @@ public sealed partial class LocalLlmCatalogRenderControl
             return;
         }
 
+        if (model.UsesAdaptedFit)
+        {
+            DrawSegmentLine(context, [(model.ResourceAllocationLabel, ResolveStatusBrush(model.CanRunOnDetectedHardware ? HardwareTone.Good : HardwareTone.Risk))], rect, codeFontFamily, fontSize);
+            return;
+        }
         var cpu = model.WorksOnCpu ? "CPU OK" : "CPU NO";
         var gpuTone = ResolveGpuTone(model);
         var gpu = gpuTone switch

@@ -94,10 +94,11 @@
                           SelectedItem="{Binding ContextControl.SelectedLocalLlmRequirementFilter, Mode=TwoWay}" />
                     </StackPanel>
                     <Button Content="Show all" Classes="header-mini" Margin="0,12,5,3" Command="{Binding ContextControl.ShowAllLocalModelsCommand}" ToolTip.Tip="Clear filters and show every catalog entry at any size. Models download only when you choose Download." />
-                    <StackPanel Spacing="2" Width="76" Margin="0,0,5,3">
+                    <CheckBox Content="Auto adapt" IsChecked="{Binding ContextControl.AutoAdaptLocalModels, Mode=TwoWay}" Margin="0,12,12,3" ToolTip.Tip="{Binding ContextControl.ResourceModeSummary}" />
+                    <StackPanel Spacing="2" Width="110" Margin="0,0,5,3">
                       <TextBlock Classes="llm-filter-label" Text="fit" />
                       <CheckBox
-                          Content="usable"
+                          Content="{Binding ContextControl.HardwareFitFilterLabel}" ToolTip.Tip="{Binding ContextControl.HardwareFitFilterDescription}"
                           FontSize="9"
                           FontWeight="Bold"
                           Foreground="{DynamicResource TextPrimaryBrush}"

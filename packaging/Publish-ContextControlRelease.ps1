@@ -178,6 +178,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "Local chat regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --runtime-regression
     if ($LASTEXITCODE -ne 0) { throw "Local runtime regression failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --resource-regression
+    if ($LASTEXITCODE -ne 0) { throw "Resource adaptation regression failed ($LASTEXITCODE)." }
 }
 
 dotnet publish $project `

@@ -22,6 +22,35 @@
                 controls:HoverScrollbarBehavior.IsEnabled="True"
                 controls:HoverScrollbarBehavior.ReserveRight="12">
               <StackPanel Spacing="8">
+                <Border Classes="rule-card" x:Name="ResourceAdaptationCard">
+                  <StackPanel Spacing="8">
+                    <CheckBox x:Name="AutoAdaptModelsToggle" Content="Auto adapt to hardware" IsChecked="{Binding ContextControl.AutoAdaptLocalModels, Mode=TwoWay}" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.HardwareSummary}" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.ResourceModeSummary}" />
+                    <StackPanel Spacing="8" IsEnabled="{Binding ContextControl.AutoAdaptLocalModels}">
+                      <WrapPanel>
+                        <CheckBox Content="GPU layers" IsChecked="{Binding ContextControl.AutoModelGpuLayers, Mode=TwoWay}" Margin="0,0,16,0" ToolTip.Tip="Estimate a split for managed GGUF runtimes. Ollama uses its own dynamic GPU allocation." />
+                        <CheckBox Content="Context size" IsChecked="{Binding ContextControl.AutoModelContext, Mode=TwoWay}" Margin="0,0,16,0" />
+                        <CheckBox Content="CPU threads" IsChecked="{Binding ContextControl.AutoModelThreads, Mode=TwoWay}" />
+                      </WrapPanel>
+                      <WrapPanel>
+                        <StackPanel Spacing="3" Margin="0,0,16,0">
+                          <TextBlock Classes="field-label" Text="Maximum auto context" />
+                          <NumericUpDown Value="{Binding ContextControl.AutoModelMaxContext, Mode=TwoWay}" Minimum="1024" Maximum="32768" Increment="1024" Width="170" />
+                        </StackPanel>
+                        <StackPanel Spacing="3" Margin="0,0,16,0">
+                          <TextBlock Classes="field-label" Text="Keep free RAM (GiB)" />
+                          <NumericUpDown Value="{Binding ContextControl.AutoModelRamReserve, Mode=TwoWay}" Minimum="1" Maximum="64" Increment="1" Width="170" />
+                        </StackPanel>
+                        <StackPanel Spacing="3">
+                          <TextBlock Classes="field-label" Text="Keep free VRAM (GiB)" />
+                          <NumericUpDown Value="{Binding ContextControl.AutoModelVramReserve, Mode=TwoWay}" Minimum="0.25" Maximum="32" Increment="0.25" Width="170" />
+                        </StackPanel>
+                      </WrapPanel>
+                    </StackPanel>
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Manual values are kept when Auto is off. Ollama adapts new requests; managed servers adapt on Start. External servers and specialized image runtimes keep their own allocation settings. Estimates do not guarantee model compatibility or speed." />
+                  </StackPanel>
+                </Border>
                 <Border Classes="rule-card">
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -41,9 +70,10 @@
                               <TextBox Text="{Binding Endpoint}" Watermark="http://127.0.0.1:8080/v1" />
                               <Grid ColumnDefinitions="*,150" ColumnSpacing="8">
                                 <TextBox Text="{Binding ApiKeyEnvironmentVariable}" Watermark="API key environment variable (optional)" />
-                                <NumericUpDown Grid.Column="1" Value="{Binding ContextTokens}" Minimum="1024" Maximum="1048576" Increment="1024" ToolTip.Tip="Context configured in the server. This budgets prompts; it does not resize the server's context." />
+                                <NumericUpDown Grid.Column="1" Value="{Binding ContextTokens}" IsEnabled="{Binding IsContextManual}" Minimum="1024" Maximum="1048576" Increment="1024" ToolTip.Tip="Manual context budget. Managed servers use it on the next Start; external servers must be configured separately. Auto preserves this value." />
                               </Grid>
                               <StackPanel IsVisible="{Binding CanManage}" Spacing="5">
+                                <CheckBox Content="Use hardware adaptation for this runtime" IsChecked="{Binding AdaptToHardware, Mode=TwoWay}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                   <TextBox Text="{Binding ModelPath}" Watermark="GGUF file path, or Transformers model folder / Hugging Face ID" />
                                   <Button Grid.Column="1" Classes="rule-mini" Content="Browse GGUF" IsVisible="{Binding SupportsGpuLayers}" Click="OnRuntimeModelBrowseClick" />
@@ -52,9 +82,15 @@
                                   <Button Classes="rule-mini" Content="Install / update runtime" Command="{Binding InstallCommand}" Margin="0,0,6,0" />
                                   <Button Classes="rule-mini primary" Content="Start model" Command="{Binding StartCommand}" Margin="0,0,6,0" />
                                   <Button Classes="rule-mini" Content="Stop / cancel" Command="{Binding StopCommand}" Margin="0,0,6,0" />
-                                  <NumericUpDown IsVisible="{Binding SupportsGpuLayers}" Value="{Binding GpuLayers}" Minimum="0" Maximum="999" Increment="1" Width="100" ToolTip.Tip="GPU layers: 0 uses CPU and saves VRAM; increase gradually for GPU acceleration." />
+                                  <NumericUpDown IsVisible="{Binding SupportsGpuLayers}" Value="{Binding GpuLayers}" IsEnabled="{Binding IsGpuManual}" Minimum="0" Maximum="999" Increment="1" Width="100" ToolTip.Tip="GPU layers: 0 uses CPU and saves VRAM; increase gradually for GPU acceleration." />
                                 </WrapPanel>
-                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="CPU is the default to save VRAM. One managed model runs at a time. Stop releases its memory. Transformers downloads weights when given a Hugging Face ID; use a small model." />
+                                <WrapPanel>
+                                  <TextBlock Classes="field-label" Text="CPU threads" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                  <NumericUpDown Value="{Binding CpuThreads}" IsEnabled="{Binding IsThreadsManual}" Minimum="0" Maximum="1024" Increment="1" Width="100" ToolTip.Tip="Manual CPU threads; 0 uses the runtime default." />
+                                  <Button Classes="rule-mini" Content="Preview allocation" Command="{Binding PreviewCommand}" Margin="8,0,0,0" />
+                                </WrapPanel>
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding AdaptationSummary}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="One managed model runs at a time. Stop releases its memory. Transformers stays on CPU; its model memory is unverified until loaded. A Hugging Face ID downloads weights on Start." />
                               </StackPanel>
                             </StackPanel>
                           </Border>

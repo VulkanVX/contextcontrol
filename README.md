@@ -4,7 +4,7 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.5.3 fixes project autosetup and separates allowed file types from LOC counting. Project Scanner has a searchable source inventory with explicit exclusions, and Settings has roomier project-rule cards. Research handles Google/Facebook optional-cookie choices and identifies login walls. Releases are built locally; GitHub Actions is disabled. See the [release notes](docs/releases/v0.5.3.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.5.4 adds optional hardware adaptation for local models: CPU/RAM fallback, GPU-layer and context estimates, CPU thread budgets, and a catalog filter that reflects the adapted allocation. Manual settings are preserved. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.5.4.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
 
 ## Install On Windows
 

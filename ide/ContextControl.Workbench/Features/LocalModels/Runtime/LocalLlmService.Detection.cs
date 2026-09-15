@@ -279,23 +279,32 @@ public sealed partial class LocalLlmService
         }
     }
 
-    private static async Task<LocalLlmHardwareProfile> DetectHardwareAsync(CancellationToken cancellationToken)
+    public static async Task<LocalLlmHardwareProfile> DetectHardwareAsync(CancellationToken cancellationToken)
     {
-        var nvidia = await DetectNvidiaGpusAsync(cancellationToken).ConfigureAwait(false);
-        if (nvidia.Count > 0)
-        {
-            return new LocalLlmHardwareProfile(nvidia);
-        }
+        var cpuTask = DetectCpuAsync(cancellationToken);
+        var gpus = await DetectNvidiaGpusAsync(cancellationToken).ConfigureAwait(false);
+        if (gpus.Count == 0) gpus = await DetectWindowsGpusAsync(cancellationToken).ConfigureAwait(false);
+        var cpu = await cpuTask.ConfigureAwait(false);
+        var memory = LocalSystemMemory.Read();
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(gpus, memory.Total, memory.Available, cpu.Name, cpu.Cores, Environment.ProcessorCount);
+    }
 
-        var windows = await DetectWindowsGpusAsync(cancellationToken).ConfigureAwait(false);
-        return new LocalLlmHardwareProfile(windows);
+    private static async Task<(string Name, int? Cores)> DetectCpuAsync(CancellationToken token)
+    {
+        if (!OperatingSystem.IsWindows()) return (Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "CPU", null);
+        var result = await RunProcessAsync("powershell",
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_Processor | ForEach-Object { $_.Name + '|' + $_.NumberOfCores }"],
+            TimeSpan.FromSeconds(3), token).ConfigureAwait(false);
+        var parts = result.StandardOutput.Trim().Split('|', 2);
+        return (parts[0].Trim(), parts.Length > 1 && int.TryParse(parts[1].Trim(), out var count) ? count : null);
     }
 
     private static async Task<IReadOnlyList<LocalLlmGpuInfo>> DetectNvidiaGpusAsync(CancellationToken cancellationToken)
     {
         var result = await RunProcessAsync(
             "nvidia-smi",
-            ["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+            ["--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
             TimeSpan.FromSeconds(2),
             cancellationToken).ConfigureAwait(false);
 
@@ -316,7 +325,7 @@ public sealed partial class LocalLlmService
 
     private static LocalLlmGpuInfo? ParseNvidiaGpuLine(string line)
     {
-        var parts = line.Split(',', 2, StringSplitOptions.TrimEntries);
+        var parts = line.Split(',', 3, StringSplitOptions.TrimEntries);
         if (parts.Length == 0 || string.IsNullOrWhiteSpace(parts[0]))
         {
             return null;
@@ -328,7 +337,7 @@ public sealed partial class LocalLlmService
             bytes = mib * 1024L * 1024L;
         }
 
-        return new LocalLlmGpuInfo(parts[0], bytes);
+        return new LocalLlmGpuInfo(parts[0], bytes, parts.Length > 2 && long.TryParse(parts[2], out var free) && free >= 0 ? free * 1024L * 1024L : null);
     }
 
     private static async Task<IReadOnlyList<LocalLlmGpuInfo>> DetectWindowsGpusAsync(CancellationToken cancellationToken)

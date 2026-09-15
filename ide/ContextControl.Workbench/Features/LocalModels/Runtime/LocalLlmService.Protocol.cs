@@ -42,7 +42,9 @@ public sealed partial class LocalLlmService
 
     private sealed record OllamaChatOptions(
         [property: JsonPropertyName("num_ctx")] int? NumContext,
-        [property: JsonPropertyName("num_predict")] int? MaxOutputTokens = null);
+        [property: JsonPropertyName("num_predict")] int? MaxOutputTokens = null,
+        [property: JsonPropertyName("num_thread")] int? CpuThreads = null,
+        [property: JsonPropertyName("num_gpu")] int? GpuLayers = null);
 
     private sealed record OllamaChatMessage(
         string Role,

@@ -13,7 +13,21 @@ public sealed partial class ContextControlViewModel
     private void InitializeRuntimeProfiles()
     {
         foreach (var profile in _settings.LocalRuntimeProfiles.Where(profile => profile is not null))
-            LocalRuntimeProfiles.Add(new(profile, (vm, action) => _ = ManageRuntimeAsync(vm, action)));
+        {
+            var vm = new LocalRuntimeProfileViewModel(profile, (vm, action) => _ = ManageRuntimeAsync(vm, action));
+            vm.SetResourceMode(_settings.LocalResources);
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(LocalRuntimeProfileViewModel.AdaptToHardware) or nameof(LocalRuntimeProfileViewModel.CpuThreads)
+                    or nameof(LocalRuntimeProfileViewModel.GpuLayers) or nameof(LocalRuntimeProfileViewModel.ContextTokens))
+                {
+                    _settings.LocalRuntimeProfiles = LocalRuntimeProfiles.Select(p => p.ToProfile()).ToArray();
+                    SaveSettingsQuietly();
+                }
+            };
+            LocalRuntimeProfiles.Add(vm);
+        }
+        _localLlmService.ConfigureResources(_settings.LocalResources, _resourceHardware);
         _localLlmService.ConfigureRuntimes(_settings.LocalRuntimeProfiles);
         ApplyRuntimeConnectionsCommand = new RelayCommand<object>(_ => _ = ApplyRuntimeConnectionsAsync());
     }
@@ -35,7 +49,17 @@ public sealed partial class ContextControlViewModel
         try
         {
             var status = new Progress<string>(value => vm.Status = value);
-            if (action == "install")
+            if (action == "preview")
+            {
+                var profile = vm.ToProfile();
+                vm.Status = "Estimating allocation…";
+                var hardware = await LocalLlmService.DetectHardwareAsync(cancellation.Token);
+                var adapted = await Task.Run(() => ManagedLocalRuntimeService.AdaptProfile(profile, _settings.LocalResources, hardware), cancellation.Token);
+                vm.AdaptationSummary = adapted.Plan is { } plan ? $"{plan.Label} · {plan.GpuLayers} GPU layers · " + plan.Detail
+                    : "Manual settings: " + profile.ContextTokens + " context, " + profile.GpuLayers + " GPU layers, " + profile.CpuThreads + " threads (0 = runtime default).";
+                vm.Status = "Preview ready";
+            }
+            else if (action == "install")
             {
                 if (_managedRuntimes.Owns(vm.Id)) { vm.Status = "Stop this runtime before updating it."; return; }
                 var transfer = new Progress<LocalLlmTransferProgress>(value => vm.Status = value.Status);
@@ -48,9 +72,10 @@ public sealed partial class ContextControlViewModel
             {
                 vm.Enabled = true;
                 vm.Status = "Starting runtime…";
-                var result = await _managedRuntimes.StartAsync(vm.ToProfile(), status, cancellation.Token);
+                var result = await _managedRuntimes.StartAsync(vm.ToProfile(), status, cancellation.Token, _settings.LocalResources);
                 await ApplyRuntimeConnectionsAsync();
                 vm.Status = result;
+                if (_managedRuntimes.LastPlan is { } plan) vm.AdaptationSummary = plan.Detail;
             }
         }
         catch (OperationCanceledException) { vm.Status = "Stopped"; }
@@ -66,7 +91,8 @@ public sealed partial class ContextControlViewModel
             var profiles = LocalRuntimeProfiles.Select(profile => profile.ToProfile()).ToArray();
             foreach (var profile in profiles.Where(profile => profile.Enabled)) _ = profile.ApiUri("models");
             _settings.LocalRuntimeProfiles = profiles;
-            _localLlmService.ConfigureRuntimes(profiles);
+            // Keep the actual running context even if the user edits settings for the next start.
+            _localLlmService.ConfigureRuntimes(profiles.Select(profile => _managedRuntimes.Owns(profile.Id) ? ManagedLocalRuntimeService.ConnectionProfile(profile, _managedRuntimes.ActiveProfile) : profile).ToArray());
             SaveSettingsQuietly();
             await RefreshLocalModelsAsync(LocalModelRefreshDepth.Fast);
         }

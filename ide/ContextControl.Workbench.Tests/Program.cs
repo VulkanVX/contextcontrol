@@ -13,6 +13,10 @@ using static SmokeTestHelpers;
 if (args.Contains("--scanner-regression")) { ProjectScannerTests.Run(); return; }
 if (args.Contains("--scanner-project")) { ProjectScannerTests.Run(args[Array.IndexOf(args, "--scanner-project") + 1]); return; }
 
+if (args.Contains("--resource-benchmark")) { await LocalResourceTests.Benchmark(args[Array.IndexOf(args, "--resource-benchmark") + 1]); return; }
+if (args.Contains("--resource-live")) { var at = Array.IndexOf(args, "--resource-live"); await LocalResourceTests.Live(args[at + 1], args[at + 2]); return; }
+if (args.Contains("--resource-regression")) { await LocalResourceTests.Run(); return; }
+
 if (args.Contains("--runtime-regression")) { await LocalRuntimeTests.Run(); return; }
 if (args.Contains("--browser-workspace-smoke")) { GoogleBrowserTests.Run(null, workspace: true); return; }
 if (args.Contains("--browser-workspace-live")) { GoogleBrowserTests.Run("granite3.3:2b", workspace: true); return; }

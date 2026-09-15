@@ -4,6 +4,25 @@ ContextControl 0.5.0 includes 544 catalog entries and discovers additional model
 
 New coverage includes Granite 4.2, Qwen 3.8 and Flash Next, Ornith 1.5, Nemotron 3.5 Lightning, Muse Glimmer, Laguna 2.1, North Mini Code, LFM 2.5, and MiniCPM V4.6. Hosted-only tags remain labeled as cloud models. Source pages and published download sizes accompany discovered entries; memory estimates include overhead and do not assume that MoE active parameter counts equal weight memory.
 
+## Auto adapt to hardware
+
+Enable **Settings → LLMs → Auto adapt to hardware**, or use **Auto adapt** above the catalog. It is off by default for existing installations. The master switch and the individual GPU layers, context size and CPU threads switches are saved. Each managed runtime can opt out. Switching off restores use of the saved manual values; automatic allocations never overwrite them.
+
+| Runtime | Automatic settings | When applied |
+| --- | --- | --- |
+| Ollama | Native dynamic GPU placement, CPU threads, bounded context | New requests; context is budgeted before assembling research and attachments |
+| Managed llama.cpp / KoboldCpp | GGUF metadata based GPU layers, context, CPU threads | Next Start; **Preview allocation** reads metadata without loading or downloading weights |
+| Managed Transformers | CPU threads and conservative context | Next Start; this bridge remains CPU-only and checkpoint memory is unverified |
+| External servers, specialized image runtimes | Their own allocation controls | Configure in their runtime; ContextControl does not remotely change the server |
+
+The planner uses available system RAM, detected VRAM (free VRAM when NVIDIA reports it), physical CPU cores, model weight size, and GGUF layer/KV-cache metadata where available. It keeps configurable RAM and VRAM reserves and lowers context if the estimate does not fit. Catalog-only estimates use a conservative KV allowance. Unknown model sizes are not positive fits. Split GGUF files currently require manual configuration. Unknown free VRAM uses a conservative fraction of total VRAM; shared system memory is not added as extra VRAM.
+
+With Auto on, **Adapted fit** includes estimated CPU/RAM and CPU+GPU operation. The VRAM threshold filters use estimated allocation instead of the model's original full-GPU recommendation. Rows show estimated RAM + VRAM, context and allocation type; hover for the assumptions and memory budgets. Hosted, external and specialized runtimes are labeled separately and remain available with **Show all**. Catalog hardware estimates refresh with **Refresh**; available RAM is checked again before preparing a new local chat. Managed starts check RAM and GPU memory again. Running generations are never reconfigured mid-response.
+
+Auto mode is a conservative allocation policy, not an autotuning benchmark. CPU/RAM offload can enable larger models but can be slower than full GPU execution. A runtime can still reject an unsupported architecture or allocate more memory than estimated. Disabling Auto permits manual configuration. Ollama chooses its exact GPU split internally, so its actual allocation may differ from the catalog estimate. Existing loaded models and other apps can reduce the reported free memory; a filtered-out model remains selectable with **Show all**.
+
+The runtime arguments follow the upstream [llama.cpp server options](https://github.com/ggml-org/llama.cpp/tree/master/tools/server), [KoboldCpp options](https://github.com/LostRuins/koboldcpp), and [Ollama runner options](https://github.com/ollama/ollama/blob/main/api/types.go). No model weights are downloaded by toggling Auto or previewing an allocation.
+
 ## Connect a model server
 
 In **LLMs**, choose **Show all** to clear search, ownership, hardware and other filters. No GB limit is applied to the catalog; downloading remains an explicit action. **Newest** follows the official library listing order before falling back to known dates, so recent entries with an unknown release date are no longer buried. A source listing rank is not presented as a release date. Hosted-only models remain visibly labeled.
@@ -23,7 +42,7 @@ The compatible route supports `/v1/models` and streamed `/v1/chat/completions`. 
 
 Native Windows installation is gated for Linux-oriented vLLM, SGLang and TensorRT-LLM; use Linux/WSL where supported and connect the API. MLX LM needs Apple Silicon macOS. ONNX/OpenVINO and specialized image backends keep their existing dependency routes and require their supported model formats.
 
-Managed llama.cpp/KoboldCpp default to **0 GPU layers (CPU)**. Increase layers gradually if VRAM permits. Only one ContextControl-managed model runs at a time. **Stop / cancel** stops its owned process and releases memory; external servers and Ollama are not stopped. Managed servers bind only to `127.0.0.1`. The model weights are not included in the app installer.
+With Auto off, managed llama.cpp/KoboldCpp default to **0 GPU layers (CPU)**. Increase layers gradually if VRAM permits. Only one ContextControl-managed model runs at a time. **Stop / cancel** stops its owned process and releases memory; external servers and Ollama are not stopped. Managed servers bind only to `127.0.0.1`. The model weights are not included in the app installer.
 
 Existing Ollama GGUF blobs can be selected through **Browse GGUF → All files**, avoiding another weight download. For a normal GGUF, select the `.gguf` file. The Transformers bridge uses an isolated CPU PyTorch environment and safetensors; it does not enable remote Python code from model repositories. Some custom architectures therefore need another runtime. This bridge currently supports text chat.
 

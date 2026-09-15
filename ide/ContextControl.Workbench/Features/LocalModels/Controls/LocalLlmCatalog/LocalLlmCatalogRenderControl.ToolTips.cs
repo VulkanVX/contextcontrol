@@ -88,6 +88,7 @@ public sealed partial class LocalLlmCatalogRenderControl
             ("BASE", model.ModelBaseLabel),
             ("DEP", model.BackendRequirementLabel),
             ("SIZE", model.EffectiveDownloadSizeLabel),
+            ("FIT", model.FitDetail),
             ("VRAM FIT", model.BigVramSummaryLabel),
             ("VRAM", model.MinimumRequirement),
             ("CTX", model.AdvertisedContext),

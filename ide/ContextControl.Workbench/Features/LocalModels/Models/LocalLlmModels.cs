@@ -33,19 +33,33 @@ public sealed record LocalLlmCatalogModel(
     string? SourceUrl = null,
     int? LibraryOrder = null);
 
-public sealed record LocalLlmGpuInfo(string Name, long? AdapterRamBytes)
+public sealed record LocalLlmGpuInfo(string Name, long? AdapterRamBytes, long? AvailableRamBytes = null)
 {
     public double? MemoryGiB => AdapterRamBytes is > 0
         ? AdapterRamBytes.Value / 1024d / 1024d / 1024d
         : null;
+
+    public double? AvailableMemoryGiB => AvailableRamBytes is >= 0 ? AvailableRamBytes.Value / 1073741824d : null;
 
     public string MemoryLabel => MemoryGiB is { } memory
         ? $"{memory:0.#} GB"
         : "VRAM unknown";
 }
 
-public sealed record LocalLlmHardwareProfile(IReadOnlyList<LocalLlmGpuInfo> Gpus)
+public sealed record LocalLlmHardwareProfile(IReadOnlyList<LocalLlmGpuInfo> Gpus,
+    long? TotalRamBytes = null, long? AvailableRamBytes = null, string CpuName = "",
+    int? PhysicalCores = null, int LogicalProcessors = 1)
 {
+    public double? TotalRamGiB => TotalRamBytes / 1073741824d;
+    public double? AvailableRamGiB => AvailableRamBytes / 1073741824d;
+    public LocalLlmHardwareProfile WithCurrentMemory()
+    {
+        var memory = LocalSystemMemory.Read();
+        return this with { TotalRamBytes = memory.Total, AvailableRamBytes = memory.Available };
+    }
+    private string CpuRamSummary => $"{(string.IsNullOrWhiteSpace(CpuName) ? "CPU" : CpuName)} · {PhysicalCores?.ToString() ?? "?"} cores · "
+        + (TotalRamGiB is { } total ? $"{total:0.#} GiB RAM ({AvailableRamGiB:0.#} free)" : "RAM unknown");
+
     public double? MaxGpuMemoryGiB => Gpus
         .Select(gpu => gpu.MemoryGiB)
         .Where(memory => memory is > 0)
@@ -58,13 +72,13 @@ public sealed record LocalLlmHardwareProfile(IReadOnlyList<LocalLlmGpuInfo> Gpus
         {
             if (Gpus.Count == 0)
             {
-                return "GPU not detected yet. CPU-capable small models are safest.";
+                return "No detected GPU · " + CpuRamSummary;
             }
 
             var primary = Gpus
                 .OrderByDescending(gpu => gpu.MemoryGiB ?? 0)
                 .First();
-            return $"{primary.Name} - {primary.MemoryLabel}";
+            return $"{primary.Name} - {primary.MemoryLabel} · {CpuRamSummary}";
         }
     }
 }

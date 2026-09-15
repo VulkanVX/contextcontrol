@@ -94,9 +94,9 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         : _detectedDownloadSizeLabel;
     public string License => Model.License;
     public string MinimumRequirement => Model.MinimumRequirement;
-    public string AdvertisedContext => Model.AdvertisedContext;
-    public string ComfortableContext => Model.ComfortableContext;
-    public int AdvertisedContextTokens => _advertisedContextTokens;
+    public string AdvertisedContext => _serverContext?.ToString() ?? Model.AdvertisedContext;
+    public string ComfortableContext => _serverContext?.ToString() ?? (_resourceSettings.AutoContext ? ResourcePlan?.ContextTokens.ToString() : null) ?? Model.ComfortableContext;
+    public int AdvertisedContextTokens => _serverContext ?? _advertisedContextTokens;
     public string SourceBudget => Model.SourceBudget;
     public string ExpectedSpeed => Model.ExpectedSpeed;
     public string PracticalUse => Model.PracticalUse;
@@ -105,7 +105,7 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
     public double RecommendedVramGiB => Model.RecommendedVramGiB;
     public double? DetectedGpuVramGiB => _detectedGpuVramGiB;
     public bool HasDetectedGpu => _detectedGpuVramGiB is > 0;
-    public bool CanRunOnDetectedCpu => IsCloudModel || WorksOnCpu;
+    public bool CanRunOnDetectedCpu => UsesAdaptedFit ? ResourcePlan is { Fits: true } : IsCloudModel || WorksOnCpu;
     public bool CanRunOnDetectedGpu => IsCloudModel
         || (_detectedGpuVramGiB is > 0 && _detectedGpuVramGiB.Value >= MinimumVramGiB);
     public bool MinimumVramFitsDetectedGpu => IsCloudModel
@@ -114,7 +114,7 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
     public bool RecommendedVramFitsDetectedGpu => IsCloudModel
         || RecommendedVramGiB <= 0
         || (_detectedGpuVramGiB is > 0 && _detectedGpuVramGiB.Value >= RecommendedVramGiB);
-    public bool CanRunOnDetectedHardware => IsCloudModel || CanRunOnDetectedCpu || CanRunOnDetectedGpu;
+    public bool CanRunOnDetectedHardware => UsesAdaptedFit ? ResourcePlan?.Fits == true : IsCloudModel || CanRunOnDetectedCpu || CanRunOnDetectedGpu;
     public string VramSummary => IsCloudModel
         ? "cloud VRAM"
         : $"{FormatVram(MinimumVramGiB)} min, {FormatVram(RecommendedVramGiB)} advised";
@@ -354,6 +354,7 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
         bool isBackendDependencyReady = false,
         bool isBackendModelReady = false)
     {
+        _hardware = hardware;
         _detectedGpuVramGiB = hardware.MaxGpuMemoryGiB;
         IsInstalled = isInstalled;
         IsBackendDependencyReady = isBackendDependencyReady;
@@ -369,10 +370,11 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
                     ? "Uses Ollama Cloud through the local Ollama API; local VRAM is not used."
                     : "Requires Ollama to be reachable and signed in for cloud access.")
             : CalculateFit(Model, hardware);
+        _nonAdaptiveFit = fit;
         IsRecommended = fit.IsRecommended;
         FitLabel = fit.Label;
         FitDetail = fit.Detail;
-        NotifyHardwareFitChanged();
+        ApplyResourceEstimate();
     }
 
     public void ApplyStorageLocation(string? location)
@@ -382,6 +384,7 @@ public sealed partial class LocalLlmModelViewModel(LocalLlmCatalogModel model) :
 
     public void ApplyDetectedDownloadSize(long? bytes)
     {
+        _weightBytes = bytes;
         var label = bytes is > 0 ? FormatDetectedBytes(bytes.Value) : "";
         if (SetProperty(ref _detectedDownloadSizeLabel, label, nameof(EffectiveDownloadSizeLabel)))
         {

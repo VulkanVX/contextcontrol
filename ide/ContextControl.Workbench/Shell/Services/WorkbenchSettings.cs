@@ -153,6 +153,7 @@ public sealed class WorkbenchSettings
     public bool ChatProgressPanelEnabled { get; set; } = true;
     public bool GoogleSearchEnabled { get; set; } = true;
     public bool BrowserActionPreviewEnabled { get; set; }
+    public LocalResourceSettings LocalResources { get; set; } = new();
     public IReadOnlyList<LocalRuntimeProfile> LocalRuntimeProfiles { get; set; } = LocalRuntimeProfile.Defaults;
     public int? ChatMonitorX { get; set; }
     public int? ChatMonitorY { get; set; }
@@ -272,6 +273,7 @@ public sealed class WorkbenchSettings
             ChatProgressPanelEnabled = data.ChatProgressPanelEnabled ?? true,
             GoogleSearchEnabled = data.GoogleSearchEnabled ?? true,
             BrowserActionPreviewEnabled = data.BrowserActionPreviewEnabled ?? false,
+            LocalResources = (data.LocalResources ?? new()).Normalize(),
             LocalRuntimeProfiles = data.LocalRuntimeProfiles ?? LocalRuntimeProfile.Defaults,
             ChatMonitorX = data.ChatMonitorX,
             ChatMonitorY = data.ChatMonitorY
@@ -292,6 +294,7 @@ public sealed class WorkbenchSettings
             ChatProgressPanelEnabled = ChatProgressPanelEnabled,
             GoogleSearchEnabled = GoogleSearchEnabled,
             BrowserActionPreviewEnabled = BrowserActionPreviewEnabled,
+            LocalResources = LocalResources.Normalize(),
             LocalRuntimeProfiles = LocalRuntimeProfiles,
             ChatMonitorX = ChatMonitorX,
             ChatMonitorY = ChatMonitorY,
@@ -629,6 +632,7 @@ public sealed class WorkbenchSettings
         public bool? ChatProgressPanelEnabled { get; set; }
         public bool? GoogleSearchEnabled { get; set; }
         public bool? BrowserActionPreviewEnabled { get; set; }
+        public LocalResourceSettings? LocalResources { get; set; }
         public IReadOnlyList<LocalRuntimeProfile>? LocalRuntimeProfiles { get; set; }
         public int? ChatMonitorX { get; set; }
         public int? ChatMonitorY { get; set; }
