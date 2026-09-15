@@ -22,11 +22,24 @@
                 controls:HoverScrollbarBehavior.IsEnabled="True"
                 controls:HoverScrollbarBehavior.ReserveRight="12">
               <StackPanel Spacing="8">
+                <Border Classes="rule-card">
+                  <StackPanel Spacing="8">
+                    <TextBlock Classes="settings-title" Text="Chat actions and game creation" />
+                    <TextBlock Classes="muted" Text="Type / in the composer to choose research, games, images or project coding explicitly." TextWrapping="Wrap" />
+                    <Button Content="Browse actions and examples" Command="{Binding ContextControl.ShowActionsCommand}" HorizontalAlignment="Left" />
+                    <CheckBox x:Name="AutoCheckGamesToggle" Content="Run and repair generated browser games" IsChecked="{Binding ContextControl.AutoCheckGames, Mode=TwoWay}" />
+                    <TextBlock Classes="muted" Text="Check final HTML in the offline Game Lab, collect startup/input errors and try up to two model repairs. Each version is saved. Stop cancels repair; passing these checks still requires a gameplay test." TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
                 <Border Classes="rule-card" x:Name="ResourceAdaptationCard">
                   <StackPanel Spacing="8">
                     <CheckBox x:Name="AutoAdaptModelsToggle" Content="Auto adapt to hardware" IsChecked="{Binding ContextControl.AutoAdaptLocalModels, Mode=TwoWay}" />
                     <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.HardwareSummary}" />
                     <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.ResourceModeSummary}" />
+                    <TextBlock Classes="field-label" Text="Context mode" />
+                    <ComboBox x:Name="ContextModePicker" ItemsSource="{Binding ContextControl.ContextModeOptions}" SelectedItem="{Binding ContextControl.LocalContextMode, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.ContextModeDescription}" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ContextControl.LastContextDecision}" />
                     <StackPanel Spacing="8" IsEnabled="{Binding ContextControl.AutoAdaptLocalModels}">
                       <WrapPanel>
                         <CheckBox Content="GPU layers" IsChecked="{Binding ContextControl.AutoModelGpuLayers, Mode=TwoWay}" Margin="0,0,16,0" ToolTip.Tip="Estimate a split for managed GGUF runtimes. Ollama uses its own dynamic GPU allocation." />
@@ -35,8 +48,8 @@
                       </WrapPanel>
                       <WrapPanel>
                         <StackPanel Spacing="3" Margin="0,0,16,0">
-                          <TextBlock Classes="field-label" Text="Maximum auto context" />
-                          <NumericUpDown Value="{Binding ContextControl.AutoModelMaxContext, Mode=TwoWay}" Minimum="1024" Maximum="32768" Increment="1024" Width="170" />
+                          <TextBlock Classes="field-label" Text="Adaptive / custom ceiling" />
+                          <NumericUpDown Value="{Binding ContextControl.AutoModelMaxContext, Mode=TwoWay}" Minimum="1024" Maximum="1048576" Increment="1024" Width="170" />
                         </StackPanel>
                         <StackPanel Spacing="3" Margin="0,0,16,0">
                           <TextBlock Classes="field-label" Text="RAM headroom (GiB)" />

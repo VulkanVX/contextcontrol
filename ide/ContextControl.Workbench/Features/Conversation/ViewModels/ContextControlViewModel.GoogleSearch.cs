@@ -57,7 +57,7 @@ public sealed partial class ContextControlViewModel
 
     private async Task<string> PrepareGooglePromptAsync(string modelId, string question, string prompt, bool enabled,
         ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant, ChatRequestProgressViewModel progress,
-        CancellationToken cancellationToken, int contextTokens = 4096, bool knowledgeGap = false)
+        CancellationToken cancellationToken, int contextTokens = 4096, bool knowledgeGap = false, bool forceSearch = false)
     {
         if (!enabled) return prompt;
         if (_googleBrowser is null) throw new InvalidOperationException("Google research is unavailable. Open this chat in the ContextControl desktop app, or switch Google off.");
@@ -82,7 +82,7 @@ public sealed partial class ContextControlViewModel
             token.ThrowIfCancellationRequested();
             return GoogleResearchService.PlannerText(answer);
         }
-        var result = await GoogleResearchService.ResearchAsync(question, AskModel, BrowserFor(assistant), UpdateStatus, cancellationToken, knowledgeGap);
+        var result = await GoogleResearchService.ResearchAsync(question, AskModel, BrowserFor(assistant), UpdateStatus, cancellationToken, knowledgeGap, forceSearch);
         cancellationToken.ThrowIfCancellationRequested();
         var prepared = GoogleSearchContext.AugmentPrompt(prompt, result, contextTokens);
         if (result.Search is { } search)

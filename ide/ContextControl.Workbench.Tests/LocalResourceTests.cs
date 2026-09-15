@@ -46,7 +46,7 @@ internal static partial class LocalResourceTests
         Check(Math.Abs(LocalResourcePlanner.ParseWeightGiB("1024 MiB")!.Value - 1) < 0.0001, "Binary units parse correctly.");
         Check(Math.Abs(LocalResourcePlanner.ParseWeightGiB("1 GB")!.Value - 0.9313226) < 0.0001, "Decimal GB differs from GiB.");
         var normalized = new LocalResourceSettings(MaxContextTokens: int.MaxValue, RamReserveGiB: double.NaN, VramReserveGiB: -8).Normalize();
-        Check(normalized.MaxContextTokens == 32768 && normalized.RamReserveGiB == 4 && normalized.VramReserveGiB == 0.25, "Clamp invalid settings safely.");
+        Check(normalized.MaxContextTokens == 1048576 && normalized.RamReserveGiB == 4 && normalized.VramReserveGiB == 0.25, "Clamp invalid settings safely.");
 
         var root = Path.Combine(Path.GetTempPath(), "ContextControlResourceTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);

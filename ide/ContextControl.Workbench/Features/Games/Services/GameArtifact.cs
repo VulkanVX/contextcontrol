@@ -26,8 +26,9 @@ public sealed record GameArtifact(string Title, string Html)
         cached.Artifact = Parse(message.RawText);
         return cached.Artifact;
     }
-    private static GameArtifact? Parse(string raw)
+    public static GameArtifact? Parse(string raw)
     {
+        if (raw.Length > MaxCharacters || raw.Contains("**Response incomplete.**", StringComparison.Ordinal)) return null;
         // Reasoning can contain tentative code. Never execute it as the final artifact.
         var visible = Regex.Replace(raw, @"<think>[\s\S]*?(?:</think>|$)", "", RegexOptions.IgnoreCase);
         var blocks = Fences.Matches(visible).Select(m => (Language: m.Groups["language"].Value.Trim().Split(' ')[0].ToLowerInvariant(), Code: m.Groups["code"].Value.Trim())).ToArray();

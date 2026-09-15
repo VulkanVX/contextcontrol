@@ -11,6 +11,7 @@ using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
 if (args.Contains("--game-regression")) { GameLabTests.Run(); return; }
+if (args.Contains("--actions-regression")) { await ChatActionTests.Run(); return; }
 if (args.Contains("--settings-persistence")) { await SettingsPersistenceTests.Run(); return; }
 if (args.Contains("--game-ui")) { GameLabUiTests.Run(args[Array.IndexOf(args, "--game-ui") + 1]); return; }
 if (args.Contains("--game-browser")) { var at = Array.IndexOf(args, "--game-browser"); GameLabBrowserTests.Run(args[at + 1], args.Length > at + 2 ? args[at + 2] : null); return; }

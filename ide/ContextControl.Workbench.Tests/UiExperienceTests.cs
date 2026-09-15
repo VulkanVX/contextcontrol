@@ -60,6 +60,7 @@ internal static partial class UiExperienceTests
         LiveDeliveryAndCatalog(context, workbench, root, output);
         ThinkingScroll(output);
         ResourceAdaptationUi(workbench, root, output);
+        ChatActionsUi(workbench, root, output);
         if (liveResources) ResourcePanelLive(workbench, output);
         workbench.UiFontSize = 17.5;
         workbench.IsChatMonitorEnabled = false;

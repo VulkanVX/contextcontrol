@@ -33,7 +33,7 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
             : GgufResourceMetadata.Read(Path.GetFullPath(profile.ModelPath.Trim()));
         var plan = LocalResourcePlanner.Plan(metadata, hardware,
             profile.Id == "transformers" ? settings with { AutoGpuLayers = false } : settings,
-            profile.ContextTokens, profile.GpuLayers, profile.CpuThreads, includeCapacity: true);
+            profile.ContextTokens, profile.GpuLayers, profile.CpuThreads, includeCapacity: true, runtimeContextLimit: 1048576);
         return (profile with
         {
             ContextTokens = settings.AutoContext ? plan.ContextTokens : profile.ContextTokens,
@@ -57,7 +57,7 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
         var endpoint = profile.ApiUri("models");
         if (endpoint.Scheme != "http" || endpoint.Host != "127.0.0.1")
             throw new InvalidOperationException("Managed servers need an http://127.0.0.1 endpoint. Other servers can be connected using Apply and connect.");
-        if (profile.ContextTokens is < 1024 or > 32768) throw new InvalidOperationException("Use 1,024–32,768 context tokens for a managed server.");
+        if (profile.ContextTokens is < 1024 or > 1048576) throw new InvalidOperationException("Use 1,024–1,048,576 context tokens, within the model's supported limit, for a managed server.");
         if (string.IsNullOrWhiteSpace(profile.ModelPath)) throw new InvalidOperationException("Choose a GGUF file, or enter a Transformers model folder / Hugging Face repository ID.");
         var info = new ProcessStartInfo { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         void Add(params string[] arguments) { foreach (var argument in arguments) info.ArgumentList.Add(argument); }

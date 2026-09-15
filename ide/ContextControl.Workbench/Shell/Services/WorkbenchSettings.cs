@@ -152,6 +152,7 @@ public sealed class WorkbenchSettings
     public bool ChatMonitorEnabled { get; set; } = true;
     public bool ChatProgressPanelEnabled { get; set; } = true;
     public bool GoogleSearchEnabled { get; set; } = true;
+    public bool AutoCheckGames { get; set; } = true;
     public bool BrowserActionPreviewEnabled { get; set; }
     public LocalResourceSettings LocalResources { get; set; } = new();
     public bool UseMeasuredLocalPerformance { get; set; } = true;
@@ -280,6 +281,7 @@ public sealed class WorkbenchSettings
             ChatMonitorEnabled = data.ChatMonitorEnabled ?? true,
             ChatProgressPanelEnabled = data.ChatProgressPanelEnabled ?? true,
             GoogleSearchEnabled = data.GoogleSearchEnabled ?? true,
+            AutoCheckGames = data.AutoCheckGames ?? true,
             BrowserActionPreviewEnabled = data.BrowserActionPreviewEnabled ?? false,
             LocalResources = (data.LocalResources ?? new()).Normalize(),
             UseMeasuredLocalPerformance = data.UseMeasuredLocalPerformance ?? true,
@@ -308,6 +310,7 @@ public sealed class WorkbenchSettings
             ChatMonitorEnabled = ChatMonitorEnabled,
             ChatProgressPanelEnabled = ChatProgressPanelEnabled,
             GoogleSearchEnabled = GoogleSearchEnabled,
+            AutoCheckGames = AutoCheckGames,
             BrowserActionPreviewEnabled = BrowserActionPreviewEnabled,
             LocalResources = LocalResources.Normalize(),
             UseMeasuredLocalPerformance = UseMeasuredLocalPerformance,
@@ -665,6 +668,7 @@ public sealed class WorkbenchSettings
         public bool? ChatMonitorEnabled { get; set; }
         public bool? ChatProgressPanelEnabled { get; set; }
         public bool? GoogleSearchEnabled { get; set; }
+        public bool? AutoCheckGames { get; set; }
         public bool? BrowserActionPreviewEnabled { get; set; }
         public LocalResourceSettings? LocalResources { get; set; }
         public bool? UseMeasuredLocalPerformance { get; set; }

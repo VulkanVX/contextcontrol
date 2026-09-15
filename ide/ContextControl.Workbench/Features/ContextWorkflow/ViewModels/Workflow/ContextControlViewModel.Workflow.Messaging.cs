@@ -21,6 +21,9 @@ public sealed partial class ContextControlViewModel
     private async Task SendAsync()
     {
         var currentMessage = PromptText.Trim();
+        var explicitAction = ChatActionCatalog.Parse(currentMessage).Action?.Command;
+        var explicitSearch = explicitAction == "/search";
+        if (!DispatchChatAction(ref currentMessage)) return;
         if (IsImageGenPromptMode && IsMessagePromptMode)
         {
             await SendImageGenerationAsync(currentMessage);
@@ -85,7 +88,7 @@ public sealed partial class ContextControlViewModel
                 }
             }
 
-            _ = SendLocalChatAsync(localMessage);
+            _ = SendLocalChatAsync(localMessage, explicitSearch, allowGameDetection: explicitAction is null);
             return;
         }
 
@@ -1398,11 +1401,11 @@ public sealed partial class ContextControlViewModel
         }
     }
 
-    private async Task SendLocalChatAsync(string message)
+    private async Task SendLocalChatAsync(string message, bool explicitSearch = false, bool allowGameDetection = true)
     {
         if (!IsAutopilotEnabled || IsGameCreationEnabled)
         {
-            await SendRawLocalChatAsync(message);
+            await SendRawLocalChatAsync(message, explicitSearch, allowGameDetection);
             return;
         }
 
@@ -1438,7 +1441,8 @@ public sealed partial class ContextControlViewModel
             ? BuildPendingAttachmentSnapshotForKinds("image")
             : [];
         model.RefreshAvailableMemory();
-        var requestedContextTokens = ResolveRequestedContextTokens(model, phase);
+        var requestedContextTokens = ResolveRequestedContextTokens(model, phase,
+            capsuleMessage + string.Concat(capsuleAttachments.Where(a => a.Included).Select(a => a.Text)));
         var capsule = _capsuleBuilder.Build(new ContextCapsuleBuildRequest(
             capsuleMessage,
             phase,
@@ -1598,13 +1602,13 @@ public sealed partial class ContextControlViewModel
         }
     }
 
-    private async Task SendRawLocalChatAsync(string message)
+    private async Task SendRawLocalChatAsync(string message, bool explicitSearch = false, bool allowGameDetection = true)
     {
         var targetSession = EnsureSelectedChatSession();
         var previousGame = ChatMessages.Select(GameArtifact.FromMessage).LastOrDefault(game => game is not null);
-        if (GameArtifact.RequestsNativeRuntime(message)) IsGameCreationEnabled = false;
-        else if (GameArtifact.IsCreationRequest(message)) IsGameCreationEnabled = true;
-        var creatingGame = IsGameCreationEnabled || GameArtifact.IsCreationRequest(message);
+        if (explicitSearch || GameArtifact.RequestsNativeRuntime(message)) IsGameCreationEnabled = false;
+        else if (allowGameDetection && GameArtifact.IsCreationRequest(message)) IsGameCreationEnabled = true;
+        var creatingGame = !explicitSearch && (IsGameCreationEnabled || allowGameDetection && GameArtifact.IsCreationRequest(message));
         var gamePrompt = creatingGame && !message.StartsWith("Create a playable browser game for ContextControl Game Lab.", StringComparison.Ordinal)
             ? GameArtifact.Prompt(message, previousGame) : message;
         var useGoogle = IsGoogleSearchEnabled && !creatingGame;
@@ -1640,7 +1644,7 @@ public sealed partial class ContextControlViewModel
         ProviderStatus = $"Local: {model.DisplayName}";
 
         model.RefreshAvailableMemory();
-        var requestedContextTokens = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat);
+        var requestedContextTokens = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat, gamePrompt, creatingGame);
         var chatCancellation = new CancellationTokenSource();
         var generationProgress = CreateGenerationProgress(targetSession, model.DisplayName, "raw", isCancellable: true);
         RegisterLocalChatRequest(generationProgress.Item, chatCancellation, targetSession, liveAssistant);
@@ -1652,7 +1656,9 @@ public sealed partial class ContextControlViewModel
             terminal.Report($"Requested local context window: {requestedContextTokens:N0} tokens.");
 
             var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, gamePrompt, useGoogle,
-                targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
+                targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens, forceSearch: explicitSearch);
+            requestedContextTokens = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat, preparedPrompt, creatingGame);
+            RequirePromptRoom(preparedPrompt, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
             var chatRequest = new LocalLlmRequest(
                     model.Id,
@@ -1688,6 +1694,9 @@ public sealed partial class ContextControlViewModel
 
             result = await RecoverGoogleKnowledgeAsync(message, chatRequest with { Prompt = message }, result, useGoogle,
                 targetSession, liveAssistant, generationProgress.Item, generationProgress.Progress, terminal, chatCancellation.Token);
+
+            if (creatingGame) result = await ReviewGeneratedGameAsync(result, message, model, targetSession,
+                liveAssistant, generationProgress.Item, generationProgress.Progress, terminal, chatCancellation.Token);
 
             if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Message))
             {

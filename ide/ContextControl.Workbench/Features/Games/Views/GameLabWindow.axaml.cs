@@ -15,6 +15,8 @@ public partial class GameLabWindow : Window
     private readonly List<string> _errors = [];
     private string _lastRun = "";
     private bool _polling, _running, _expanded;
+    private bool _checkDone;
+    private bool _validating;
     private int _revision;
     private Action<string>? _repair;
     public bool IsClosed { get; private set; }
@@ -40,17 +42,45 @@ public partial class GameLabWindow : Window
     }
     private void OnRun(object? sender, RoutedEventArgs e) => Run(SourceEditor.Text ?? "");
     private void OnRestart(object? sender, RoutedEventArgs e) { if (_lastRun.Length > 0) Run(_lastRun); }
-    private void Run(string html)
+    private void Run(string html, bool checkInputs = false)
     {
         try
         {
-            var document = GamePreviewDocument.Build(html);
+            var document = GamePreviewDocument.Build(html, checkInputs);
+            _checkDone = false;
             _errors.Clear(); ConsoleText.Text = "Starting game…"; ConsoleTitle.Text = "CONSOLE · no errors reported";
             _lastRun = html; _running = true; StateLabel.Text = "STARTING";
             RevisionLabel.Text = $"Run {++_revision} · offline preview";
             GameBrowser.NavigateHtml(document); _poll.Start();
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { AddError(ex.Message); }
+    }
+    public async Task<GameValidationResult> ValidateAsync(GameArtifact game, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(game.Html, @"<script\b[^>]*>\s*[^\s<]", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return new(true, ["The game has no inline JavaScript logic. Include a complete playable implementation."], "No game logic was found.");
+        if (_validating) throw new InvalidOperationException("A game check is already running in this window.");
+        _validating = true;
+        SourceEditor.Text = game.Html; GameTitle.Text = game.Title;
+        // Only the browser startup/check has a bounded observation window. Model inference has no deadline.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Run(game.Html, checkInputs: true);
+        var revision = _revision;
+        try
+        {
+            while (!_checkDone && !IsClosed && _running && revision == _revision && GameBrowser.InitializationError is null && clock.Elapsed < TimeSpan.FromSeconds(30))
+                await Task.Delay(100, token);
+            token.ThrowIfCancellationRequested();
+            if (IsClosed || !_running || revision != _revision) return new(false, [], "Game check interrupted; no pass was recorded.");
+            if (!_checkDone) return new(false, _errors.ToArray(), "Browser check could not finish; the preview may be unavailable or unresponsive. No pass was recorded.");
+            return new(true, _errors.ToArray(), _errors.Count == 0 ? "Startup and synthetic input/restart checks completed." : "The browser reported game errors.");
+        }
+        finally
+        {
+            _validating = false;
+            if (!IsClosed && revision == _revision) OnStop(null, new RoutedEventArgs());
+        }
     }
     private void OnStop(object? sender, RoutedEventArgs e)
     {
@@ -116,7 +146,8 @@ public partial class GameLabWindow : Window
             using var events = JsonDocument.Parse(json);
             foreach (var item in events.RootElement.EnumerateArray())
             {
-                if (item.GetProperty("kind").GetString() == "game-error") AddError(item.GetProperty("text").GetString() ?? "Game error");
+                if (item.GetProperty("kind").GetString() == "game-check-done") _checkDone = true;
+                else if (item.GetProperty("kind").GetString() == "game-error") AddError(item.GetProperty("text").GetString() ?? "Game error");
                 else if (item.GetProperty("kind").GetString() == "game-stats") RevisionLabel.Text = $"Run {_revision} · {item.GetProperty("text").GetString()} preview FPS";
                 else if (_errors.Count == 0) { StateLabel.Text = "PLAYING"; ConsoleText.Text = "Game loaded. Click the stage to play. No runtime errors reported."; }
             }

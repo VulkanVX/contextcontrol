@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:s="clr-namespace:ContextControl.Workbench.Services" xmlns:c="clr-namespace:ContextControl.Workbench.Controls"
+        x:Class="ContextControl.Workbench.Views.ActionLibraryWindow" Title="ContextControl · Actions"
+        Width="760" Height="700" MinWidth="480" MinHeight="400" Background="{DynamicResource AppBackgroundBrush}">
+  <Grid RowDefinitions="Auto,*" Background="{DynamicResource AppBackgroundBrush}" Margin="24" RowSpacing="16">
+    <StackPanel Spacing="8">
+      <TextBlock Text="Actions" FontSize="26" FontWeight="SemiBold" />
+      <TextBlock Text="Choose what you want to do. Type / in the composer, or pick an action below and add your request. Send starts it." TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" />
+    </StackPanel>
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl x:Name="ActionItems">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="s:ChatAction">
+            <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,10">
+              <Grid ColumnDefinitions="24,*,Auto" ColumnSpacing="12">
+                <c:WorkspaceIcon IconKey="{Binding Icon}" Width="20" Height="20" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Spacing="7">
+                  <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBlock Text="{Binding Example}" TextWrapping="Wrap" FontFamily="Cascadia Mono,Consolas" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+                </StackPanel>
+                <Button Grid.Column="2" Content="Use" VerticalAlignment="Top" Click="OnUse" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</Window>

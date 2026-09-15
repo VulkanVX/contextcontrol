@@ -7,6 +7,55 @@ namespace ContextControl.Workbench.ViewModels;
 
 public sealed partial class ContextControlViewModel
 {
+    public bool AutoCheckGames
+    {
+        get => _settings.AutoCheckGames;
+        set { if (_settings.AutoCheckGames == value) return; _settings.AutoCheckGames = value; OnPropertyChanged(); SaveSettingsQuietly(); }
+    }
+    private async Task<LocalLlmChatResult> ReviewGeneratedGameAsync(LocalLlmChatResult result, string request,
+        LocalLlmModelViewModel model, ChatSessionViewModel session, LocalLlmChatMessageViewModel assistant,
+        ChatRequestProgressViewModel progress, IProgress<LocalLlmGenerationProgress> downstream,
+        IProgress<string> terminal, CancellationToken token)
+    {
+        if (!AutoCheckGames || !result.Succeeded && !result.OutputLimited) return result;
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var lab = new GameLabWindow { ShowActivated = false };
+        var directory = Path.Combine(_settings.ContextControlRoot, ".ccWorkbench.generated-projects",
+            "game-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            if (owner is null) lab.Show(); else lab.Show(owner);
+            var review = await GameCreationReview.RunAsync(result, request, directory,
+                (game, cancellation) => lab.ValidateAsync(game, cancellation), async (prompt, cancellation) =>
+                {
+                    assistant.UpdateContent(""); assistant.IsAwaitingAnswer = true; assistant.LiveStage = "Repairing";
+                    model.RefreshAvailableMemory();
+                    var context = ResolveRequestedContextTokens(model, ContextCapsulePhase.Chat, prompt, game: true);
+                    RequirePromptRoom(prompt, context);
+                    return await _localLlmService.SendChatAsync(new(model.Id, prompt, "game repair", [], context,
+                        Think: ShouldRequestLocalThinking(model)), CreateLiveAssistantProgress(assistant, downstream), terminal, cancellation);
+                }, status =>
+                {
+                    progress.Status = status; assistant.IsAwaitingAnswer = true;
+                    assistant.LiveStage = status.StartsWith("Repairing") ? "Repairing" : "Checking";
+                    RefreshLiveAssistantMessage(session, assistant); terminal.Report(status);
+                }, token);
+            terminal.Report("Game versions and checks saved: " + directory);
+            if (!token.IsCancellationRequested && !lab.IsClosed && GameArtifact.Parse(review.Response.Message ?? "") is { } game)
+            {
+                lab.LoadGame(game, prompt => { if (ChatSessions.Contains(session)) SelectChatSession(session); PrepareGameRepair(prompt); owner?.Activate(); });
+                lab.Activate();
+            }
+            else if (!lab.IsClosed) lab.Close();
+            return review.Response;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or OperationCanceledException)
+        {
+            if (!lab.IsClosed) lab.Close();
+            terminal.Report("Game check unavailable: " + ex.Message);
+            return result with { Message = (result.Message ?? "") + "\n\n**Game not checked.** " + ex.Message };
+        }
+    }
     private readonly Dictionary<string, bool> _gameModes = [];
     private GameLabWindow? _gameLab;
     public bool IsGameCreationEnabled

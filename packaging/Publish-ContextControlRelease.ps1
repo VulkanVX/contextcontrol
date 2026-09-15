@@ -176,6 +176,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "Google research regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --game-regression
     if ($LASTEXITCODE -ne 0) { throw "Game Lab regression failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --actions-regression
+    if ($LASTEXITCODE -ne 0) { throw "Chat actions and context regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --game-ui (Join-Path $releaseRoot "game-ui")
     if ($LASTEXITCODE -ne 0) { throw "Game Lab UI regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --local-chat-regression

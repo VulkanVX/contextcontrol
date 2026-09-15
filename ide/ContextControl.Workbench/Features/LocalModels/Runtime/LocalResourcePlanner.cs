@@ -6,11 +6,18 @@ namespace ContextControl.Workbench.Services;
 /// <summary>Saved preferences only. Effective values never replace manual runtime settings.</summary>
 public sealed record LocalResourceSettings(bool Enabled = false, bool AutoGpuLayers = true,
     bool AutoContext = true, bool AutoThreads = true, int MaxContextTokens = 8192,
-    double RamReserveGiB = 4, double VramReserveGiB = 0.75)
+    double RamReserveGiB = 4, double VramReserveGiB = 0.75, string ContextMode = "Custom")
 {
+    public static IReadOnlyList<string> ContextModes { get; } = ["Adaptive", "Fast · 8K", "Balanced · 16K", "Long · 32K", "Maximum fit", "Custom"];
+    public int ContextCeiling => ContextMode switch
+    {
+        "Fast · 8K" => 8192, "Balanced · 16K" => 16384, "Long · 32K" => 32768,
+        "Maximum fit" => 1048576, _ => MaxContextTokens
+    };
     public LocalResourceSettings Normalize() => this with
     {
-        MaxContextTokens = Math.Clamp(MaxContextTokens, 1024, 32768),
+        MaxContextTokens = Math.Clamp(MaxContextTokens, 1024, 1048576),
+        ContextMode = ContextModes.Contains(ContextMode) ? ContextMode : "Custom",
         RamReserveGiB = double.IsFinite(RamReserveGiB) ? Math.Clamp(RamReserveGiB, 1, 64) : 4,
         VramReserveGiB = double.IsFinite(VramReserveGiB) ? Math.Clamp(VramReserveGiB, 0.25, 32) : 0.75
     };
@@ -73,9 +80,16 @@ public static class LocalResourcePlanner
         LocalResourceSettings preferences, int manualContext = 4096, int manualGpuLayers = 0, int manualThreads = 0,
         bool includeCapacity = false, int runtimeContextLimit = 32768)
     {
-        var plan = PlanCore(model, hardware, preferences, manualContext, manualGpuLayers, manualThreads);
+        LocalContextCapacity? maximum = null;
+        var effective = preferences;
+        if (preferences is { Enabled: true, AutoContext: true, ContextMode: "Maximum fit" })
+        {
+            maximum = EstimateMaximumContext(model, hardware, preferences, model.MaxContext ?? 32768, manualGpuLayers, manualThreads);
+            effective = preferences with { ContextMode = "Custom", MaxContextTokens = Math.Max(1024, maximum.Tokens ?? 2048) };
+        }
+        var plan = PlanCore(model, hardware, effective, manualContext, manualGpuLayers, manualThreads);
         if (!includeCapacity) return plan;
-        var capacity = EstimateMaximumContext(model, hardware, preferences, runtimeContextLimit, manualGpuLayers, manualThreads);
+        var capacity = maximum ?? EstimateMaximumContext(model, hardware, preferences, runtimeContextLimit, manualGpuLayers, manualThreads);
         return plan with { MaximumContextTokens = capacity.Tokens, MaximumContextDetail = capacity.Detail };
     }
 
@@ -108,7 +122,7 @@ public static class LocalResourcePlanner
         var settings = preferences.Normalize();
         var threads = settings.Enabled && settings.AutoThreads ? Threads(hardware) : Math.Clamp(manualThreads, 0, 1024);
         var automaticContext = settings.Enabled && settings.AutoContext;
-        var ceiling = automaticContext ? settings.MaxContextTokens : Math.Clamp(manualContext, 1024, 1048576);
+        var ceiling = automaticContext ? settings.ContextCeiling : Math.Clamp(manualContext, 1024, 1048576);
         if (model.MaxContext is > 0) ceiling = Math.Min(ceiling, model.MaxContext.Value);
         var context = Math.Max(1, ceiling);
         if (model.WeightGiB is not > 0)

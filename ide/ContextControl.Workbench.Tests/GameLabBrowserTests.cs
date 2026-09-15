@@ -92,10 +92,30 @@ internal sealed class GameLabTestApp : Application
                 Check(repair?.Contains("fixture repair check") == true && repair.Contains("throw new Error('fixture repair check')"), "Repair draft includes the errors and exact source.");
                 Check(!window.IsVisible, "Repair returns the user to chat and stops the preview.");
                 window.Show();
+                var validation = await window.ValidateAsync(new("Checked fixture", GameLabTests.Fixture), default);
+                Check(validation.Passed, "The automatic startup/input check accepts a working game: " + string.Join(";", validation.Errors));
+                var broken = GameLabTests.Fixture.Replace("reset();</script>", "reset();throw new Error('automatic initialization error');</script>");
+                validation = await window.ValidateAsync(new("Broken game", broken), default);
+                Check(!validation.Passed && validation.Completed && validation.Errors.Any(e => e.Contains("automatic initialization error")), "Automatic checking catches final-code initialization errors.");
+                var attempts = 0;
+                var reviewed = await GameCreationReview.RunAsync(new(true, "done", "```html\n" + broken + "\n```"), "Snake", Path.Combine(GameLabBrowserTests.Output, "automatic-review"),
+                    (game, token) => window.ValidateAsync(game, token), (prompt, token) => { attempts++; return Task.FromResult(new LocalLlmChatResult(true, "fixture repair", "```html\n" + GameLabTests.Fixture + "\n```")); }, _ => { }, default);
+                Check(reviewed.Validation.Passed && attempts == 1, "The repair coordinator reruns corrected code through the real browser.");
+                var badInput = GameLabTests.Fixture.Replace("reset();</script>", "reset();addEventListener('keydown',()=>{throw new Error('input handler broken')});</script>");
+                validation = await window.ValidateAsync(new("Broken input", badInput), default);
+                Check(validation.Errors.Any(e => e.Contains("input handler broken")), "Synthetic input catches handler errors after successful startup.");
                 if (GameLabBrowserTests.GamePath is { } path)
                 {
                     frame = null;
                     var html = await File.ReadAllTextAsync(path);
+                    var original = Path.Combine(Path.GetDirectoryName(path)!, "qwen-original.html");
+                    if (File.Exists(original))
+                    {
+                        validation = await window.ValidateAsync(new("Original Qwen Snake", await File.ReadAllTextAsync(original)), default);
+                        Check(validation.Completed && !validation.Passed, "The automatic checker catches the original Qwen Snake bug.");
+                    }
+                    validation = await window.ValidateAsync(new("Repaired Qwen Snake", html), default);
+                    Check(validation.Passed, "The repaired Qwen Snake survives automatic checks: " + string.Join(";", validation.Errors));
                     window.LoadGame(new("Generated Snake", html), _ => { });
                     await Until(() => state.Text is "PLAYING" or "CHECK ERRORS");
                     await Task.Delay(1500);

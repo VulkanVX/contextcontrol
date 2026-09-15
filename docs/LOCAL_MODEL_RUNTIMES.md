@@ -1,8 +1,29 @@
 # Local models and runtimes
 
+## Context modes and actions
+
+Choose a context mode beside **/ Actions** in the composer, or in **Settings → LLMs**:
+
+| Mode | Allocation policy |
+| --- | --- |
+| Adaptive | Grows in buckets with prepared input and preferred thinking/output reserves, up to the Adaptive/custom ceiling. Short requests use less context. |
+| Fast / Balanced / Long | Requests up to 8K / 16K / 32K; hardware adaptation may lower the result. These are capacity presets, not measured speed guarantees. |
+| Maximum fit | Searches estimated available memory in 1K steps up to the known model limit; uses a conservative 32K search ceiling when that limit is unknown. |
+| Custom | Uses the entered ceiling, up to 1,048,576 tokens, reduced by hardware/model constraints when adaptation is enabled. |
+
+Selecting a different mode enables automatic context and hardware adaptation. The master Auto switch and individual Context size switch can still restore manual behavior. Existing preferences are preserved; fresh-install settings use Adaptive with a 32K ceiling. GPU and CPU options retain their own switches.
+
+Context covers input, thinking and generated output together. Adaptive uses a conservative character-based estimate (not the exact model tokenizer), adds room for the answer and reasoning, and reserves more for game code. The composer displays the selected request budget and estimated remaining space. A prompt that cannot leave even minimal answer room is rejected before sending. Workflow exporters may intentionally compact source context. Images have additional model-dependent token costs not represented by this text estimate.
+
+The mode updates Ollama on the next request. Managed servers use the selected ceiling on their next Start; requests may budget less, but changing their live allocation requires a restart. External servers remain controlled by their own application. Hardware filters and allocation previews follow the same mode ceiling. Memory fit is an estimate, not proof of runtime support or stability. Saved speed tuning applies only when the exact context and other measured conditions match.
+
+See [Chat actions](CHAT_ACTIONS.md) for explicit Google research, game creation, images and project coding.
+
 ## Game Lab and long generations
 
 Turn on **Create game** in the Local composer, or ask it to create a browser game. Completed HTML games gain a **Game Lab** button. The lab supports inline HTML/CSS/JavaScript and simple answers split into HTML, CSS and JavaScript blocks. It provides desktop/mobile previews, editable source, Run/Restart/Stop, screenshots and an error console. **Improve / fix with model** prepares a draft in the original chat for review; it does not automatically send it. Other languages and engine projects use Create Project / file export.
+
+From 0.6.0, `/game` explicitly selects this mode. Automatic final-code checking runs startup/input tests, attempts up to two model repairs on observed errors, and reruns corrections. Versions and validation reports are preserved. Disable automatic checking in Settings → LLMs. A passed smoke check still requires a gameplay test.
 
 Local Ollama and compatible chat streams have no total or idle-duration deadline. Loading, thinking and generation can continue as long as needed. Stop remains available, runtime errors are shown, and partial responses are kept but marked incomplete. Managed runtimes also wait for readiness while their owned process is alive. This does not remove model context/output limits or change a server's own limits.
 

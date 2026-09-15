@@ -36,6 +36,17 @@
   "LocalLlmRequirementFilter": "Any requirement",
   "PromptModeKey": "context",
   "IsAutopilotEnabled": false,
+  "AutoCheckGames": true,
+  "LocalResources": {
+    "Enabled": true,
+    "AutoGpuLayers": true,
+    "AutoContext": true,
+    "AutoThreads": true,
+    "MaxContextTokens": 32768,
+    "RamReserveGiB": 4,
+    "VramReserveGiB": 0.75,
+    "ContextMode": "Adaptive"
+  },
   "PromptBarOpenByDefault": true,
   "WorkspaceModeKey": "llms",
   "ExternalBrowserKey": "edge",

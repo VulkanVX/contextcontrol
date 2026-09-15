@@ -38,6 +38,11 @@ internal static class LocalRuntimeTests
             Check(!request.RootElement.GetProperty("chat_template_kwargs").GetProperty("enable_thinking").GetBoolean(), "Explicit thinking-off survives compatible transport");
             Check(request.RootElement.GetProperty("max_tokens").GetInt32() == 128, "Respect output budget");
         }
+        service.ConfigureRuntimes([new("test", "Test", "http://127.0.0.1:18111/v1", ContextTokens: 16384)]);
+        await service.DiscoverRuntimeModelsAsync(default);
+        await service.SendChatAsync(Request(models[0].Id) with { ContextWindowTokens = 8192, MaxOutputTokens = null }, null, null);
+        using (var request = JsonDocument.Parse(handler.Bodies.Last()))
+            Check(request.RootElement.GetProperty("max_tokens").GetInt32() is > 4096 and < 8192, "Compatible output uses available request space without the old hidden 4K cutoff.");
         foreach (var data in new[] { "", Event("incomplete"), "data: broken\n\n", "data: {\"error\":{\"message\":\"OOM\"}}\n\n", Event("", "stop"), Event("<THINK>no answer</THINK>", "stop") })
         {
             handler.Response = data;

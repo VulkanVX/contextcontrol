@@ -106,7 +106,7 @@ public sealed partial class ContextControlViewModel
             if (plan is not null)
             {
                 var capacity = LocalResourcePlanner.EstimateMaximumContext(selected.MemoryEstimate, selected.PlanningHardware,
-                    settings with { Enabled = true }, selected.UsesOllamaPull ? 1048576 : 32768);
+                    settings with { Enabled = true }, selected.IsConnectedRuntime ? Math.Max(1024, selected.AdvertisedContextTokens) : 1048576);
                 ResourceEstimateSummary = $"With adaptation: {plan.Label} · RAM {GiB(plan.RamGiB)} + VRAM {GiB(plan.VramGiB)} · "
                     + $"{plan.ContextTokens:N0} context target · {plan.CpuThreads} CPU threads. "
                     + (report.Running && report.TotalBytes is not null ? "Includes this model's reclaimable allocation. " : "")

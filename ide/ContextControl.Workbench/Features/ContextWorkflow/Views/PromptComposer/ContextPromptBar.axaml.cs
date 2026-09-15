@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ContextControl.Workbench.Services;
 
 namespace ContextControl.Workbench.Views.MainWindowParts;
 
@@ -89,9 +90,40 @@ public sealed partial class ContextPromptBar : UserControl
 
     private void OnPromptTextBoxLostFocus(object? sender, RoutedEventArgs e) => OwnerWindow?.OnPromptTextBoxLostFocus(sender, e);
 
-    private void OnPromptTextBoxKeyDown(object? sender, KeyEventArgs e) => OwnerWindow?.OnPromptTextBoxKeyDown(sender, e);
+    private void OnPromptTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (ActionPopup.IsOpen)
+        {
+            if (e.Key == Key.Escape) { ActionPopup.IsOpen = false; e.Handled = true; return; }
+            if (e.Key is Key.Up or Key.Down)
+            {
+                SlashActions.SelectedIndex = Math.Clamp(SlashActions.SelectedIndex + (e.Key == Key.Down ? 1 : -1), 0, SlashActions.ItemCount - 1);
+                e.Handled = true; return;
+            }
+            if (e.Key is Key.Tab or Key.Enter) { InsertSlashAction(); e.Handled = true; return; }
+        }
+        OwnerWindow?.OnPromptTextBoxKeyDown(sender, e);
+    }
 
-    private void OnPromptTextBoxTextChanged(object? sender, TextChangedEventArgs e) => OwnerWindow?.OnPromptTextBoxTextChanged(sender, e);
+    private void OnPromptTextBoxTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        OwnerWindow?.OnPromptTextBoxTextChanged(sender, e);
+        if (ActionPopup is null || SlashActions is null) return;
+        var text = ContextPromptTextBox.Text ?? "";
+        var matches = text.StartsWith('/') && !text.Any(char.IsWhiteSpace) ? ChatActionCatalog.Match(text) : [];
+        SlashActions.ItemsSource = matches;
+        SlashActions.SelectedIndex = matches.Count > 0 ? 0 : -1;
+        ActionPopup.IsOpen = ContextPromptTextBox.IsFocused && matches.Count > 0;
+    }
+    private void OnSlashActionTapped(object? sender, TappedEventArgs e) => InsertSlashAction();
+    private void InsertSlashAction()
+    {
+        if (SlashActions.SelectedItem is not ChatAction action) return;
+        ActionPopup.IsOpen = false;
+        ContextPromptTextBox.Text = action.Command + " ";
+        ContextPromptTextBox.CaretIndex = ContextPromptTextBox.Text.Length;
+        ContextPromptTextBox.Focus();
+    }
 
     private void OnAttachmentRowTapped(object? sender, TappedEventArgs e) => OwnerWindow?.OnAttachmentRowTapped(sender, e);
 

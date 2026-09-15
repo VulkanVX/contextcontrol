@@ -102,13 +102,15 @@ public sealed partial class LocalLlmService
                 parts.AddRange(encoded.Select(value => (object)new { type = "image_url", image_url = new { url = "data:" + ImageMimeType(value) + ";base64," + value } }));
                 userContent = parts;
             }
+            var contextBudget = Math.Min(profile.ContextTokens, request.ContextWindowTokens ?? profile.ContextTokens);
+            var outputRoom = Math.Max(1, contextBudget - (int)Math.Ceiling(request.Prompt.Length / 3d) - 256);
             var payload = new Dictionary<string, object?>
             {
                 ["model"] = binding.ModelId,
                 ["messages"] = new[] { new { role = "user", content = userContent } },
                 ["stream"] = true,
                 ["stream_options"] = new { include_usage = true },
-                ["max_tokens"] = request.MaxOutputTokens is > 0 ? request.MaxOutputTokens.Value : Math.Clamp(profile.ContextTokens / 3, 256, 4096)
+                ["max_tokens"] = request.MaxOutputTokens is > 0 ? Math.Min(request.MaxOutputTokens.Value, outputRoom) : outputRoom
             };
             if (request.Think is { } think) payload["chat_template_kwargs"] = new { enable_thinking = think };
             // No wall-clock deadline: CPU/offloaded models can remain productive for hours.

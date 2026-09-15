@@ -35,7 +35,7 @@ public sealed partial class ContextControlViewModel
             ?? InstalledLocalModels.FirstOrDefault();
     }
 
-    private static int ResolveRequestedContextTokens(LocalLlmModelViewModel? model, ContextCapsulePhase phase)
+    private int ResolveRequestedContextTokens(LocalLlmModelViewModel? model, ContextCapsulePhase phase, string? prompt = null, bool game = false)
     {
         if (model is null)
         {
@@ -45,6 +45,14 @@ public sealed partial class ContextControlViewModel
         var comfortable = ContextCapsuleBuilder.EstimateContextTokens(
             model.ComfortableContext,
             ContextCapsuleBuilder.DefaultComfortableContextTokens);
+        if (prompt is not null)
+        {
+            var decision = LocalContextBudget.Choose(_settings.LocalResources, model.MemoryEstimate,
+                model.PlanningHardware, comfortable, prompt, ShouldRequestLocalThinking(model), game,
+                model.SupportsResourceAdaptation, model.IsConnectedRuntime ? model.AdvertisedContextTokens : null);
+            LastContextDecision = decision.Detail;
+            return decision.Tokens;
+        }
         if (phase == ContextCapsulePhase.Chat)
         {
             return comfortable;
@@ -84,6 +92,13 @@ public sealed partial class ContextControlViewModel
         }
 
         return results;
+    }
+
+    private static void RequirePromptRoom(string prompt, int context)
+    {
+        var estimate = (long)Math.Ceiling(prompt.Length / 3d) + 256;
+        if (estimate + 1024 > context)
+            throw new InvalidOperationException($"This prompt needs about {estimate:N0} input tokens plus room for an answer, but the context budget is {context:N0}. Choose a larger context mode/ceiling or shorten the prompt. No truncated request was sent.");
     }
 
     private static ContextControlAttachmentViewModel[] BuildSentAttachmentSnapshot(IEnumerable<ContextCapsuleAttachment> attachments)

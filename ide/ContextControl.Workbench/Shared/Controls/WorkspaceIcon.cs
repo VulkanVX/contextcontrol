@@ -15,6 +15,9 @@ public sealed class WorkspaceIcon : Control
     private static readonly IReadOnlyDictionary<string, Geometry> Shapes = new Dictionary<string, string>
     {
         ["code"] = "M8 6 L2 12 8 18 M16 6 L22 12 16 18 M14 3 L10 21",
+        ["game"] = "M7 7 H17 Q20 7 21 11 L22 17 Q22 20 19 19 L16 16 H8 L5 19 Q2 20 2 17 L3 11 Q4 7 7 7 Z M6 10 V14 M4 12 H8 M16 11 H17 M19 13 H20",
+        ["image"] = "M3 4 H21 V20 H3 Z M3 17 L9 10 14 16 17 12 21 17 M17 7 H18 V8 H17 Z",
+        ["list"] = "M8 5 H21 M8 12 H21 M8 19 H21 M3 5 H4 M3 12 H4 M3 19 H4",
         ["model-change"] = "M4 7 H20 M15 2 L20 7 15 12 M20 17 H4 M9 12 L4 17 9 22",
         ["chat"] = "M5 4 H19 Q21 4 21 6 V15 Q21 17 19 17 H10 L5 21 V17 Q3 17 3 15 V6 Q3 4 5 4 Z M7 9 H17 M7 13 H14",
         ["graph"] = "M5 5 H9 V9 H5 Z M16 3 H20 V7 H16 Z M15 16 H19 V20 H15 Z M4 16 H8 V20 H4 Z M9 7 L16 5 M8 9 L15 16 M6 9 V16",

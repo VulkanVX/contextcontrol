@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
+    xmlns:s="clr-namespace:ContextControl.Workbench.Services"
 >
             <Border
                 x:Name="PromptBarRoot"
@@ -208,6 +209,10 @@
   
                     <StackPanel Grid.Row="1" Spacing="3">
                       <WrapPanel Orientation="Horizontal">
+                      <Button Classes="cc-prompt-mode" Content="/ Actions" Margin="0,0,6,0" Command="{Binding ContextControl.ShowActionsCommand}" ToolTip.Tip="Browse actions and examples. Type / for the quick menu." />
+                      <ComboBox x:Name="ComposerContextMode" Classes="cc-local-model-picker" Width="145" Margin="0,0,6,0"
+                                IsVisible="{Binding ContextControl.IsLocalPromptMode}" ItemsSource="{Binding ContextControl.ContextModeOptions}"
+                                SelectedItem="{Binding ContextControl.LocalContextMode, Mode=TwoWay}" ToolTip.Tip="{Binding ContextControl.ContextModeDescription}" />
                       <Button Classes="cc-prompt-mode" Margin="0,0,6,0" HorizontalAlignment="Left"
                               IsVisible="{Binding ContextControl.IsLocalPromptMode}" Classes.active="{Binding ContextControl.IsGameCreationEnabled}"
                               Content="{Binding ContextControl.GameCreationLabel}" Command="{Binding ContextControl.ToggleGameCreationCommand}"
@@ -219,6 +224,8 @@
                               ToolTip.Tip="{Binding ContextControl.GoogleSearchToolTip}"
                               Command="{Binding ContextControl.ToggleGoogleSearchCommand}" />
                       </WrapPanel>
+                      <TextBlock Classes="cc-prompt-meta" Text="{Binding ContextControl.LastContextDecision}" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding ContextControl.LastContextDecision}" IsVisible="{Binding ContextControl.IsLocalPromptMode}" />
                       <Border Classes="cc-transfer-progress" IsVisible="{Binding ContextControl.IsCodexPromptAuthBlocked}">
                         <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                           <StackPanel>
@@ -301,6 +308,23 @@
                         controls:HoverScrollbarBehavior.IsEnabled="True"
                         controls:HoverScrollbarBehavior.ReserveRight="12"
                         Text="{Binding ContextControl.PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Popup x:Name="ActionPopup" PlacementTarget="{Binding #ContextPromptTextBox}" Placement="TopEdgeAlignedLeft" IsLightDismissEnabled="True">
+                      <Border Background="#182234" BorderBrush="#547895" BorderThickness="1" CornerRadius="10" Padding="8" Width="550">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="ACTIONS · ↑ ↓ to choose · Tab / Enter to insert" Foreground="#C9DAEA" FontSize="12" />
+                          <ListBox x:Name="SlashActions" MaxHeight="260" Background="Transparent" Tapped="OnSlashActionTapped">
+                            <ListBox.ItemTemplate>
+                              <DataTemplate x:DataType="s:ChatAction">
+                                <StackPanel Spacing="3" Margin="4">
+                                  <TextBlock Text="{Binding Label}" Foreground="#EAF5FF" FontWeight="SemiBold" />
+                                  <TextBlock Text="{Binding Description}" Foreground="#A5B8CC" TextWrapping="Wrap" FontSize="12" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ListBox.ItemTemplate>
+                          </ListBox>
+                        </StackPanel>
+                      </Border>
+                    </Popup>
   
                     <TextBox
                         Grid.Row="2"
