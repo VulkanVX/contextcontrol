@@ -32,6 +32,15 @@ public partial class LocalResourceStatusPanel : UserControl
         base.OnDetachedFromVisualTree(e);
     }
     private void OnRefreshClick(object? sender, RoutedEventArgs e) => Refresh(true);
+    private async void OnTuneClick(object? sender, RoutedEventArgs e)
+    {
+        if (_lifetime is not null && DataContext is WorkbenchViewModel vm)
+            await vm.ContextControl.TuneSelectedModelAsync(_lifetime.Token);
+    }
+    private void OnCancelTuneClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is WorkbenchViewModel vm) vm.ContextControl.CancelPerformanceTuning();
+    }
     private void Refresh(bool force)
     {
         if (_lifetime is not null && IsEffectivelyVisible && TopLevel.GetTopLevel(this) is not Window { WindowState: WindowState.Minimized }

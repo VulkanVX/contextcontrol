@@ -4,7 +4,7 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.5.5 fixes hardware filtering across the full model catalog and adds live resource readings: available RAM/VRAM, reported model allocation, active context and estimated maximum context. RAM offload fits are included, manual settings are preserved, and model previews do not download weights. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.5.5.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.5.6 adds measured speed tuning for installed local Ollama chat models. It compares CPU threads and supported speculative draft lengths, verifies improvements on two prompts, and applies saved settings only when the model and runtime allocation match. Chats take priority, manual controls are preserved, and tuning never downloads weights. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.5.6.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
 
 ## Install On Windows
 

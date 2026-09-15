@@ -57,6 +57,7 @@ public sealed partial class ContextControlViewModel
         bool isCancellable = false)
     {
         IsPromptOpen = true;
+        CancelPerformanceTuning();
         session.IsGenerating = true;
         var item = new ChatRequestProgressViewModel(session.Id, $"{phase} with {modelName}", isCancellable);
         _generationSessions[item] = session;
@@ -428,6 +429,7 @@ public sealed partial class ContextControlViewModel
         CancellationTokenSource? cancellationSource = null,
         bool revealTerminal = true)
     {
+        CancelPerformanceTuning();
         if (revealTerminal)
         {
             IsPromptOpen = true;

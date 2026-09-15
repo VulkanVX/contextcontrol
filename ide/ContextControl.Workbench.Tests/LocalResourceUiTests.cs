@@ -78,6 +78,16 @@ internal static partial class UiExperienceTests
             "Preview any model without changing the active chat model.");
         Check(resourcePanel.FindControl<TextBlock>("ActualAllocation")!.Text == context.ResourceAllocationSummary,
             "Runtime allocation status is bound in settings.");
+        var measuredToggle = resourcePanel.FindControl<CheckBox>("MeasuredPerformanceToggle")!;
+        measuredToggle.IsChecked = false;
+        Dispatcher.UIThread.RunJobs();
+        Check(!context.UseMeasuredLocalPerformance && SpinWait.SpinUntil(() => !WorkbenchSettings.Load(root).UseMeasuredLocalPerformance, TimeSpan.FromSeconds(3)),
+            "Measured performance opt-out persists through the actual settings control.");
+        Check(resourcePanel.FindControl<TextBlock>("PerformanceSummary")!.Text == context.SavedPerformanceSummary,
+            "The performance panel follows the selected resource model.");
+        context.TuneSelectedModelAsync(default).GetAwaiter().GetResult();
+        Check(!context.IsPerformanceTuning && context.PerformanceStatus.Contains("fully installed"),
+            "The tune button cannot download or benchmark a catalog-only model.");
         context.AutoAdaptLocalModels = before;
         window.Close();
     }

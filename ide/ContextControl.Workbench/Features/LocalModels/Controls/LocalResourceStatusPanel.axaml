@@ -17,5 +17,18 @@
     <TextBlock x:Name="ActualAllocation" Text="{Binding ContextControl.ResourceAllocationSummary}" TextWrapping="Wrap" />
     <TextBlock Classes="muted" Text="{Binding ContextControl.ResourceEstimateSummary}" TextWrapping="Wrap" />
     <TextBlock Classes="muted" x:Name="ContextCapacity" Text="{Binding ContextControl.ResourceContextSummary}" TextWrapping="Wrap" />
+    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PanelBorderBrush}" Padding="0,8,0,0" Margin="0,4,0,0">
+      <StackPanel Spacing="5">
+        <WrapPanel Orientation="Horizontal">
+          <CheckBox x:Name="MeasuredPerformanceToggle" Content="Use measured speed settings" IsChecked="{Binding ContextControl.UseMeasuredLocalPerformance, Mode=TwoWay}" Margin="0,0,12,0" />
+          <Button x:Name="TuneModelButton" Classes="rule-mini" Content="Tune speed" Click="OnTuneClick" Margin="0,0,6,0"
+              ToolTip.Tip="Compare CPU threads and supported draft lengths on short test prompts. Up to 15 minutes; real chats take priority." />
+          <Button Classes="rule-mini" Content="Cancel" Click="OnCancelTuneClick" IsVisible="{Binding ContextControl.IsPerformanceTuning}" />
+        </WrapPanel>
+        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding ContextControl.IsPerformanceTuning}" />
+        <TextBlock x:Name="PerformanceSummary" Classes="muted" Text="{Binding ContextControl.SavedPerformanceSummary}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding ContextControl.PerformanceStatus}" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
   </StackPanel>
 </UserControl>

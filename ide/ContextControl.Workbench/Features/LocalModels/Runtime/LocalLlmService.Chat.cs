@@ -49,6 +49,7 @@ public sealed partial class LocalLlmService
         IProgress<string>? terminal,
         CancellationToken cancellationToken = default)
     {
+        using var activity = LocalPerformanceActivity.Chat();
         var result = await SendBackendChatAsync(request, progress, terminal, cancellationToken).ConfigureAwait(false);
         // Some reasoning models exhaust their context before producing any answer.
         // Retry once with explicit thinking disabled, retaining the original evidence.
@@ -108,7 +109,7 @@ public sealed partial class LocalLlmService
             request.ModelId,
             [new OllamaChatMessage("user", request.Prompt.Trim(), encodedImages)],
             Stream: true,
-            Options: ResourceOptions(request),
+            Options: await PerformanceOptionsAsync(request, cancellationToken).ConfigureAwait(false),
             Think: request.Think);
 
         try

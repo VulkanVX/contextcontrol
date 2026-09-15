@@ -4,6 +4,22 @@ ContextControl 0.5.0 includes 544 catalog entries and discovers additional model
 
 New coverage includes Granite 4.2, Qwen 3.8 and Flash Next, Ornith 1.5, Nemotron 3.5 Lightning, Muse Glimmer, Laguna 2.1, North Mini Code, LFM 2.5, and MiniCPM V4.6. Hosted-only tags remain labeled as cloud models. Source pages and published download sizes accompany discovered entries; memory estimates include overhead and do not assume that MoE active parameter counts equal weight memory.
 
+## Measured speed tuning
+
+In 0.5.6, choose an installed local Ollama chat model in **Settings → LLMs → Resources** (also in the LLM catalog), enable **Auto adapt**, **Auto CPU threads** and **Auto GPU**, then click **Tune speed**. Use **Cancel** to stop. Tuning can take up to 15 minutes; it refuses active chats/downloads and stops when this app starts a chat or transfer. It does not detect requests made by unrelated applications, so keep other inference clients idle while measuring.
+
+The tuner compares the ordinary Auto thread count with half the physical cores, all physical cores and all logical processors. If the installed model already enables speculative decoding through `draft_num_predict`, it also compares draft lengths 0, 2 and 8 against the model default. It keeps Ollama's dynamic GPU placement and the selected context unchanged. Each configuration is warmed first. Decode throughput comes from Ollama's final token counts and evaluation duration; first-text latency is also measured.
+
+A sweep winner is checked against the baseline in alternating order on code and prose prompts. Both checks must improve by at least 3%, combined throughput by at least 5%, without a large first-text regression. A separate arithmetic answer check must pass. Early/truncated output, changed GPU placement, cancellation or runtime errors cannot save a new override. These are short synthetic workload checks, not a proof of maximum performance or exhaustive answer quality.
+
+**Use measured speed settings** can disable saved overrides. They apply to subsequent text chats only when Auto threads/GPU remain enabled and model digest, Ollama version, hardware, context and the already loaded GPU allocation match. A cold model first uses normal Auto settings. Changed context, model updates, other GPU placement or runtime updates fall back to Auto; retune after such changes or power/driver changes. Benchmark temperature, seed and thinking controls never replace the user's chat settings. No weight downloads, quantization changes, server-wide changes or forced model unloads are performed. Managed llama.cpp, KoboldCpp and external runtimes retain their existing resource adaptation; this measured tuner currently targets Ollama.
+
+Local validation on a Ryzen 5 5600H / RTX 3050 Ti 4 GiB / 64 GiB RAM, Ollama 0.34.0, and installed Granite 3.3 2B at 8,192 context found 74.3 tok/s baseline versus 75.2 tok/s candidate. The small gain failed the repeatability threshold, so defaults were retained. Qwen 3.8 27B was not fully installed and was not benchmarked. No Qwen speedup is claimed.
+
+Run deterministic checks with `--performance-regression` on the Workbench test executable. For an intentionally idle local runtime, `--performance-live <installed-model-id> <report.json>` runs the bounded experiment at 8,192 context and saves a report without changing application preferences.
+
+The runtime controls are documented by [Ollama](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx). Speculation can help or hurt depending on acceptance and verification cost; it is measured rather than assumed faster.
+
 ## Auto adapt to hardware
 
 Enable **Settings → LLMs → Auto adapt to hardware**, or use **Auto adapt** above the catalog. It is off by default for existing installations. The master switch and the individual GPU layers, context size and CPU threads switches are saved. Each managed runtime can opt out. Switching off restores use of the saved manual values; automatic allocations never overwrite them.

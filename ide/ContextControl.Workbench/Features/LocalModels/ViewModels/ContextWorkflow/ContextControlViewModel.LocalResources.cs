@@ -25,6 +25,7 @@ public sealed partial class ContextControlViewModel
         resources = resources.Normalize();
         if (_settings.LocalResources == resources) return;
         _settings.LocalResources = resources;
+        CancelPerformanceTuning();
         SaveSettingsQuietly();
         foreach (var name in new[] { nameof(AutoAdaptLocalModels), nameof(AutoModelGpuLayers), nameof(AutoModelContext),
             nameof(AutoModelThreads), nameof(AutoModelMaxContext), nameof(AutoModelRamReserve), nameof(AutoModelVramReserve),
@@ -35,8 +36,10 @@ public sealed partial class ContextControlViewModel
     private void ApplyResourceMode()
     {
         _localLlmService.ConfigureResources(_settings.LocalResources, _resourceHardware);
+        _localLlmService.ConfigurePerformance(_settings.LocalPerformanceProfiles, _settings.UseMeasuredLocalPerformance);
         foreach (var runtime in LocalRuntimeProfiles) runtime.SetResourceMode(_settings.LocalResources);
         foreach (var model in LocalLlmModels) model.ConfigureResources(_settings.LocalResources);
         ApplyLocalLlmFilters();
+        RefreshPerformanceDisplay();
     }
 }

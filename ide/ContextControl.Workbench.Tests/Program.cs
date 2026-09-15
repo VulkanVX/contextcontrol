@@ -10,6 +10,9 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--performance-regression")) { await LocalPerformanceTests.Run(); return; }
+if (args.Contains("--performance-live")) { var at = Array.IndexOf(args, "--performance-live"); await LocalPerformanceTests.Live(args[at + 1], args[at + 2]); return; }
+
 if (args.Contains("--scanner-regression")) { ProjectScannerTests.Run(); return; }
 if (args.Contains("--scanner-project")) { ProjectScannerTests.Run(args[Array.IndexOf(args, "--scanner-project") + 1]); return; }
 

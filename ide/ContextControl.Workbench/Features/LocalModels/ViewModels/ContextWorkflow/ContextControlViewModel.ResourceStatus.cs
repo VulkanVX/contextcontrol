@@ -17,6 +17,7 @@ public sealed partial class ContextControlViewModel
         set
         {
             if (!SetProperty(ref _resourceModel, value)) return;
+            RefreshPerformanceDisplay();
             ResourceAllocationSummary = "Reading model resources…";
             ResourceContextSummary = ResourceEstimateSummary = "";
         }
@@ -55,6 +56,7 @@ public sealed partial class ContextControlViewModel
             token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(selected, SelectedResourceModel) || settings != _settings.LocalResources) return;
             _resourceHardware = hardware;
+            RefreshPerformanceDisplay();
             HardwareSummary = hardware.Summary;
             _localLlmService.ConfigureResources(settings, hardware);
             LocalRuntimeAllocation? selectedAllocation = null;

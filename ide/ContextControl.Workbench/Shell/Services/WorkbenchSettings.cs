@@ -154,6 +154,8 @@ public sealed class WorkbenchSettings
     public bool GoogleSearchEnabled { get; set; } = true;
     public bool BrowserActionPreviewEnabled { get; set; }
     public LocalResourceSettings LocalResources { get; set; } = new();
+    public bool UseMeasuredLocalPerformance { get; set; } = true;
+    public IReadOnlyList<LocalPerformanceProfile> LocalPerformanceProfiles { get; set; } = [];
     public IReadOnlyList<LocalRuntimeProfile> LocalRuntimeProfiles { get; set; } = LocalRuntimeProfile.Defaults;
     public int? ChatMonitorX { get; set; }
     public int? ChatMonitorY { get; set; }
@@ -274,6 +276,8 @@ public sealed class WorkbenchSettings
             GoogleSearchEnabled = data.GoogleSearchEnabled ?? true,
             BrowserActionPreviewEnabled = data.BrowserActionPreviewEnabled ?? false,
             LocalResources = (data.LocalResources ?? new()).Normalize(),
+            UseMeasuredLocalPerformance = data.UseMeasuredLocalPerformance ?? true,
+            LocalPerformanceProfiles = (data.LocalPerformanceProfiles ?? []).Where(p => p is { IsValid: true }).Take(64).ToArray(),
             LocalRuntimeProfiles = data.LocalRuntimeProfiles ?? LocalRuntimeProfile.Defaults,
             ChatMonitorX = data.ChatMonitorX,
             ChatMonitorY = data.ChatMonitorY
@@ -295,6 +299,8 @@ public sealed class WorkbenchSettings
             GoogleSearchEnabled = GoogleSearchEnabled,
             BrowserActionPreviewEnabled = BrowserActionPreviewEnabled,
             LocalResources = LocalResources.Normalize(),
+            UseMeasuredLocalPerformance = UseMeasuredLocalPerformance,
+            LocalPerformanceProfiles = LocalPerformanceProfiles.Where(p => p is { IsValid: true }).Take(64).ToArray(),
             LocalRuntimeProfiles = LocalRuntimeProfiles,
             ChatMonitorX = ChatMonitorX,
             ChatMonitorY = ChatMonitorY,
@@ -633,6 +639,8 @@ public sealed class WorkbenchSettings
         public bool? GoogleSearchEnabled { get; set; }
         public bool? BrowserActionPreviewEnabled { get; set; }
         public LocalResourceSettings? LocalResources { get; set; }
+        public bool? UseMeasuredLocalPerformance { get; set; }
+        public IReadOnlyList<LocalPerformanceProfile>? LocalPerformanceProfiles { get; set; }
         public IReadOnlyList<LocalRuntimeProfile>? LocalRuntimeProfiles { get; set; }
         public int? ChatMonitorX { get; set; }
         public int? ChatMonitorY { get; set; }
