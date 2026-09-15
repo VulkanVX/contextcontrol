@@ -81,8 +81,9 @@ internal static partial class UiExperienceTests
         var measuredToggle = resourcePanel.FindControl<CheckBox>("MeasuredPerformanceToggle")!;
         measuredToggle.IsChecked = false;
         Dispatcher.UIThread.RunJobs();
-        Check(!context.UseMeasuredLocalPerformance && SpinWait.SpinUntil(() => !WorkbenchSettings.Load(root).UseMeasuredLocalPerformance, TimeSpan.FromSeconds(3)),
-            "Measured performance opt-out persists through the actual settings control.");
+        var savedOptOut = SpinWait.SpinUntil(() => !WorkbenchSettings.Load(root).UseMeasuredLocalPerformance, TimeSpan.FromSeconds(3));
+        Check(!context.UseMeasuredLocalPerformance && savedOptOut,
+            $"Measured performance opt-out persists through the actual settings control. Checkbox={measuredToggle.IsChecked}, model={context.UseMeasuredLocalPerformance}, saved={savedOptOut}, path={root}");
         Check(resourcePanel.FindControl<TextBlock>("PerformanceSummary")!.Text == context.SavedPerformanceSummary,
             "The performance panel follows the selected resource model.");
         context.TuneSelectedModelAsync(default).GetAwaiter().GetResult();

@@ -188,6 +188,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "Performance tuning regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --download-regression
     if ($LASTEXITCODE -ne 0) { throw "Ollama download regression failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --settings-persistence
+    if ($LASTEXITCODE -ne 0) { throw "Settings persistence regression failed ($LASTEXITCODE)." }
 }
 
 dotnet publish $project `

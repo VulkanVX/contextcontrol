@@ -196,6 +196,10 @@ public sealed class WorkbenchSettings
 
     public static WorkbenchSettings Load(string? contextRoot = null)
     {
+        lock (FileGate) return LoadCore(contextRoot);
+    }
+    private static WorkbenchSettings LoadCore(string? contextRoot)
+    {
         var contextControlRoot = contextRoot is null ? ResolveContextControlRoot() : Path.GetFullPath(contextRoot);
         var settingsPath = Path.Combine(contextControlRoot, ".ccWorkbench.settings.json");
         var data = new WorkbenchSettingsJson();
@@ -204,7 +208,9 @@ public sealed class WorkbenchSettings
         {
             try
             {
-                data = JsonSerializer.Deserialize<WorkbenchSettingsJson>(File.ReadAllText(settingsPath), JsonOptions)
+                using var input = new FileStream(settingsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(input);
+                data = JsonSerializer.Deserialize<WorkbenchSettingsJson>(reader.ReadToEnd(), JsonOptions)
                     ?? new WorkbenchSettingsJson();
             }
             catch
@@ -284,7 +290,12 @@ public sealed class WorkbenchSettings
         };
     }
 
+    private static readonly object FileGate = new();
     public void Save()
+    {
+        lock (FileGate) SaveCore();
+    }
+    private void SaveCore()
     {
         var parent = Path.GetDirectoryName(SettingsPath);
         if (!string.IsNullOrWhiteSpace(parent))
@@ -359,7 +370,24 @@ public sealed class WorkbenchSettings
             ShowProjectGraphTreePane = ShowProjectGraphTreePane,
             ProjectGraphGenerationColors = NormalizeGraphGenerationColors(ProjectGraphGenerationColors)
         };
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(data, JsonOptions) + Environment.NewLine, Utf8NoBom);
+        // Readers keep a complete old file until the complete new file replaces it.
+        var temporary = SettingsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(data, JsonOptions) + Environment.NewLine, Utf8NoBom);
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    if (File.Exists(SettingsPath)) File.Replace(temporary, SettingsPath, null);
+                    else File.Move(temporary, SettingsPath);
+                    break;
+                }
+                catch (IOException ex) when (attempt < 5 && (ex.HResult & 0xffff) is 32 or 33) { Thread.Sleep(20); }
+                catch (UnauthorizedAccessException) when (attempt < 5 && File.Exists(SettingsPath)) { Thread.Sleep(20); }
+            }
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     private static string ResolveContextControlRoot()

@@ -349,18 +349,28 @@ public sealed partial class ContextControlViewModel
 
     private void SaveSettingsQuietly()
     {
-        _ = Task.Run(() =>
+        lock (_settingsSaveLock)
         {
-            try
+            _settingsSavePending = true;
+            if (_settingsSaveQueued) return;
+            _settingsSaveQueued = true;
+        }
+        _ = Task.Run(async () =>
+        {
+            while (true)
             {
+                // Coalesce rapid slider/filter changes into one writer, rather than
+                // flooding the thread pool with tasks blocked on the same lock.
+                await Task.Delay(30).ConfigureAwait(false);
+                lock (_settingsSaveLock) _settingsSavePending = false;
+                try { _settings.Save(); }
+                catch { /* Keep the editor usable when the settings folder is unavailable. */ }
                 lock (_settingsSaveLock)
                 {
-                    _settings.Save();
+                    if (_settingsSavePending) continue;
+                    _settingsSaveQueued = false;
+                    return;
                 }
-            }
-            catch
-            {
-                // UI state should stay usable even if the settings file is locked.
             }
         });
     }

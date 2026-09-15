@@ -90,6 +90,7 @@ public sealed partial class ContextControlViewModel : ObservableObject
     private readonly ChatHistoryService _chatHistoryService;
     private readonly DispatcherTimer _promptDraftSaveTimer;
     private readonly object _settingsSaveLock = new();
+    private bool _settingsSaveQueued, _settingsSavePending;
     private Func<string, Task>? _clipboardWriter;
     private Func<ChatSnippetViewModel, Task<string?>>? _snippetFileSaver;
     private Action<string>? _projectFileOpener;
