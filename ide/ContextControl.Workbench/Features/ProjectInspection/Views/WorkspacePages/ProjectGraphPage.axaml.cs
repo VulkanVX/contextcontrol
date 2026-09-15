@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ContextControl.Workbench.Controls;
 
@@ -11,6 +12,16 @@ public sealed partial class ProjectGraphPage : UserControl
     public ProjectGraphPage()
     {
         InitializeComponent();
+        ProjectGraphSearchPanel.PropertyChanged += (_, change) =>
+        {
+            if (change.Property == IsVisibleProperty && ProjectGraphSearchPanel.IsVisible)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!ProjectGraphSearchPanel.IsEffectivelyVisible) return;
+                    ProjectGraphSearchBox.Focus();
+                    ProjectGraphSearchBox.SelectAll();
+                });
+        };
     }
 
     internal ProjectGraphRenderControl GraphView => ProjectGraphView;

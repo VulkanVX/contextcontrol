@@ -10,7 +10,7 @@
             <Border
                 Grid.Row="2"
                 Classes="editor-body graph-page"
-                Padding="6"
+                Padding="10"
                 ClipToBounds="True"
                 MinHeight="0"
                 IsVisible="{Binding IsProjectGraphMode}">
@@ -20,7 +20,7 @@
                   <ColumnDefinition Width="{Binding ProjectGraphTreePaneWidth}" />
                 </Grid.ColumnDefinitions>
                 <Border Classes="graph-surface" ClipToBounds="True" MinHeight="0">
-                  <Grid ClipToBounds="True">
+                  <Grid ClipToBounds="True" RowDefinitions="*,Auto">
                     <controls:ProjectGraphRenderControl
                         x:Name="ProjectGraphView"
                         Items="{Binding ProjectTree}"
@@ -33,19 +33,25 @@
                         LayoutMode="{Binding ProjectGraphLayoutMode}"
                         GenerationPalette="{Binding ProjectGraphGenerationPalette}" />
 
+                    <Border Grid.Row="1" Padding="10,7"
+                            BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,1,0,0" IsHitTestVisible="False">
+                      <TextBlock Text="Drag canvas to pan · Ctrl + wheel to zoom" Classes="graph-header-meta" TextWrapping="Wrap" />
+                    </Border>
+
                     <Border
                         x:Name="ProjectGraphSearchPanel"
                         Classes="graph-search-panel"
-                        HorizontalAlignment="Center"
+                        HorizontalAlignment="Stretch"
                         VerticalAlignment="Top"
-                        Margin="0,8,0,0"
+                        MaxWidth="440"
+                        Margin="12,12,12,0"
                         IsVisible="{Binding IsProjectGraphSearchOpen}"
                         IsHitTestVisible="{Binding IsProjectGraphSearchOpen}">
-                      <Grid RowDefinitions="Auto,Auto" Width="380">
+                      <Grid RowDefinitions="Auto,Auto" MaxWidth="420" MinWidth="220">
                         <TextBox
                             x:Name="ProjectGraphSearchBox"
                             Classes="graph-search-input"
-                            Watermark="Search graph"
+                            Watermark="Find a file or folder..."
                             Text="{Binding ProjectGraphSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                             KeyDown="OnProjectGraphSearchKeyDown" />
 
@@ -89,42 +95,26 @@
                     MinHeight="0"
                     IsVisible="{Binding IsProjectGraphTreePaneOpen}"
                     IsHitTestVisible="{Binding IsProjectGraphTreePaneOpen}">
-                  <Grid RowDefinitions="Auto,*" RowSpacing="6" MinHeight="0">
+                  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10" MinHeight="0">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                      <TextBlock Classes="graph-sidebar-title" Text="Current project tree" />
+                      <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"><controls:WorkspaceIcon IconKey="tree" Width="14" Height="14" Foreground="{DynamicResource TextMutedBrush}" /><TextBlock Classes="graph-sidebar-title" Text="Project tree" /></StackPanel>
                       <Button
                           Grid.Column="1"
                           Classes="browser-nav-button"
                           ToolTip.Tip="Copy"
                           Click="OnProjectGraphCopyTreeClick">
-                        <Canvas Width="12" Height="13">
-                          <Border
-                              Canvas.Left="1"
-                              Canvas.Top="1"
-                              Width="7.5"
-                              Height="8.5"
-                              CornerRadius="1.4"
-                              BorderThickness="1.15"
-                              BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                          <Border
-                              Canvas.Left="4"
-                              Canvas.Top="4"
-                              Width="7.5"
-                              Height="8.5"
-                              CornerRadius="1.4"
-                              BorderThickness="1.15"
-                              BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                        </Canvas>
+                        <controls:WorkspaceIcon IconKey="copy" Width="13" Height="13" Foreground="{DynamicResource TextMutedBrush}" />
                       </Button>
                       <Button
                           Grid.Column="2"
                           Classes="browser-nav-button"
-                          Content="x"
+                          Content="×"
                           ToolTip.Tip="Close graph project tree"
                           Command="{Binding ToggleProjectGraphTreePaneCommand}" />
                     </Grid>
+                    <TextBlock Grid.Row="1" Text="Files · versions · lines of code" Classes="graph-header-meta" TextWrapping="Wrap" />
                     <TextBox
-                        Grid.Row="1"
+                        Grid.Row="2"
                         Classes="graph-tree-text"
                         AcceptsReturn="True"
                         IsReadOnly="True"

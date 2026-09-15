@@ -586,7 +586,7 @@ public sealed class WorkbenchSettings
     }
 
     private const string DefaultSummaryFoldKinds = "namespace,class,struct,interface,enum,method,property,object,block,array,arguments";
-    public const string DefaultProjectGraphGenerationColors = "#7A858B,#808B76,#887F90,#918473,#728987,#8C787A,#82866E,#778094";
+    public const string DefaultProjectGraphGenerationColors = "#64CDBA,#6CA7F7,#B79CF9,#E5B77B,#EC99B2,#7CD3DF,#B5CC86,#A3AFE8";
     private const string LegacyProjectGraphGenerationColors = "#4FA3FF,#22B8A7,#8B5CF6,#EAB308,#EF476F,#06D6A0,#F97316,#A3E635";
 
     private static string NormalizeSummaryFoldKinds(string? value)
@@ -632,6 +632,7 @@ public sealed class WorkbenchSettings
 
     private static bool IsLegacyProjectGraphGenerationPalette(IReadOnlyList<string> colors)
     {
+        if (string.Join(",", colors).Equals("#7A858B,#808B76,#887F90,#918473,#728987,#8C787A,#82866E,#778094", StringComparison.OrdinalIgnoreCase)) return true;
         var legacy = LegacyProjectGraphGenerationColors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return colors.Count == legacy.Length
             && colors.SequenceEqual(legacy, StringComparer.OrdinalIgnoreCase);

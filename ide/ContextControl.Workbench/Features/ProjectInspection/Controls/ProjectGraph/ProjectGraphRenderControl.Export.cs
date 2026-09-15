@@ -31,7 +31,7 @@ public sealed partial class ProjectGraphRenderControl
             totalHeight = graphHeight + detailsGap + detailsHeight;
         }
 
-        var bitmap = new RenderTargetBitmap(new PixelSize(width, totalHeight), new Vector(96, 96));
+        using var bitmap = new RenderTargetBitmap(new PixelSize(width, totalHeight), new Vector(96, 96));
         var previousZoom = _zoom;
         var previousPan = _pan;
         var previousFitRequested = _fitRequested;
@@ -137,7 +137,7 @@ public sealed partial class ProjectGraphRenderControl
         var svgBounds = detailsRect is { } footer
             ? UnionRects(bounds, footer)
             : bounds;
-        var palette = ParseGenerationPalette(GenerationPalette);
+        var palette = _generationColors;
         var builder = new StringBuilder(16 * 1024);
         builder.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"");
         AppendInvariant(builder, svgBounds.X);
@@ -165,8 +165,8 @@ public sealed partial class ProjectGraphRenderControl
 
         foreach (var node in _nodes.Where(node => node.RegionBounds.Width > 0 && node.RegionBounds.Height > 0))
         {
-            var baseColor = palette[RegionPaletteIndex(node, palette.Length)];
-            AppendSvgRect(builder, node.RegionBounds, baseColor, resources.IsDark ? ScaleColor(baseColor, 1.08) : ScaleColor(baseColor, 0.68), 1.0, 2.0);
+            AppendSvgRect(builder, node.RegionBounds, BrushColor(RegionFillBrush(node, resources), Colors.Transparent),
+                BrushColor(RegionBorderBrush(node, resources), Colors.Gray), 1.0, 7.0);
         }
 
         foreach (var edge in _edges)
@@ -186,17 +186,12 @@ public sealed partial class ProjectGraphRenderControl
 
         foreach (var node in _nodes)
         {
-            var hasGenerationFill = node.Node?.IsFolder == true && node.Children.Count > 0;
-            var baseColor = hasGenerationFill
-                ? palette[RegionPaletteIndex(node, palette.Length)]
-                : BrushColor(resources.CommandBackground, Colors.Black);
-            var fill = hasGenerationFill
-                ? baseColor
-                : node.Node?.IsFolder == true
-                    ? resources.IsDark ? EmptyFolderDarkColor : EmptyFolderLightColor
-                : BrushColor(resources.CommandBackground, Colors.Black);
-            AppendSvgRect(builder, node.Bounds, fill, baseColor, 1.0, 3.0);
-            var meta = node.Node is null || node.IsAggregate ? "" : BuildNodeMeta(node.Node);
+            var appearance = Appearance(node, false, false, resources);
+            AppendSvgRect(builder, node.Bounds, BrushColor(appearance.Fill, Colors.White), BrushColor(appearance.Border, Colors.Gray), 1.0, 5.0);
+            if (node.Node?.IsFolder == true)
+                AppendSvgRect(builder, new Rect(node.Bounds.X + 2, node.Bounds.Y + 5, 2, node.Bounds.Height - 10),
+                    BrushColor(appearance.Accent, Colors.Gray), Colors.Transparent, 0, 1);
+            var meta = node.Meta;
             builder.Append("<text x=\"");
             AppendInvariant(builder, node.Bounds.X + 7);
             builder.Append("\" y=\"");
@@ -204,9 +199,7 @@ public sealed partial class ProjectGraphRenderControl
             builder.Append("\" font-family=\"");
             builder.Append(XmlEscape(resources.UiFontKey));
             builder.Append("\" font-size=\"9\" fill=\"");
-            builder.Append(ColorHex(hasGenerationFill
-                ? ContrastTextColor(baseColor)
-                : BrushColor(node.Node?.IsFolder == true ? resources.TextPrimary : resources.FileText, Colors.White)));
+            builder.Append(ColorHex(BrushColor(appearance.Title, Colors.White)));
             builder.Append("\">");
             builder.Append(XmlEscape(node.Title));
             builder.Append("</text>");
@@ -219,9 +212,7 @@ public sealed partial class ProjectGraphRenderControl
                 builder.Append("\" font-family=\"");
                 builder.Append(XmlEscape(resources.CodeFontKey));
                 builder.Append("\" font-size=\"7\" fill=\"");
-                builder.Append(ColorHex(hasGenerationFill
-                    ? ContrastTextColor(baseColor)
-                    : BrushColor(node.Node?.IsExternal == true ? resources.ExternalText : resources.MetricLoc, Colors.White)));
+                builder.Append(ColorHex(BrushColor(appearance.Meta, Colors.White)));
                 builder.Append("\">");
                 builder.Append(XmlEscape(meta));
                 builder.Append("</text>");

@@ -34,26 +34,17 @@ public sealed partial class ProjectGraphRenderControl
         var isSelected = IsSelectedNode(node);
         var isHovered = ReferenceEquals(_hoveredNode, node);
         var isExternal = node.Node?.IsExternal == true;
-        var background = NodeBackground(node, isSelected, isHovered, resources);
-        var borderBrush = isSelected
-            ? resources.AccentBorder
-            : isExternal
-                ? resources.ExternalText
-                : node.Node?.IsFolder == true
-                    ? FolderNodeBorderBrush(node, resources)
-                    : resources.PanelBorder;
-        var borderWidth = isSelected || isExternal
-            ? 1.35
-            : node.Node?.IsFolder == true
-                ? 1.22
-                : 1.0;
-
-        context.DrawRectangle(
-            background,
-            CachedPen(borderBrush, Math.Clamp(borderWidth * _zoom, 0.75, 1.6)),
-            rect,
-            Math.Clamp(3 * _zoom, 0.75, 3),
-            Math.Clamp(3 * _zoom, 0.75, 3));
+        var appearance = Appearance(node, isSelected, isHovered, resources);
+        var radius = Math.Clamp(5 * _zoom, 1.0, 7);
+        context.DrawRectangle(appearance.Fill,
+            CachedPen(appearance.Border, Math.Clamp((isSelected ? 1.8 : 1.0) * _zoom, .65, 2.0)), rect, radius, radius);
+        // A slim generation marker leaves the title and all metrics in their original space.
+        if (node.Node?.IsFolder == true && rect.Height > 9)
+        {
+            var inset = Math.Clamp(5 * _zoom, 2, 7);
+            context.DrawRectangle(appearance.Accent, null,
+                new Rect(rect.X + Math.Clamp(2 * _zoom, 1, 3), rect.Y + inset, Math.Clamp(2 * _zoom, 1, 3), Math.Max(1, rect.Height - inset * 2)), 1, 1);
+        }
 
         if (node.IsPinned && _zoom > 0.35)
         {
@@ -81,27 +72,23 @@ public sealed partial class ProjectGraphRenderControl
         var metaY = 0.0;
         if (_zoom >= 0.46 && !node.IsAggregate && node.Node is not null)
         {
-            var meta = BuildNodeMeta(node.Node);
+            var meta = node.Meta;
             if (!string.IsNullOrWhiteSpace(meta))
             {
-                var metaBrush = node.Node.IsExternal
-                    ? resources.ExternalText
-                    : node.Node.IsFolder
-                        ? FolderNodeMetaBrush(node, resources)
-                        : resources.MetricLoc;
-                var metaSize = _isExportRendering ? Math.Max(4.0, 7.7 * _zoom) : Math.Clamp(7.7 * _zoom, 4.0, 8.2);
-                metaText = GetFormattedText(meta, metaBrush, resources.CodeFont, resources.CodeFontKey, FontWeight.Black, FontStyle.Normal, metaSize);
+                var metaBrush = appearance.Meta;
+                var metaSize = _isExportRendering ? Math.Max(4.0, 7.7 * _zoom) : Math.Clamp(7.7 * _zoom, 4.0, 18.0);
+                metaText = GetFormattedText(meta, metaBrush, resources.CodeFont, resources.CodeFontKey, FontWeight.Medium, FontStyle.Normal, metaSize);
                 metaY = rect.Bottom - padBottom - metaText.Height;
             }
         }
 
-        var titleBrush = NodeTextBrush(node, resources);
-        var titleWeight = node.Node?.IsFolder == true || node.IsAggregate ? FontWeight.ExtraBold : FontWeight.SemiBold;
+        var titleBrush = appearance.Title;
+        var titleWeight = node.Node?.IsFolder == true || node.IsAggregate ? FontWeight.SemiBold : FontWeight.Medium;
         var titleStyle = isExternal ? FontStyle.Italic : FontStyle.Normal;
         var titleFont = node.IsAggregate ? resources.CodeFont : resources.UiFont;
         var titleFontKey = node.IsAggregate ? resources.CodeFontKey : resources.UiFontKey;
         var titleBaseSize = node.Depth == 0 ? 11.5 : 10.0;
-        var titleSize = _isExportRendering ? Math.Max(4.5, titleBaseSize * _zoom) : Math.Clamp(titleBaseSize * _zoom, 4.5, 12.0);
+        var titleSize = _isExportRendering ? Math.Max(4.5, titleBaseSize * _zoom) : Math.Clamp(titleBaseSize * _zoom, 4.5, 24.0);
         var title = GetFormattedText(node.Title, titleBrush, titleFont, titleFontKey, titleWeight, titleStyle, titleSize);
         var titleBottom = metaText is null
             ? rect.Bottom - padBottom
@@ -118,77 +105,11 @@ public sealed partial class ProjectGraphRenderControl
         DrawClippedText(context, metaText, metaClip, new Point(metaClip.X, metaClip.Y));
     }
 
-    private IBrush NodeBackground(GraphNode node, bool isSelected, bool isHovered, RenderResources resources)
-    {
-        if (!node.IsAggregate && node.Node?.IsFolder == true && node.Children.Count > 0)
-        {
-            return FolderNodeBackgroundBrush(node, resources);
-        }
+    private IBrush RegionFillBrush(GraphNode node, RenderResources resources) => SolidBrush(BlendColor(
+        BrushColor(resources.EditorSurface, resources.IsDark ? Colors.Black : Colors.White), GenerationColor(node), resources.IsDark ? .065 : .045));
 
-        if (isSelected)
-        {
-            return resources.DropdownSelected;
-        }
-
-        if (isHovered)
-        {
-            return resources.HistoryActive;
-        }
-
-        if (node.IsAggregate)
-        {
-            return resources.CommandBackground;
-        }
-
-        if (node.Node?.IsFolder == true)
-        {
-            return node.Children.Count == 0
-                ? EmptyFolderBackgroundBrush(resources)
-                : FolderNodeBackgroundBrush(node, resources);
-        }
-
-        return resources.CommandBackground;
-    }
-
-    private IBrush EmptyFolderBackgroundBrush(RenderResources resources)
-    {
-        return SolidBrush(resources.IsDark
-            ? EmptyFolderDarkColor
-            : EmptyFolderLightColor);
-    }
-
-    private IBrush FolderNodeBackgroundBrush(GraphNode node, RenderResources resources)
-    {
-        return SolidBrush(GenerationColor(node));
-    }
-
-    private IBrush FolderNodeBorderBrush(GraphNode node, RenderResources resources)
-    {
-        if (node.Children.Count == 0)
-        {
-            return SolidBrush(resources.IsDark
-                ? EmptyFolderBorderDarkColor
-                : EmptyFolderBorderLightColor);
-        }
-
-        var color = GenerationColor(node);
-        return SolidBrush(resources.IsDark
-            ? ScaleColor(color, 1.12)
-            : ScaleColor(color, 0.70));
-    }
-
-    private IBrush RegionFillBrush(GraphNode node, RenderResources resources)
-    {
-        return SolidBrush(GenerationColor(node));
-    }
-
-    private IBrush RegionBorderBrush(GraphNode node, RenderResources resources)
-    {
-        var color = GenerationColor(node);
-        return SolidBrush(resources.IsDark
-            ? ScaleColor(color, 1.08)
-            : ScaleColor(color, 0.68));
-    }
+    private IBrush RegionBorderBrush(GraphNode node, RenderResources resources) => SolidBrush(BlendColor(
+        BrushColor(resources.EditorSurface, resources.IsDark ? Colors.Black : Colors.White), GenerationColor(node), resources.IsDark ? .28 : .32));
 
     private IBrush SolidBrush(Color color)
     {
@@ -231,8 +152,7 @@ public sealed partial class ProjectGraphRenderControl
 
     private Color GenerationColor(GraphNode node)
     {
-        var palette = ParseGenerationPalette(GenerationPalette);
-        return palette[RegionPaletteIndex(node, palette.Length)];
+        return _generationColors[RegionPaletteIndex(node, _generationColors.Length)];
     }
 
     private static Color[] ParseGenerationPalette(string? value)
@@ -265,20 +185,6 @@ public sealed partial class ProjectGraphRenderControl
         }
     }
 
-    private static Color ScaleColor(Color color, double scale)
-    {
-        return Color.FromArgb(
-            color.A,
-            (byte)Math.Clamp((int)Math.Round(color.R * scale), 0, 255),
-            (byte)Math.Clamp((int)Math.Round(color.G * scale), 0, 255),
-            (byte)Math.Clamp((int)Math.Round(color.B * scale), 0, 255));
-    }
-
-    private static Color WithAlpha(Color color, byte alpha)
-    {
-        return Color.FromArgb(alpha, color.R, color.G, color.B);
-    }
-
     private static Color BlendColor(Color source, Color target, double targetAmount)
     {
         var sourceAmount = 1.0 - targetAmount;
@@ -287,47 +193,6 @@ public sealed partial class ProjectGraphRenderControl
             (byte)Math.Clamp((int)Math.Round(source.R * sourceAmount + target.R * targetAmount), 0, 255),
             (byte)Math.Clamp((int)Math.Round(source.G * sourceAmount + target.G * targetAmount), 0, 255),
             (byte)Math.Clamp((int)Math.Round(source.B * sourceAmount + target.B * targetAmount), 0, 255));
-    }
-
-    private IBrush NodeTextBrush(GraphNode node, RenderResources resources)
-    {
-        if (node.IsAggregate)
-        {
-            return resources.TextMuted;
-        }
-
-        if (node.Node?.IsExternal == true)
-        {
-            return resources.ExternalText;
-        }
-
-        return node.Node?.IsFolder == true
-            ? FolderNodeTextBrush(node, resources)
-            : resources.FileText;
-    }
-
-    private IBrush FolderNodeTextBrush(GraphNode node, RenderResources resources)
-    {
-        return node.Children.Count == 0
-            ? resources.FolderText
-            : SolidBrush(ContrastTextColor(GenerationColor(node)));
-    }
-
-    private IBrush FolderNodeMetaBrush(GraphNode node, RenderResources resources)
-    {
-        return node.Children.Count == 0
-            ? resources.MetricFile
-            : SolidBrush(ContrastTextColor(GenerationColor(node)));
-    }
-
-    private static Color ContrastTextColor(Color color)
-    {
-        var luminance = (0.2126 * SrgbToLinear(color.R)
-            + 0.7152 * SrgbToLinear(color.G)
-            + 0.0722 * SrgbToLinear(color.B));
-        return luminance > 0.48
-            ? Color.Parse("#172126")
-            : Color.Parse("#FFFFFF");
     }
 
     private static double SrgbToLinear(byte value)

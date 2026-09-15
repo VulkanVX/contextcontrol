@@ -7,7 +7,8 @@
     xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
 >
-          <Grid RowDefinitions="Auto,40">
+          <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" MinHeight="40" /></Grid.RowDefinitions>
             <Border Grid.Row="0" Classes="workspace-mode-bar" Padding="6,5">
               <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
                 <ItemsControl
@@ -305,70 +306,50 @@
               </Grid>
             </Border>
 
-            <Border Grid.Row="1" Classes="pane-header" Padding="12,0" IsVisible="{Binding IsProjectGraphMode}">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="Architecture graph" FontSize="12" FontWeight="ExtraBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Text="{Binding ProjectGraphSummary}" Classes="editor-meta" Margin="0,2,0,0" />
-                  <TextBlock Text="{Binding ProjectGraphSelectedLabel}" Classes="scanner-status" />
-                </StackPanel>
-                <ItemsControl
-                    Grid.Column="1"
-                    ItemsSource="{Binding ProjectGraphGenerationColors}"
-                    VerticalAlignment="Center">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="4" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:ProjectGraphGenerationColorViewModel}">
-                      <Button
-                          Classes="graph-color-swatch-button"
-                          Click="OnProjectGraphColorSwatchClick">
-                        <StackPanel Width="14" Spacing="1" HorizontalAlignment="Left">
-                          <Border
-                              Width="11"
-                              Height="11"
-                              CornerRadius="2"
-                              HorizontalAlignment="Center"
-                              Background="{Binding SwatchBrush}"
-                              BorderBrush="{DynamicResource PanelBorderBrush}"
-                              BorderThickness="1" />
-                          <TextBlock
-                              Text="{Binding Label}"
-                              Foreground="{DynamicResource TextMutedBrush}"
-                              FontSize="7"
-                              FontWeight="Black"
-                              TextAlignment="Center"
-                              HorizontalAlignment="Stretch" />
-                        </StackPanel>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Button
-                    Grid.Column="2"
-                    Classes="browser-open-button"
-                    Content="Export"
-                    Click="OnProjectGraphExportClick" />
-                <Button
-                    Grid.Column="3"
-                    Classes="browser-open-button"
-                    Content="{Binding ProjectGraphLayoutToggleLabel}"
-                    Command="{Binding ToggleProjectGraphLayoutModeCommand}"
-                    ToolTip.Tip="Generation 1 sort" />
-                <Button
-                    Grid.Column="4"
-                    Classes="browser-open-button"
-                    Content="Fit Layout"
-                    Click="OnProjectGraphFitLayoutClick" />
-                <Button
-                    Grid.Column="5"
-                    Classes="browser-open-button"
-                    Content="{Binding ProjectGraphTreeToggleLabel}"
-                    Command="{Binding ToggleProjectGraphTreePaneCommand}" />
-              </Grid>
+            <Border Grid.Row="1" Classes="pane-header graph-header" Padding="12,10,12,6" IsVisible="{Binding IsProjectGraphMode}">
+              <StackPanel Spacing="6">
+                <WrapPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,2" VerticalAlignment="Center">
+                    <controls:WorkspaceIcon IconKey="graph" Width="18" Height="18" Foreground="{DynamicResource AccentBorderBrush}" />
+                    <TextBlock Text="Architecture graph" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding ProjectGraphSummary}" Classes="graph-header-meta" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </WrapPanel>
+                <TextBlock Text="{Binding ProjectGraphSelectedLabel}" ToolTip.Tip="{Binding ProjectGraphSelectedLabel}" Classes="graph-header-meta" TextTrimming="CharacterEllipsis" />
+                <WrapPanel>
+                  <Button Classes="graph-toolbar-button" Command="{Binding OpenProjectGraphSearchCommand}" ToolTip.Tip="Find a node (Ctrl+F)">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:WorkspaceIcon IconKey="search" Classes="graph-button-icon" /><TextBlock Text="Find" /></StackPanel>
+                  </Button>
+                  <Button Classes="graph-toolbar-button" Click="OnProjectGraphExportClick" ToolTip.Tip="Export graph and project details">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:WorkspaceIcon IconKey="export" Classes="graph-button-icon" /><TextBlock Text="Export" /></StackPanel>
+                  </Button>
+                  <Button Classes="graph-toolbar-button" Command="{Binding ToggleProjectGraphLayoutModeCommand}" ToolTip.Tip="Switch generation 1 packing">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:WorkspaceIcon IconKey="layout" Classes="graph-button-icon" /><TextBlock Text="{Binding ProjectGraphLayoutToggleLabel}" /></StackPanel>
+                  </Button>
+                  <Button Classes="graph-toolbar-button" Click="OnProjectGraphFitLayoutClick" ToolTip.Tip="Reset arrangement and fit the graph">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:WorkspaceIcon IconKey="fit" Classes="graph-button-icon" /><TextBlock Text="Fit layout" /></StackPanel>
+                  </Button>
+                  <Button Classes="graph-toolbar-button" Command="{Binding ToggleProjectGraphTreePaneCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:WorkspaceIcon IconKey="tree" Classes="graph-button-icon" /><TextBlock Text="{Binding ProjectGraphTreeToggleLabel}" /></StackPanel>
+                  </Button>
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,0,0,4" VerticalAlignment="Center">
+                    <TextBlock Text="Levels" Classes="graph-header-meta" VerticalAlignment="Center" />
+                    <ItemsControl ItemsSource="{Binding ProjectGraphGenerationColors}" VerticalAlignment="Center">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ProjectGraphGenerationColorViewModel}">
+                          <Button Classes="graph-color-swatch-button" Click="OnProjectGraphColorSwatchClick" ToolTip.Tip="Change this generation's accent color">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center" Background="{Binding SwatchBrush}" />
+                              <TextBlock Text="{Binding Label}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </WrapPanel>
+              </StackPanel>
             </Border>
 
             <Border Grid.Row="1" Classes="pane-header" Padding="12,0" IsVisible="{Binding IsProjectScannerMode}">

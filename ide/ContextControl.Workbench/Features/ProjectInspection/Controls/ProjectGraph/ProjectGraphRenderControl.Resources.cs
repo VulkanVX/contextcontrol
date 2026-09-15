@@ -46,9 +46,9 @@ public sealed partial class ProjectGraphRenderControl
             return formatted;
         }
 
-        if (_textCache.Count > MaxTextCacheEntries)
+        if (_textCache.Count >= MaxTextCacheEntries && _textCacheOrder.TryDequeue(out var oldest))
         {
-            _textCache.Clear();
+            _textCache.Remove(oldest);
         }
 
         formatted = new FormattedText(
@@ -59,14 +59,19 @@ public sealed partial class ProjectGraphRenderControl
             fontSize,
             brush);
         _textCache[key] = formatted;
+        _textCacheOrder.Enqueue(key);
         return formatted;
     }
+
+    private void ClearTextCache() { _textCache.Clear(); _textCacheOrder.Clear(); }
+
+    private readonly Dictionary<string, FontFamily> _fontCache = new(StringComparer.Ordinal);
 
     private RenderResources ResolveRenderResources()
     {
         var uiFont = ResolveFontFamily(UiFontFamily, Resource("UiFontFamily", DefaultUiFontFamily));
         var codeFont = ResolveFontFamily(CodeFontFamily, Resource("CodeFontFamily", DefaultCodeFontFamily));
-        return new RenderResources(
+        var resources = new RenderResources(
             Resource("EditorSurfaceBrush", EditorSurfaceFallbackBrush),
             Resource("PanelBorderBrush", PanelBorderFallbackBrush),
             Resource("CommandBackgroundBrush", CommandBackgroundFallbackBrush),
@@ -86,6 +91,18 @@ public sealed partial class ProjectGraphRenderControl
             codeFont,
             codeFont.ToString(),
             IsDarkTheme(ThemeKey));
+        if (_paletteValue != GenerationPalette)
+        {
+            _paletteValue = GenerationPalette;
+            _generationColors = ParseGenerationPalette(_paletteValue);
+            _appearanceCache.Clear();
+        }
+        if (_appearanceResources != resources)
+        {
+            _appearanceResources = resources;
+            _appearanceCache.Clear();
+        }
+        return resources;
     }
 
     private T Resource<T>(string key, T fallback)
@@ -106,7 +123,7 @@ public sealed partial class ProjectGraphRenderControl
         return fallback;
     }
 
-    private static FontFamily ResolveFontFamily(string? value, FontFamily fallback)
+    private FontFamily ResolveFontFamily(string? value, FontFamily fallback)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -115,7 +132,11 @@ public sealed partial class ProjectGraphRenderControl
 
         try
         {
-            return new FontFamily(value);
+            if (_fontCache.TryGetValue(value, out var font)) return font;
+            if (_fontCache.Count >= 8) _fontCache.Clear();
+            font = new FontFamily(value);
+            _fontCache[value] = font;
+            return font;
         }
         catch
         {

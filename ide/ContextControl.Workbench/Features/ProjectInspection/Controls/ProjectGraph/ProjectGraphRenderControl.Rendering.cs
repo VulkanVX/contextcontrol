@@ -56,7 +56,7 @@ public sealed partial class ProjectGraphRenderControl
         var startX = _pan.X % step;
         var startY = _pan.Y % step;
 
-        using (context.PushOpacity(resources.IsDark ? 0.20 : 0.35))
+        using (context.PushOpacity(resources.IsDark ? 0.12 : 0.18))
         {
             for (var x = startX; x < viewport.Width; x += step)
             {
@@ -93,8 +93,8 @@ public sealed partial class ProjectGraphRenderControl
             var selected = IsSelectedNode(node);
             var fillBrush = RegionFillBrush(node, resources);
             var borderPen = CachedPen(RegionBorderBrush(node, resources), Math.Clamp(0.95 * _zoom, 0.55, 1.2));
-            var borderOpacity = selected ? 0.74 : 0.46;
-            var radius = Math.Clamp(1.5 * _zoom, 0.5, 1.5);
+            var borderOpacity = selected ? 0.9 : 1.0;
+            var radius = Math.Clamp(7 * _zoom, 1.5, 10);
 
             context.DrawRectangle(
                 fillBrush,
@@ -134,7 +134,7 @@ public sealed partial class ProjectGraphRenderControl
             }
         }
 
-        using (context.PushOpacity(0.78))
+        using (context.PushOpacity(resources.IsDark ? .48 : .55))
         {
             foreach (var route in _edgeRoutes)
             {

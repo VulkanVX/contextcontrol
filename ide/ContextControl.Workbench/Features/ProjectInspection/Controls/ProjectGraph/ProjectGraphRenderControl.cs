@@ -41,7 +41,7 @@ public sealed partial class ProjectGraphRenderControl : Control
     public static readonly StyledProperty<string> GenerationPaletteProperty =
         AvaloniaProperty.Register<ProjectGraphRenderControl, string>(
             nameof(GenerationPalette),
-            "#7A858B,#808B76,#887F90,#918473,#728987,#8C787A,#82866E,#778094");
+            "#64CDBA,#6CA7F7,#B79CF9,#E5B77B,#EC99B2,#7CD3DF,#B5CC86,#A3AFE8");
 
     private const int MaxGraphNodes = 4200;
     private const int MaxChildrenPerParent = 120;
@@ -58,19 +58,19 @@ public sealed partial class ProjectGraphRenderControl : Control
     private const double MinZoom = 0.05;
     private const double MaxZoom = 2.35;
     private const double WheelPanStep = 42.0;
-    private const int MaxTextCacheEntries = 4096;
+    private const int MaxTextCacheEntries = MaxGraphNodes * 2;
     private const int MaxPenCacheEntries = 768;
 
     private static readonly FontFamily DefaultUiFontFamily = new("Segoe UI");
     private static readonly FontFamily DefaultCodeFontFamily = new("Consolas");
-    private static Cursor HandCursor => new(StandardCursorType.Hand);
-    private static Cursor ArrowCursor => new(StandardCursorType.Arrow);
-    private static Cursor PanCursor => new(StandardCursorType.SizeAll);
+    private static Cursor? _handCursor, _arrowCursor, _panCursor;
+    private static Cursor HandCursor => _handCursor ??= new(StandardCursorType.Hand);
+    private static Cursor ArrowCursor => _arrowCursor ??= new(StandardCursorType.Arrow);
+    private static Cursor PanCursor => _panCursor ??= new(StandardCursorType.SizeAll);
 
     private static readonly IBrush EditorSurfaceFallbackBrush = Brush.Parse("#F8F7F2");
     private static readonly IBrush PanelBorderFallbackBrush = Brush.Parse("#C9D0D2");
     private static readonly IBrush CommandBackgroundFallbackBrush = Brush.Parse("#EEF1EF");
-    private static readonly IBrush DirectoryHighlightFallbackBrush = Brush.Parse("#EBF0EA");
     private static readonly IBrush HistoryActiveFallbackBrush = Brush.Parse("#E7EEF0");
     private static readonly IBrush DropdownSelectedFallbackBrush = Brush.Parse("#CFE8EC");
     private static readonly IBrush TextPrimaryFallbackBrush = Brush.Parse("#31464B");
@@ -82,42 +82,16 @@ public sealed partial class ProjectGraphRenderControl : Control
     private static readonly IBrush AccentBorderFallbackBrush = Brush.Parse("#79BDA0");
     private static readonly IBrush MetricFileFallbackBrush = Brush.Parse("#4E7D88");
     private static readonly IBrush MetricLocFallbackBrush = Brush.Parse("#5E766D");
-    private static readonly Color EmptyFolderDarkColor = Color.Parse("#252B2F");
-    private static readonly Color EmptyFolderLightColor = Color.Parse("#DEE4E7");
-    private static readonly Color EmptyFolderBorderDarkColor = Color.Parse("#58636A");
-    private static readonly Color EmptyFolderBorderLightColor = Color.Parse("#88959B");
-    private static readonly Color[] LightRegionPalette =
-    [
-        Color.Parse("#D8EBFA"),
-        Color.Parse("#E3E7FB"),
-        Color.Parse("#D6F1F3"),
-        Color.Parse("#E8E1FA"),
-        Color.Parse("#DDEFF8"),
-        Color.Parse("#DCEAFD"),
-        Color.Parse("#D3F0EA"),
-        Color.Parse("#E7EDFA")
-    ];
-    private static readonly Color[] DarkRegionPalette =
-    [
-        Color.Parse("#102B3C"),
-        Color.Parse("#1D2646"),
-        Color.Parse("#10363C"),
-        Color.Parse("#292346"),
-        Color.Parse("#143245"),
-        Color.Parse("#172E49"),
-        Color.Parse("#12372F"),
-        Color.Parse("#1A2D42")
-    ];
     private static readonly Color[] DefaultGenerationBasePalette =
     [
-        Color.Parse("#7A858B"),
-        Color.Parse("#808B76"),
-        Color.Parse("#887F90"),
-        Color.Parse("#918473"),
-        Color.Parse("#728987"),
-        Color.Parse("#8C787A"),
-        Color.Parse("#82866E"),
-        Color.Parse("#778094")
+        Color.Parse("#64CDBA"),
+        Color.Parse("#6CA7F7"),
+        Color.Parse("#B79CF9"),
+        Color.Parse("#E5B77B"),
+        Color.Parse("#EC99B2"),
+        Color.Parse("#7CD3DF"),
+        Color.Parse("#B5CC86"),
+        Color.Parse("#A3AFE8")
     ];
 
     private readonly List<GraphNode> _roots = [];
@@ -129,6 +103,7 @@ public sealed partial class ProjectGraphRenderControl : Control
     private readonly Dictionary<uint, IBrush> _solidBrushCache = new();
     private readonly Dictionary<PenCacheKey, Pen> _penCache = new();
     private readonly Dictionary<TextCacheKey, FormattedText> _textCache = new();
+    private readonly Queue<TextCacheKey> _textCacheOrder = new();
     private static readonly Pen EdgeRouteRailPen = new(Brushes.Transparent);
     private static readonly Pen EdgeRouteBranchPen = new(Brushes.Transparent);
 
@@ -241,13 +216,17 @@ public sealed partial class ProjectGraphRenderControl : Control
         }
         else if (change.Property == ThemeKeyProperty)
         {
+            _appearanceCache.Clear();
             _solidBrushCache.Clear();
             _penCache.Clear();
-            _textCache.Clear();
+            ClearTextCache();
             InvalidateVisual();
         }
         else if (change.Property == GenerationPaletteProperty)
         {
+            _paletteValue = null;
+            ClearTextCache();
+            _appearanceCache.Clear();
             _solidBrushCache.Clear();
             _penCache.Clear();
             InvalidateVisual();
@@ -259,10 +238,13 @@ public sealed partial class ProjectGraphRenderControl : Control
             MarkLayoutDirty();
         }
         else if (change.Property == UiFontFamilyProperty
-            || change.Property == CodeFontFamilyProperty
-            || change.Property == SelectedNodeProperty)
+            || change.Property == CodeFontFamilyProperty)
         {
-            _textCache.Clear();
+            ClearTextCache();
+            InvalidateVisual();
+        }
+        else if (change.Property == SelectedNodeProperty)
+        {
             InvalidateVisual();
         }
     }
@@ -346,6 +328,7 @@ public sealed partial class ProjectGraphRenderControl : Control
         {
             _hoveredNode = hovered;
             Cursor = hovered is null ? ArrowCursor : HandCursor;
+            ToolTip.SetTip(this, hovered is null ? null : BuildExportNodeTooltip(hovered));
             InvalidateVisual();
         }
     }
@@ -364,6 +347,7 @@ public sealed partial class ProjectGraphRenderControl : Control
         if (!_isPanning)
         {
             _hoveredNode = null;
+            ToolTip.SetTip(this, null);
             Cursor = ArrowCursor;
             InvalidateVisual();
         }
@@ -426,7 +410,7 @@ public sealed partial class ProjectGraphRenderControl : Control
     private void MarkLayoutDirty()
     {
         _layoutDirty = true;
-        _textCache.Clear();
+        ClearTextCache();
         InvalidateVisual();
     }
 

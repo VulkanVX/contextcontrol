@@ -111,6 +111,18 @@ public sealed partial class ProjectGraphRenderControl
         public int Depth { get; }
         public string Key { get; }
         public string Title { get; }
+        private (string Version, long Loc, int Files, int DiskFiles, bool External)? _metaState;
+        private string _meta = "";
+        public string Meta
+        {
+            get
+            {
+                if (Node is null) return "";
+                var state = (Node.VersionLabel, Node.Loc, Node.FileCount, Node.DiskFileCount, Node.IsExternal);
+                if (_metaState != state) { _metaState = state; _meta = BuildNodeMeta(Node); }
+                return _meta;
+            }
+        }
         public bool IsAggregate { get; }
         public bool IsPinned { get; set; }
         public double Weight { get; set; }

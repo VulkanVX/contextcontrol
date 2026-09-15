@@ -4,7 +4,9 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.6.0 adds **chat actions**, **adaptive context modes**, and **automatic game checks and repair**. Type `/` to choose Google research, game creation, local chat, image generation or project coding. Browse descriptions and examples in **Actions**. Local generation has no fixed duration cutoff. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.6.0.md), [action guide](docs/CHAT_ACTIONS.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.6.1 refreshes the **architecture graph** with layered generation colors, readable node cards, a responsive toolbar and a clearer project tree panel. Layout, connections, paths, versions, file counts and LOC are preserved. Selection reuses cached labels instead of rebuilding every label. See the [release notes](docs/releases/v0.6.1.md) and [graph guide](docs/ARCHITECTURE_GRAPH.md).
+
+Chat actions, adaptive context modes, and automatic game checks and repair remain available: type `/` or open **Actions**. Local generation has no fixed duration cutoff. See the [action guide](docs/CHAT_ACTIONS.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md). Releases are built locally without GitHub Actions.
 
 ## Install On Windows
 

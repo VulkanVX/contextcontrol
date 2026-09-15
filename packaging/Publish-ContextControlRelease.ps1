@@ -172,6 +172,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw "Project scanner regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --ui-experience-regression (Join-Path $releaseRoot "ui-review")
     if ($LASTEXITCODE -ne 0) { throw "UI experience regression failed ($LASTEXITCODE)." }
+    dotnet run --project $testProject --configuration $Configuration --no-build -- --graph-experience (Join-Path $releaseRoot "graph-review")
+    if ($LASTEXITCODE -ne 0) { throw "Architecture graph regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --google-research-regression
     if ($LASTEXITCODE -ne 0) { throw "Google research regression failed ($LASTEXITCODE)." }
     dotnet run --project $testProject --configuration $Configuration --no-build -- --game-regression

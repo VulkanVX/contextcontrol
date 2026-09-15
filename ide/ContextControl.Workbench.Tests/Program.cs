@@ -10,6 +10,7 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--graph-experience")) { ProjectGraphExperienceTests.Run(args[Array.IndexOf(args, "--graph-experience") + 1], args.Contains("--renderer-only"), args.Contains("--baseline")); return; }
 if (args.Contains("--game-regression")) { GameLabTests.Run(); return; }
 if (args.Contains("--actions-regression")) { await ChatActionTests.Run(); return; }
 if (args.Contains("--settings-persistence")) { await SettingsPersistenceTests.Run(); return; }
