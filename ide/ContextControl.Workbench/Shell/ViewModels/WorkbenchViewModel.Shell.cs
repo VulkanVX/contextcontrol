@@ -383,6 +383,8 @@ public sealed partial class WorkbenchViewModel
 
     public void Dispose()
     {
+        _projectScanCancellation?.Cancel();
+        _projectScanFilterCancellation?.Cancel();
         FlushAppearanceSettings();
         ContextControl.FlushPendingChatDraft();
         ContextControl.ChatMonitor.Dispose();

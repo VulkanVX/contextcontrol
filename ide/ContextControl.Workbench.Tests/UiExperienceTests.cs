@@ -14,7 +14,7 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using ContextControl.Workbench.Views;
 
-internal static class UiExperienceTests
+internal static partial class UiExperienceTests
 {
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
     private static int _checks;
@@ -55,6 +55,7 @@ internal static class UiExperienceTests
         Snapshot(settingsWindow, 1080, 700, Path.Combine(output, "settings-200.png"));
         settingsWindow.Close();
         MainWindowFlow(workbench, output);
+        ProjectScannerAndRules(workbench, root, output);
         Presentation(context, root, output);
         LiveDeliveryAndCatalog(context, workbench, root, output);
         ThinkingScroll(output);

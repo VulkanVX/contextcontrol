@@ -9,9 +9,6 @@ namespace ContextControl.Workbench.Services;
 
 public static partial class ProjectStackScanner
 {
-    private const int MaxDepth = 20;
-    private const int MaxDirectories = 8000;
-    private const int MaxFiles = 50000;
     private const long MaxManifestReadBytes = 512 * 1024;
     private const long MaxTextSignalReadBytes = 160 * 1024;
     private const int MaxTextSignalFiles = 3000;
@@ -19,107 +16,10 @@ public static partial class ProjectStackScanner
     private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
     private static readonly EnumerationOptions SafeEnumerationOptions = new()
     {
-        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
-        IgnoreInaccessible = true,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
         RecurseSubdirectories = false
     };
-    private static readonly HashSet<string> AlwaysSkippedDirectories = new(NameComparer)
-    {
-        ".bundle",
-        ".cache",
-        ".ccReplace.versions",
-        ".ccWorkbench.browser-data",
-        ".angular",
-        ".bloop",
-        ".claude",
-        ".conan",
-        ".conan2",
-        ".codex",
-        ".cursor",
-        ".dart_tool",
-        ".expo",
-        ".git",
-        ".godot",
-        ".gptReplace.versions",
-        ".gradle",
-        ".idea",
-        ".import",
-        ".metals",
-        ".m2",
-        ".mypy_cache",
-        ".next",
-        ".nox",
-        ".opam",
-        ".nuxt",
-        ".nuget",
-        ".parcel-cache",
-        ".pnpm-store",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".serverless",
-        ".svelte-kit",
-        ".terraform",
-        ".tmp",
-        ".tox",
-        ".turbo",
-        ".venv",
-        ".vs",
-        ".vscode",
-        ".yarn",
-        ".zig-cache",
-        "__pycache__",
-        "_build",
-        "_deps",
-        "_opam",
-        "bazel-bin",
-        "bazel-out",
-        "bazel-testlogs",
-        "bin",
-        "bower_components",
-        "build",
-        "build-debug",
-        "build-release",
-        "cmake-build-debug",
-        "cmake-build-release",
-        "CMakeFiles",
-        "coverage",
-        "DerivedData",
-        "deps",
-        "dist",
-        "elm-stuff",
-        "external",
-        "extern",
-        "node_modules",
-        "obj",
-        "out",
-        "packages",
-        "Pods",
-        "target",
-        "third_party",
-        "thirdparty",
-        "vendor",
-        "vcpkg_installed",
-        "venv",
-        "zig-out"
-    };
-    private static readonly HashSet<string> TopLevelBuildConfigurationDirectories = new(NameComparer)
-    {
-        "Debug",
-        "MinSizeRel",
-        "Release",
-        "RelWithDebInfo",
-        "x64"
-    };
-    private static readonly string[] AutoSetupIgnoredFileNames =
-    [
-        ".ccFileRules.json",
-        ".ccReplace.settings.auto.json",
-        ".ccReplace.settings.json",
-        ".ccWorkbench.settings.json",
-        ".DS_Store",
-        "desktop.ini",
-        "Thumbs.db"
-    ];
     private static readonly string[] AutoSetupIgnoredExtensions =
     [
         ".a",

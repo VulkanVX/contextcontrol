@@ -84,7 +84,9 @@ public static partial class GoogleResearchService
                 catch (Exception ex) when (ex is InvalidOperationException or IOException or TimeoutException or System.Runtime.InteropServices.COMException)
                 {
                     // Keep the exact limitation in the evidence; never turn an unread page into a claimed read.
-                    if (ex is GooglePageUnavailableException blocked && GoogleSearchContext.IsPublicWebUrl(blocked.PageUrl))
+                    if (ex is GooglePageUnavailableException blocked && GoogleSearchContext.IsPublicWebUrl(blocked.PageUrl)
+                        && !BrowserPageGate.IsAuthenticationUrl(blocked.PageUrl)
+                        && !new Uri(blocked.PageUrl!).Host.Equals("consent.google.com", StringComparison.OrdinalIgnoreCase))
                         resolvedSources[number - 1] = source with { Url = blocked.PageUrl! };
                     pages.Add(new GooglePageEvidence(number, "Page unavailable: " + ex.Message, false));
                     status($"Source [{number}] unavailable · looking for another source…");

@@ -4,13 +4,19 @@ namespace ContextControl.Workbench.Services;
 
 public static partial class ProjectStackScanner
 {
-    public static Task<ProjectStackScanResult> ScanAsync(string projectRoot, ProjectFileRules rules)
+    static ProjectStackScanner()
     {
-        return Task.Run(() => Scan(projectRoot, rules));
+        foreach (var pair in AdditionalCodeExtensions) LanguageByExtension.TryAdd(pair.Key, pair.Value);
     }
 
-    public static ProjectStackScanResult Scan(string projectRoot, ProjectFileRules rules)
+    public static Task<ProjectStackScanResult> ScanAsync(string projectRoot, ProjectFileRules rules,
+        CancellationToken cancellationToken = default, IProgress<ProjectScanProgress>? progress = null)
+        => Task.Run(() => Scan(projectRoot, rules, cancellationToken, progress), cancellationToken);
+
+    public static ProjectStackScanResult Scan(string projectRoot, ProjectFileRules rules,
+        CancellationToken cancellationToken = default, IProgress<ProjectScanProgress>? progress = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var root = new DirectoryInfo(projectRoot);
         if (!root.Exists)
         {
@@ -23,10 +29,10 @@ public static partial class ProjectStackScanner
                 "No scan completed",
                 [],
                 [],
-                ProjectStackRuleSet.Empty());
+                ProjectStackRuleSet.Empty()) { IsComplete = false };
         }
 
-        var state = new ScanState(root.FullName, rules);
+        var state = new ScanState(root.FullName, rules) { CancellationToken = cancellationToken, Progress = progress };
         ScanDirectory(root, root.FullName, 0, rules, state, hiddenByCurrentRules: false);
         AddPostScanStackSignals(state);
         return BuildResult(state);

@@ -94,7 +94,9 @@ public static class GoogleResearchScripts
           return { url: location.href, title: document.title, text: parts.join('\n').slice(0,24000),
             imageUrl, images,
             heading: document.querySelector('h1')?.innerText?.slice(0,500) || '',
-            gateText: gate?.innerText?.slice(0,1600) || '', hasArticle: !!document.querySelector('article,shreddit-post') };
+            gateText: gate?.innerText?.slice(0,1600) || '', hasArticle: !!document.querySelector('article,shreddit-post'),
+            hasPasswordField: Array.from(document.querySelectorAll('input[type="password"]')).some(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'),
+            needsConsent: !!gate && /cookies|slapuk|sīkdat|küpsis|файлы cookie/i.test(gate.innerText) };
         })()
         """;
 }

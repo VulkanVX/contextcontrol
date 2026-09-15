@@ -1,36 +1,84 @@
-<?xml version="1.0" encoding="utf-8"?>
-<UserControl
-    x:Class="ContextControl.Workbench.Views.MainWindowParts.ProjectScannerPage"
-    xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
-    xmlns:svc="clr-namespace:ContextControl.Workbench.Services"
-    xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
->
-            <Border
-                Grid.Row="2"
-                Classes="editor-body scanner-page"
-                Padding="6"
-                ClipToBounds="True"
-                MinHeight="0"
-                IsVisible="{Binding IsProjectScannerMode}">
-              <Grid RowDefinitions="*" RowSpacing="0">
-                <ScrollViewer
-                    Grid.Row="0"
-                    VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled"
-                    AllowAutoHide="False">
-                  <controls:ProjectScannerRenderControl
-                      Metrics="{Binding ProjectScanMetrics}"
-                      IdentitySections="{Binding ProjectScanIdentitySections}"
-                      FileSections="{Binding ProjectScanFileSections}"
-                      RuleSections="{Binding ProjectScanRuleSections}"
-                      DiagnosticSections="{Binding ProjectScanDiagnosticSections}"
-                      ShowMetrics="{Binding ShowProjectScanMetrics}"
-                      ThemeKey="{Binding ThemeKey}"
-                      UiFontFamily="{Binding UiFontFamily}"
-                      CodeFontFamily="{Binding CodeFontFamily}" />
-                </ScrollViewer>
-              </Grid>
-            </Border>
+<UserControl x:Class="ContextControl.Workbench.Views.MainWindowParts.ProjectScannerPage"
+    xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:ContextControl.Workbench.Controls" xmlns:svc="clr-namespace:ContextControl.Workbench.Services">
+  <Border Classes="editor-body scanner-page" Background="{DynamicResource PanelBackgroundBrush}" Padding="16,12" IsVisible="{Binding IsProjectScannerMode}" ClipToBounds="True">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="10">
+      <Border Classes="scanner-overview-card">
+        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="6">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Your project, in focus" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Text="{Binding ProjectScanCoverage}" FontSize="12" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" />
+            <TextBlock Text="Project source only. Dependency packages, build caches and links stay skipped." FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Content="Cancel scan" Command="{Binding CancelProjectScanCommand}" IsVisible="{Binding CanCancelProjectScan}" VerticalAlignment="Top" />
+          <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="5" IsVisible="{Binding IsProjectScanRunning}">
+            <ProgressBar IsIndeterminate="True" Height="3" />
+            <TextBlock Text="{Binding ProjectScanProgressText}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+      <StackPanel Grid.Row="1" Spacing="4">
+        <Expander Header="Stack, languages and rule recommendations" IsVisible="{Binding ShowProjectScanMetrics}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <ScrollViewer MaxHeight="230" HorizontalScrollBarVisibility="Disabled">
+            <controls:ProjectScannerRenderControl Metrics="{Binding ProjectScanMetrics}" IdentitySections="{Binding ProjectScanIdentitySections}"
+                FileSections="{Binding ProjectScanFileSections}" RuleSections="{Binding ProjectScanRuleSections}"
+                DiagnosticSections="{Binding ProjectScanDiagnosticSections}" ThemeKey="{Binding ThemeKey}"
+                UiFontFamily="{Binding UiFontFamily}" CodeFontFamily="{Binding CodeFontFamily}" />
+          </ScrollViewer>
+        </Expander>
+        <Expander Header="Skipped locations and scan notices" IsVisible="{Binding HasProjectScanNotices}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <ListBox ItemsSource="{Binding ProjectScanNotices}" MaxHeight="180" FontSize="11" Background="Transparent" />
+        </Expander>
+      </StackPanel>
+      <Grid Grid.Row="2" ColumnDefinitions="*,165,Auto" ColumnSpacing="10">
+        <TextBox x:Name="ScannerSearch" Watermark="Search by path, file name or language…" Text="{Binding ProjectScanSearchText, Mode=TwoWay}" MinHeight="34" />
+        <ComboBox Grid.Column="1" ItemsSource="{Binding ProjectScanFilters}" SelectedItem="{Binding ProjectScanFilter, Mode=TwoWay}" HorizontalAlignment="Stretch" MinHeight="34" />
+        <TextBlock Grid.Column="2" Text="{Binding ProjectScanInventoryCount}" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+      </Grid>
+      <Border Grid.Row="3" Classes="scanner-inventory-card" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <Border Background="{DynamicResource CommandBackgroundBrush}" Padding="14,10">
+            <Grid ColumnDefinitions="*,140,100,76" ColumnSpacing="10">
+              <TextBlock Text="SOURCE FILE" Classes="scanner-column-label" />
+              <TextBlock Grid.Column="1" Text="LANGUAGE" Classes="scanner-column-label" />
+              <TextBlock Grid.Column="2" Text="RULE STATUS" Classes="scanner-column-label" />
+              <TextBlock Grid.Column="3" Text="SIZE" Classes="scanner-column-label" />
+            </Grid>
+          </Border>
+          <ListBox x:Name="ScannerFiles" Grid.Row="1" ItemsSource="{Binding ProjectScanFilteredFiles}"
+              SelectedItem="{Binding SelectedProjectScanFile, Mode=TwoWay}" DoubleTapped="OnFileDoubleTapped"
+              Classes="scanner-file-list" Background="Transparent" BorderThickness="0"
+              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="{x:Type svc:ProjectScanFile}">
+                <Grid ColumnDefinitions="*,140,100,76" ColumnSpacing="10" Margin="8,5">
+                  <Grid ColumnDefinitions="22,*" ColumnSpacing="6">
+                    <Path Data="M 8,3 L 2,9 L 8,15 M 14,3 L 20,9 L 14,15" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.6" Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                      <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding RelativePath}" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RelativePath}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Grid.Column="1" Text="{Binding Language}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <Border Grid.Column="2" Background="{DynamicResource CommandBackgroundBrush}" CornerRadius="8" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding Status}" FontSize="10.5" ToolTip.Tip="{Binding Detail}" />
+                  </Border>
+                  <TextBlock Grid.Column="3" Text="{Binding SizeLabel}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Grid.Row="1" Text="No matching files. Run Scan or adjust your filter." IsVisible="{Binding HasNoProjectScanMatches}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+        </Grid>
+      </Border>
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding SelectedProjectScanFile.RelativePath}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextPrimaryBrush}" />
+          <TextBlock Text="{Binding SelectedProjectScanFile.Detail}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="browser-open-button" Content="Open file" Click="OnOpenFileClick" />
+      </Grid>
+    </Grid>
+  </Border>
 </UserControl>

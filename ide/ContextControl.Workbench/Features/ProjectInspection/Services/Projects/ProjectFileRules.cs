@@ -499,7 +499,7 @@ public sealed class ProjectFileRules
         }
 
         var extension = NormalizeExtension(Path.GetExtension(normalizedFullPath));
-        if (!_supportedExtensions.Contains(extension))
+        if (!_supportedExtensions.Contains(extension) && !MatchesShownFile(normalizedRelativePath, fileName))
         {
             return ProjectFileTrackDecision.Ignore($"unsupported extension: {extension}");
         }
@@ -526,9 +526,13 @@ public sealed class ProjectFileRules
         }
 
         var normalizedExtension = NormalizeExtension(extension);
-        return _supportedExtensions.Contains(normalizedExtension)
-            && !_ignoredExtensions.Contains(normalizedExtension);
+        return MatchesShownFile(NormalizeRulePath(relativePath), fileName)
+            || (_supportedExtensions.Contains(normalizedExtension) && !_ignoredExtensions.Contains(normalizedExtension));
     }
+
+    public bool ShouldCountLocFile(string relativePath, string fileName, string extension) =>
+        ShouldCountLocExtension(extension) || (MatchesShownFile(NormalizeRulePath(relativePath), fileName)
+            && (string.IsNullOrEmpty(extension) || ProjectStackScanner.IsNamedSourceFile(fileName)));
 
     public bool ShouldSkipExtension(string extension)
     {
@@ -548,6 +552,13 @@ public sealed class ProjectFileRules
             : directoryName.Trim();
 
         return MatchesIgnoredDirectory(normalizedRelativePath, cleanDirectoryName);
+    }
+
+    internal bool HasCustomDirectoryExclusion(string directoryName, string relativePath)
+    {
+        var custom = _ignoredDirectories.Where(rule => !DefaultIgnoredDirectories.Contains(rule, NameComparer));
+        var matcher = CreateSnapshot(string.Join(Environment.NewLine, custom), "", "", "", "");
+        return matcher.ShouldSkipDirectory(directoryName, relativePath);
     }
 
     public bool SkipFile(string relativePath)

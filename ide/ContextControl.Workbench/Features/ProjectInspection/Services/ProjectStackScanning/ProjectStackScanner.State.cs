@@ -17,7 +17,12 @@ public static partial class ProjectStackScanner
         public int TrackedFiles { get; set; }
         public int UnsupportedVisibleFiles { get; set; }
         public int TextSignalFilesScanned { get; set; }
-        public bool LimitHit { get; set; }
+        public CancellationToken CancellationToken { get; init; }
+        public IProgress<ProjectScanProgress>? Progress { get; init; }
+        public System.Diagnostics.Stopwatch ProgressClock { get; } = System.Diagnostics.Stopwatch.StartNew();
+        public List<ProjectScanFile> Files { get; } = [];
+        public List<string> Notices { get; } = [];
+        public bool IsComplete { get; set; } = true;
         public Dictionary<string, int> ExtensionCounts { get; } = new(NameComparer);
         public Dictionary<string, int> UnsupportedExtensionCounts { get; } = new(NameComparer);
         public Dictionary<string, int> SkippedExtensionCounts { get; } = new(NameComparer);

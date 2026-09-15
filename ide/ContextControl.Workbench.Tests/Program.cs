@@ -10,6 +10,9 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--scanner-regression")) { ProjectScannerTests.Run(); return; }
+if (args.Contains("--scanner-project")) { ProjectScannerTests.Run(args[Array.IndexOf(args, "--scanner-project") + 1]); return; }
+
 if (args.Contains("--runtime-regression")) { await LocalRuntimeTests.Run(); return; }
 if (args.Contains("--browser-workspace-smoke")) { GoogleBrowserTests.Run(null, workspace: true); return; }
 if (args.Contains("--browser-workspace-live")) { GoogleBrowserTests.Run("granite3.3:2b", workspace: true); return; }

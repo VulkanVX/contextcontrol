@@ -13,60 +13,15 @@ namespace ContextControl.Workbench.Services;
 
 public static class ProjectLoader
 {
-    private const int MaxDepth = 20;
     private const int DefaultExpandedDepth = 2;
     private const long MaxExactLineCountBytes = 512 * 1024;
     private const long EstimatedBytesPerLine = 44;
     private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
     private static readonly EnumerationOptions SafeEnumerationOptions = new()
     {
-        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+        AttributesToSkip = FileAttributes.ReparsePoint,
         IgnoreInaccessible = true,
         RecurseSubdirectories = false
-    };
-    private static readonly HashSet<string> AlwaysIgnoredDirectories = new(PathComparer)
-    {
-        ".git",
-        ".vs",
-        ".vscode",
-        ".idea",
-        ".cache",
-        ".godot",
-        ".import",
-        ".ccReplace.versions",
-        "__pycache__",
-        "bin",
-        "build",
-        "build-debug",
-        "build-release",
-        "cmake-build-debug",
-        "cmake-build-release",
-        "CMakeFiles",
-        "obj",
-        "out",
-    };
-    private static readonly HashSet<string> TopLevelBuildConfigurationDirectories = new(PathComparer)
-    {
-        "Debug",
-        "MinSizeRel",
-        "Release",
-        "RelWithDebInfo",
-        "x64"
-    };
-    private static readonly HashSet<string> IgnoredDirectories = new(PathComparer)
-    {
-        "deps",
-        "dependencies",
-        "dist",
-        "external",
-        "extern",
-        "node_modules",
-        "packages",
-        "PackageCache",
-        "third_party",
-        "thirdparty",
-        "vendor",
-        "vcpkg_installed"
     };
     private static readonly HashSet<string> IncludeableExternalDirectories = new(PathComparer)
     {
@@ -81,18 +36,6 @@ public static class ProjectLoader
         "vendor",
         "vcpkg_installed"
     };
-    private static readonly HashSet<string> VulkanVxTopLevelAllowList = new(PathComparer)
-    {
-        "assets",
-        "CMakeLists.txt",
-        "include",
-        "maps",
-        "README.md",
-        "shaders",
-        "src",
-        "tools"
-    };
-
     public static Task<LoadedProject> LoadAsync(
         string folderPath,
         IEnumerable<string>? includedExternalPaths = null,
@@ -186,7 +129,7 @@ public static class ProjectLoader
         var children = new List<ProjectNodeViewModel>();
         var allFiles = Array.Empty<FileInfo>();
 
-        if (depth < MaxDepth)
+        // Links are excluded during enumeration; source depth is not capped.
         {
             foreach (var childDirectory in EnumerateAllDirectories(directory))
             {
@@ -208,8 +151,7 @@ public static class ProjectLoader
             foreach (var file in allFiles)
             {
                 var relativePath = NormalizePath(Path.GetRelativePath(rootPath, file.FullName));
-                if (!fileRules.ShouldTrackFile(relativePath, file.Name, file.Extension)
-                    || !fileRules.ShouldCountLocExtension(file.Extension))
+                if (!fileRules.ShouldTrackFile(relativePath, file.Name, file.Extension))
                 {
                     if (showSkippedFiles)
                     {
@@ -219,17 +161,7 @@ public static class ProjectLoader
                     continue;
                 }
 
-                var fileLoc = EstimateLoc(file);
-                if (fileLoc <= 0)
-                {
-                    if (showSkippedFiles)
-                    {
-                        children.Add(new ProjectNodeViewModel(file.Name, relativePath, false, "skip", isExternal: true, diskFileCount: 1));
-                    }
-
-                    continue;
-                }
-
+                var fileLoc = fileRules.ShouldCountLocFile(relativePath, file.Name, file.Extension) ? EstimateLoc(file) : 0;
                 fileCount++;
                 lineCount += fileLoc;
                 var version = FindVersion(currentVersions, relativePath, directory.Name);
@@ -259,7 +191,7 @@ public static class ProjectLoader
         var children = new List<ProjectNodeViewModel>();
         var allFiles = Array.Empty<FileInfo>();
 
-        if (depth < MaxDepth)
+        // Links are excluded during enumeration; source depth is not capped.
         {
             foreach (var childDirectory in EnumerateAllDirectories(directory))
             {
@@ -306,38 +238,9 @@ public static class ProjectLoader
         IReadOnlySet<string> includedExternalPaths,
         ProjectFileRules fileRules)
     {
-        if (directory.Name.Equals("contextcontrol", StringComparison.OrdinalIgnoreCase) && LooksLikeContextControl(directory))
-        {
-            return true;
-        }
-
-        if (AlwaysIgnoredDirectories.Contains(directory.Name) || fileRules.ShouldSkipDirectory(directory.Name, relativePath))
-        {
-            return true;
-        }
-
-        if (TopLevelBuildConfigurationDirectories.Contains(directory.Name)
-            && IsTopLevelPath(relativePath))
-        {
-            return true;
-        }
-
-        if (IsIncludedExternalPath(relativePath, includedExternalPaths))
-        {
-            return false;
-        }
-
-        if (IgnoredDirectories.Contains(directory.Name))
-        {
-            return true;
-        }
-
-        if (profile == "vulkanvx" && depth == 0)
-        {
-            return !ShouldIncludeVulkanVxTopLevel(relativePath);
-        }
-
-        return false;
+        if (ProjectStackScanner.InventoryMetadataDirectories.Contains(directory.Name)) return true;
+        if (IsIncludedExternalPath(relativePath, includedExternalPaths)) return false;
+        return fileRules.ShouldSkipDirectory(directory.Name, relativePath);
     }
 
     private static bool IsIncludedExternalPath(string relativePath, IReadOnlySet<string> includedExternalPaths)
@@ -346,19 +249,6 @@ public static class ProjectLoader
         return includedExternalPaths.Any(path =>
             normalized.Equals(path, StringComparison.OrdinalIgnoreCase)
             || normalized.StartsWith(path + "/", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsTopLevelPath(string relativePath)
-    {
-        var normalized = NormalizePath(relativePath);
-        return !string.IsNullOrWhiteSpace(normalized)
-            && !normalized.Contains('/', StringComparison.Ordinal);
-    }
-
-    private static bool ShouldIncludeVulkanVxTopLevel(string relativePath)
-    {
-        var top = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return top is not null && VulkanVxTopLevelAllowList.Contains(top);
     }
 
     private static void PrepareTree(IReadOnlyList<ProjectNodeViewModel> roots)

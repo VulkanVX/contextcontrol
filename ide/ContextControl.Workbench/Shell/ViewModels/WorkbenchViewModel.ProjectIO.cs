@@ -752,17 +752,18 @@ public sealed partial class WorkbenchViewModel
         RefreshExternalChangeLabels();
     }
 
-    private async Task RefreshCurrentProjectFromDiskAsync()
+    private async Task RefreshCurrentProjectFromDiskAsync(ProjectTabViewModel? projectToRefresh = null)
     {
-        if (CurrentProject is null || !_workspaceByProjectId.TryGetValue(CurrentProject.Id, out var currentWorkspace))
+        var project = projectToRefresh ?? CurrentProject;
+        if (project is null || !_workspaceByProjectId.TryGetValue(project.Id, out var currentWorkspace))
         {
             return;
         }
 
-        var projectRoot = CurrentProject.ProjectRoot;
-        var projectId = CurrentProject.Id;
+        var projectRoot = project.ProjectRoot;
+        var projectId = project.Id;
         var loadedProject = await ProjectLoader.LoadAsync(projectRoot, currentWorkspace.IncludedExternalPaths, ShowSkippedFiles);
-        var existingIndex = Projects.IndexOf(CurrentProject);
+        var existingIndex = Projects.ToList().FindIndex(item => item.Id == projectId);
         if (existingIndex >= 0)
         {
             Projects[existingIndex] = loadedProject.Project;
@@ -783,7 +784,7 @@ public sealed partial class WorkbenchViewModel
             _trackersByProjectId[loadedProject.Project.Id] = tracker;
         }
 
-        SelectProject(loadedProject.Project);
+        if (CurrentProject?.Id == projectId) SelectProject(loadedProject.Project);
     }
 
     private void RecalculateExternalChangeFlows(IEnumerable<ExternalChangeItemViewModel> changes)

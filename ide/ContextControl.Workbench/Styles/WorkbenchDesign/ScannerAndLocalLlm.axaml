@@ -4,6 +4,27 @@
     xmlns:controls="clr-namespace:ContextControl.Workbench.Controls">
 
 
+    <Style Selector="ListBox.scanner-file-list > ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.scanner-overview-card">
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="16,14" />
+    </Style>
+    <Style Selector="Border.scanner-inventory-card">
+      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style Selector="TextBlock.scanner-column-label">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    </Style>
+
     <Style Selector="TextBox.scanner-result">
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />

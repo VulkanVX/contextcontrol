@@ -7,7 +7,7 @@
       <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="CornerRadius" Value="12" />
       <Setter Property="Padding" Value="10" />
     </Style>
 
@@ -15,19 +15,19 @@
       <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Padding" Value="5" />
     </Style>
 
     <Style Selector="Button.settings-nav">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="12,10" />
       <Setter Property="FontSize" Value="11" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="10" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -47,7 +47,7 @@
 
     <Style Selector="TextBlock.settings-title">
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="ExtraBold" />
     </Style>
 
@@ -166,7 +166,7 @@
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontSize" Value="11" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -292,7 +292,7 @@
 
     <Style Selector="CheckBox.summary-kind-check">
       <Setter Property="FontSize" Value="10" />
-      <Setter Property="MinHeight" Value="15" />
+      <Setter Property="MinHeight" Value="22" />
       <Setter Property="Height" Value="15" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="Margin" Value="4,0,0,0" />
@@ -350,7 +350,7 @@
       <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="10" />
       <Setter Property="ClipToBounds" Value="True" />
       <Setter Property="Padding" Value="7" />
     </Style>
@@ -366,7 +366,7 @@
       <Setter Property="Background" Value="{DynamicResource EditorSurfaceBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Padding" Value="5" />
   </Style>
 
@@ -385,13 +385,13 @@
       <Setter Property="CornerRadius" Value="3" />
       <Setter Property="Padding" Value="3,0" />
       <Setter Property="Margin" Value="0,0,3,3" />
-      <Setter Property="MinHeight" Value="15" />
+      <Setter Property="MinHeight" Value="22" />
     </Style>
 
     <Style Selector="TextBlock.rule-value">
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="FontFamily" Value="{DynamicResource CodeFontFamily}" />
-      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontSize" Value="11" />
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>

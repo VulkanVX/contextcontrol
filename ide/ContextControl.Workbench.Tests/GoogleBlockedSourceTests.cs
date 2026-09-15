@@ -18,6 +18,21 @@ internal static class GoogleBlockedSourceTests
             catch (GooglePageUnavailableException ex) { Check(ex.Message.Contains(status.ToString()) && ex.PageUrl == "https://www.reddit.com/", "Failures must preserve status and the actual destination."); }
         }
         GooglePageReader.ThrowIfHttpError("https://example.com/", 200);
+        foreach (var payload in new[]
+        {
+            JsonSerializer.Serialize(new { url = "https://consent.google.com/m", title = "Prieš pereinant į „Google“", text = "Naudojame slapukus ir duomenis. " + new string('a', 6000) }),
+            JsonSerializer.Serialize(new { url = "https://www.google.com/search?q=test", title = "Prieš pereinant į „Google“", text = "Slapukų nuostatos" }),
+            JsonSerializer.Serialize(new { url = "https://www.facebook.com/login/?next=post", title = "Facebook", text = new string('a', 6000) }),
+            JsonSerializer.Serialize(new { url = "https://www.facebook.com/posts/42", title = "Facebook", text = new string('a', 6000), hasPasswordField = true }),
+            JsonSerializer.Serialize(new { url = "https://www.facebook.com/posts/42", title = "Facebook", text = new string('a', 6000), needsConsent = true })
+        })
+        {
+            try { GooglePageReader.Parse(payload); Check(false, "Consent/login screens must never reach model evidence."); }
+            catch (GooglePageUnavailableException) { checks++; }
+        }
+        Check(!BrowserPageGate.IsAuthenticationUrl("https://www.facebook.com/public-page/posts/123"), "Public Facebook post URLs must remain eligible.");
+        Check(GooglePageReader.Parse(JsonSerializer.Serialize(new { url = "https://example.com/article", title = "Why Google's consent screen says before you continue to Google", text = "An article about privacy settings.", hasArticle = true })).Text.Length > 0,
+            "Articles discussing consent must not be mistaken for a consent screen.");
         foreach (var json in new[]
         {
             Page("Reddit", redditBlock), Page("Just a moment...", "Checking your browser before continuing."),

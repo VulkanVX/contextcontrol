@@ -29,6 +29,11 @@ public sealed class GoogleResearchReader(WebView2Host browser, Action<string> se
             {
                 token.ThrowIfCancellationRequested();
                 ThrowIfUnavailable();
+                if (HasCompletedNavigation(previousNavigation) && await HandlePageGateAsync(token))
+                {
+                    await Task.Delay(500, token);
+                    continue;
+                }
                 if (HasCompletedNavigation(previousNavigation) && GoogleSearchContext.IsMatchingSearchPage(_browser.Source, query))
                 {
                     var json = await _browser.ExecuteScriptAsync(GoogleResearchScripts.SearchResults).WaitAsync(TimeSpan.FromSeconds(5), token);
@@ -71,6 +76,11 @@ public sealed class GoogleResearchReader(WebView2Host browser, Action<string> se
                 }
                 if (HasCompletedNavigation(previousNavigation))
                 {
+                    if (await HandlePageGateAsync(token))
+                    {
+                        await Task.Delay(400, token);
+                        continue;
+                    }
                     var page = GooglePageReader.Parse(await _browser.ExecuteScriptAsync(GoogleResearchScripts.PageText).WaitAsync(TimeSpan.FromSeconds(5), token));
                     // Do not accidentally return a previous page or a redirect to a login/consent provider.
                     if (MatchesSourcePage(source.Url, page.Url) && page.Text.Length >= 120) return page;
@@ -92,6 +102,29 @@ public sealed class GoogleResearchReader(WebView2Host browser, Action<string> se
         return expected.Host.Replace("www.", "", StringComparison.OrdinalIgnoreCase).Equals(found.Host.Replace("www.", "", StringComparison.OrdinalIgnoreCase), StringComparison.OrdinalIgnoreCase)
             && expected.AbsolutePath.TrimEnd('/').Equals(found.AbsolutePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
             && expected.Query == found.Query;
+    }
+
+    private async Task<bool> HandlePageGateAsync(CancellationToken token)
+    {
+        var json = await _browser.ExecuteScriptAsync(BrowserPageGate.InspectAndRejectOptionalCookies).WaitAsync(TimeSpan.FromSeconds(5), token);
+        using var document = JsonDocument.Parse(json);
+        var kind = document.RootElement.TryGetProperty("kind", out var value) ? value.GetString() : "none";
+        if (kind == "login")
+            throw new GooglePageUnavailableException(_browser.Source, "This source is behind a login screen. Its post or article could not be read.");
+        if (kind == "cookie-choice")
+        {
+            _setStatus("Rejecting optional cookies · continuing research…");
+            return true;
+        }
+        if (kind == "consent")
+        {
+            _setStatus("Waiting for cookie preference confirmation in the Browser tab…");
+            RequestBrowserAttention();
+            return true;
+        }
+        if (BrowserPageGate.IsAuthenticationUrl(_browser.Source))
+            throw new GooglePageUnavailableException(_browser.Source, "This source requires a login. No private content was read; continuing with public sources.");
+        return false;
     }
 
     private bool HasFinishedNavigation(ulong previous) => _browser.IsReady && !_browser.IsNavigating

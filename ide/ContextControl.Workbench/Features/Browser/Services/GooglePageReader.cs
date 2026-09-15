@@ -34,6 +34,12 @@ public static partial class GooglePageReader
         var heading = Read(page, "heading");
         var text = Read(page, "text");
         var gate = Read(page, "gateText");
+        var passwordVisible = page.TryGetProperty("hasPasswordField", out var password) && password.ValueKind == JsonValueKind.True;
+        var consentVisible = page.TryGetProperty("needsConsent", out var consent) && consent.ValueKind == JsonValueKind.True;
+        if (BrowserPageGate.IsAuthenticationUrl(url) || passwordVisible || consentVisible
+            || Uri.TryCreate(url, UriKind.Absolute, out var gateUri) && gateUri.Host.Equals("consent.google.com", StringComparison.OrdinalIgnoreCase)
+            || ConsentScreen().IsMatch(title) || ConsentScreen().IsMatch(heading))
+            throw new GooglePageUnavailableException(url, "This source displayed a cookie-consent or login screen. Its content was not read.");
         var hasArticle = page.TryGetProperty("hasArticle", out var article) && article.ValueKind == JsonValueKind.True;
         var shortScreen = text.Length < 5000 && !hasArticle;
         if (BlockScreen().IsMatch(gate)
@@ -59,4 +65,7 @@ public static partial class GooglePageReader
 
     [GeneratedRegex(@"\b(blocked by network security|blocked due to a network policy|your request has been blocked|access denied|verify (?:that )?you are (?:a )?human|checking (?:your )?browser|log in to (?:your reddit account|continue)|sign in to continue)\b", RegexOptions.IgnoreCase)]
     private static partial Regex BlockScreen();
+
+    [GeneratedRegex(@"^(?:before you (?:continue|go) to google|prieš pereinant į.*google|prieš tęsdami.*google|facebook\s*[-–—:]\s*(?:log in or sign up|prisijunkite)|log in to facebook|prisijunkite prie.*facebook)", RegexOptions.IgnoreCase)]
+    private static partial Regex ConsentScreen();
 }

@@ -149,7 +149,7 @@ public sealed partial class WorkbenchViewModel
             return;
         }
 
-        IsProjectScanRunning = true;
+        BeginProjectScan();
         ApplyProjectScanBusy(workspace);
         FileRulesStatus = "Scanning project rules...";
 
@@ -165,16 +165,23 @@ public sealed partial class WorkbenchViewModel
             ApplyProjectScanResult(result, workspace.ProjectScanAutoSetupStatus);
             FileRulesStatus = "Project scan complete.";
         }
+        catch (OperationCanceledException)
+        {
+            if (CurrentProject?.Id == project.Id) ApplyProjectScanResult(workspace.ProjectScanResult, "Scan cancelled; saved rules unchanged.");
+        }
         catch (Exception ex)
         {
             workspace.ProjectScanResult = null;
             workspace.ProjectScanAutoSetupStatus = "";
-            ApplyProjectScanError("Scan failed.", ex.Message);
-            FileRulesStatus = "Project scan failed.";
+            if (CurrentProject?.Id == project.Id)
+            {
+                ApplyProjectScanError("Scan failed.", ex.Message);
+                FileRulesStatus = "Project scan failed.";
+            }
         }
         finally
         {
-            IsProjectScanRunning = false;
+            EndProjectScan();
         }
     }
 
@@ -220,7 +227,12 @@ public sealed partial class WorkbenchViewModel
             SupportedFileTypesText,
             LocFileTypesText);
 
-        return await ProjectStackScanner.ScanAsync(project.ProjectRoot, rules);
+        return await ProjectStackScanner.ScanAsync(project.ProjectRoot, rules, _projectScanCancellation?.Token ?? default,
+            new Progress<ProjectScanProgress>(progress =>
+            {
+                if (CurrentProject?.Id == project.Id && IsProjectScanRunning)
+                    ProjectScanProgressText = $"{progress.Files:N0} files · {progress.Directories:N0} folders · {progress.Path}";
+            }));
     }
 
     private async Task AutoSetupProjectRulesAsync()
@@ -237,46 +249,59 @@ public sealed partial class WorkbenchViewModel
             return;
         }
 
-        IsProjectScanRunning = true;
+        BeginProjectScan();
         ApplyProjectScanBusy(workspace);
         FileRulesStatus = "Scanning project rules for autosetup...";
 
         try
         {
             var result = await ScanProjectRulesCoreAsync(project, workspace);
-            workspace.ProjectScanResult = result;
-            ApplyAutoSetupRules(workspace.FileRules, result.AutoSetupRules);
-            workspace.FileRules.Save();
-            workspace.ProjectScanAutoSetupStatus = $"Autosetup saved rules to {workspace.FileRules.RulesPath}";
-
+            if (!result.IsComplete)
+            {
+                workspace.ProjectScanResult = result;
+                if (CurrentProject?.Id == project.Id) ApplyProjectScanResult(result, "Some locations could not be read.");
+                throw new IOException("Autosetup needs a complete scan. Check the unreadable paths in the inventory notices.");
+            }
+            var currentRules = workspace.FileRules;
+            var updatedRules = currentRules.CreateSnapshot(currentRules.IgnoredDirectoriesText, currentRules.IgnoredFileNamesText,
+                currentRules.IgnoredExtensionsText, currentRules.SupportedExtensionsText, currentRules.LocExtensionsText);
+            ApplyAutoSetupRules(updatedRules, result.AutoSetupRules);
+            _projectScanCancellation?.Token.ThrowIfCancellationRequested();
+            _projectScanCancellation?.Dispose();
+            _projectScanCancellation = null;
+            OnPropertyChanged(nameof(CanCancelProjectScan));
+            ProjectScanProgressText = "Saving project rules and refreshing the inventory…";
+            updatedRules.Save();
+            workspace.FileRules = updatedRules;
+            workspace.ProjectScanAutoSetupStatus = $"Autosetup saved to {updatedRules.RulesPath}";
+            // Report the rules actually saved, with no fire-and-forget rescan race.
+            workspace.ProjectScanResult = await ProjectStackScanner.ScanAsync(project.ProjectRoot, updatedRules);
+            ReloadTrackerRules(project);
             if (CurrentProject?.Id == project.Id)
             {
-                ApplyFileRulesToEditor(workspace.FileRules, workspace.ProjectScanAutoSetupStatus);
-                ApplyProjectScanResult(result, workspace.ProjectScanAutoSetupStatus);
-                ReloadTrackerRules(project);
+                ApplyFileRulesToEditor(updatedRules, workspace.ProjectScanAutoSetupStatus);
+                ApplyProjectScanResult(workspace.ProjectScanResult, workspace.ProjectScanAutoSetupStatus);
             }
-
-            IsProjectScanRunning = false;
-            await RefreshCurrentProjectFromDiskAsync();
-
-            if (CurrentProject?.Id == project.Id)
-            {
-                PostToUi(() => _ = ScanProjectRulesAsync());
-            }
+            await RefreshCurrentProjectFromDiskAsync(project);
+        }
+        catch (OperationCanceledException)
+        {
+            if (CurrentProject?.Id == project.Id) ApplyProjectScanResult(workspace.ProjectScanResult, "Autosetup cancelled; saved rules unchanged.");
         }
         catch (Exception ex)
         {
-            workspace.ProjectScanAutoSetupStatus = "Autosetup failed.";
+            workspace.ProjectScanAutoSetupStatus = "Autosetup failed: " + ex.Message;
             if (CurrentProject?.Id == project.Id)
             {
-                ProjectScanAutoSetupStatus = "Autosetup failed.";
+                ProjectScanAutoSetupStatus = workspace.ProjectScanAutoSetupStatus;
+                ProjectScanSummary = "Autosetup failed.";
                 ProjectScanResultText = ex.Message;
                 FileRulesStatus = "Autosetup failed.";
             }
         }
         finally
         {
-            IsProjectScanRunning = false;
+            EndProjectScan();
         }
     }
 
@@ -288,6 +313,7 @@ public sealed partial class WorkbenchViewModel
             ruleSet.IgnoredExtensions,
             ruleSet.SupportedExtensions,
             ruleSet.LocExtensions);
+        foreach (var path in ruleSet.ShownFiles) rules.ShowFile(path);
     }
 
     private void ApplyProjectScanBusy(ProjectWorkspaceState workspace)
@@ -324,6 +350,7 @@ public sealed partial class WorkbenchViewModel
         ProjectScanSummary = result.Summary;
         ProjectScanResultText = result.DetailsText;
         ProjectScanRuleSummary = result.RuleSummary;
+        SetProjectScanInventory(result);
         foreach (var metric in result.Metrics)
         {
             ProjectScanMetrics.Add(metric);
@@ -343,6 +370,7 @@ public sealed partial class WorkbenchViewModel
 
     private void ClearProjectScanCollections()
     {
+        SetProjectScanInventory(null);
         ProjectScanMetrics.Clear();
         ProjectScanSections.Clear();
         ProjectScanIdentitySections.Clear();

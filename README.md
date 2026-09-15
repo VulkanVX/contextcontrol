@@ -4,7 +4,7 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.5.2 brings research into independent tabs in the existing Browser, with an animated agent count and optional action previews. Photos load alongside the answer, received text displays immediately, and sourced replies can open as illustrated article pages. The model catalog has no download-size cap. See the [release notes](docs/releases/v0.5.2.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.5.3 fixes project autosetup and separates allowed file types from LOC counting. Project Scanner has a searchable source inventory with explicit exclusions, and Settings has roomier project-rule cards. Research handles Google/Facebook optional-cookie choices and identifies login walls. Releases are built locally; GitHub Actions is disabled. See the [release notes](docs/releases/v0.5.3.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
 
 ## Install On Windows
 
@@ -194,7 +194,7 @@ ContextControl validates the managed Diffusers runtime before download, cache de
 
 ## Windows Download Warnings
 
-Windows SmartScreen may warn on new unsigned installers even when the file is clean. The technical fix is Authenticode code signing with an OV/EV certificate and enough download reputation over time. The release workflow supports optional certificate-based signing through repository secrets, but public builds remain unsigned until a signing certificate is configured.
+Windows SmartScreen may warn on new unsigned installers even when the file is clean. The technical fix is Authenticode code signing with an OV/EV certificate and enough download reputation over time. The local release script supports optional certificate-based signing through environment variables, but public builds remain unsigned until a signing certificate is configured.
 
 ## Main Workbench Areas
 
@@ -268,12 +268,11 @@ Output goes to:
 .tmp\release\
 ```
 
-The GitHub Actions workflow in `.github/workflows/contextcontrol-release.yml` publishes the Windows installer when a `v*` tag is pushed. The release script also creates a local app-folder zip as the installer payload and for developer smoke testing, but end users only need the setup EXE.
+Releases are built and verified locally, then uploaded to GitHub with the setup EXE and checksum. GitHub Actions is disabled for this repository; pushing a tag does not build or publish anything. See [local release instructions](packaging/RELEASE.md). The release script also creates a local app-folder zip as the installer payload and for developer smoke testing, but end users only need the setup EXE.
 
 ## Repository Layout
 
 ```text
-.github/workflows/                 Release workflow
 docs/SKILLBOOK.md                  Skills and PowerShell workflow guide
 ide/ContextControl.Workbench/       Avalonia desktop app
 ide/ContextControl.Workbench.Tests/ Focused smoke tests

@@ -102,6 +102,7 @@ public sealed class GoogleBrowserTestApp : Application
                 var blockedJson = await browser.ExecuteScriptAsync(GoogleResearchScripts.PageText);
                 try { GooglePageReader.Parse(blockedJson); throw new Exception("The reader accepted the Reddit block screen as article text."); }
                 catch (GooglePageUnavailableException) { Console.WriteLine("Native WebView2 block-screen detection passed."); }
+                await BrowserConsentTests.Run(browser, deadline.Token);
                 fixture.Close();
                 if (Workspace) { await WorkspaceBrowserTests.RunAsync(deadline.Token, Model, SourceOnly); return; }
                 if (!string.IsNullOrWhiteSpace(Model))

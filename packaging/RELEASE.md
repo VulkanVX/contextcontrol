@@ -66,4 +66,16 @@ SmartScreen/reputation note: the release script can Authenticode-sign the setup 
 
 Skillbook includes **CC Main** and **CC Flow** instructions based on the PowerShell DIR/CC/GO pipeline. Built-in skills open read-only; Edit and Save persist markdown overrides under `skillbook/built-in-overrides/`. Project/global legacy markdown still loads, and custom flows, sections, and skills can be created, renamed, enabled/disabled, saved, and reloaded. Full per-phase custom prompt activation remains a later customization pass. See the [Skillbook guide](../docs/SKILLBOOK.md).
 
-The GitHub Actions workflow `.github/workflows/contextcontrol-release.yml` builds the installer on `workflow_dispatch` and attaches the setup EXE plus checksum to releases when a `v*` tag is pushed. The zip is not required for end-user install.
+GitHub Actions is disabled for this repository. Build and verify releases locally; a tag push alone does not publish an installer. From a clean release checkout, after committing the tested source and preparing `docs/releases/vX.Y.Z.md`:
+
+```powershell
+$releaseVersion = 'X.Y.Z' # replace with the release version
+.\packaging\Publish-ContextControlRelease.ps1 -Version $releaseVersion -NoZip
+# Inspect the build/test results and installer before publishing.
+git push origin HEAD:main
+git tag "v$releaseVersion"
+git push origin "v$releaseVersion"
+gh release create "v$releaseVersion" .tmp/release/ContextControl-win-x64-Setup.exe .tmp/release/ContextControl-win-x64-Setup.exe.sha256.txt --repo VulkanVX/contextcontrol --title "ContextControl v$releaseVersion" --notes-file "docs/releases/v$releaseVersion.md" --verify-tag --latest
+```
+
+Publish only the setup EXE and its checksum. The zip is not required for end-user install.

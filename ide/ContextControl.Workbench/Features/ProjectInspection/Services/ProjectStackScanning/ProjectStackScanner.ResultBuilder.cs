@@ -80,18 +80,19 @@ public static partial class ProjectStackScanner
             }
         }
 
-        PruneAllowedSuggestionsToLocTypes(supportedSuggestions, locSuggestions, state.Rules.LocExtensions);
 
+
+        var autoRules = BuildAutoSetupRuleSet(state, stacks.Select(item => item.Key), supportedSuggestions, locSuggestions);
+        var autoPlan = BuildAutosetupDeltaItems(state.Rules, autoRules);
         var builder = new StringBuilder();
         builder.AppendLine($"Project: {state.ProjectRoot}");
         var ruleSummary = $"{state.Rules.SupportedExtensions.Count:N0} allowed | {state.Rules.LocExtensions.Count:N0} LOC | {state.Rules.IgnoredExtensions.Count:N0} skipped types | {state.Rules.IgnoredDirectories.Count:N0} skipped folders";
         var scanSummary = $"{state.FilesSeen:N0} scanned | {state.VisibleFiles:N0} visible | {state.TrackedFiles:N0} matched | {state.UnsupportedVisibleFiles:N0} unsupported | {state.FilesSkippedByRules:N0} hidden files | {state.DirectoriesSkippedByRules:N0} hidden folders | {state.DirectoriesExcluded:N0} excluded folders";
         builder.AppendLine($"Rules: {ruleSummary}");
         builder.AppendLine($"Scan: {scanSummary}");
-        if (state.LimitHit)
-        {
-            builder.AppendLine($"Limit: stopped at {MaxFiles:N0} files or {MaxDirectories:N0} folders");
-        }
+        builder.AppendLine(state.IsComplete ? "Inventory complete within declared scope." : "Partial inventory: some paths could not be read.");
+        builder.AppendLine("Scope: project files, including hidden source and nested projects. Dependency packages, generated build roots, metadata/cache folders and links are skipped and listed separately.");
+        AppendSection(builder, "Inventory notices", state.Notices);
 
         var stackItems = stacks.Select(item =>
             $"{item.Key}: {string.Join(", ", item.Value.Take(4))}{(item.Value.Count > 4 ? ", ..." : "")}").ToArray();
@@ -99,25 +100,21 @@ public static partial class ProjectStackScanner
         var languageItems = state.LanguageCounts
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(10)
             .Select(item => $"{item.Key}: {item.Value:N0} files")
             .ToArray();
         var topFileTypeItems = state.ExtensionCounts
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(10)
             .Select(item => $"{item.Key}: {item.Value:N0}")
             .ToArray();
         var unsupportedItems = state.UnsupportedExtensionCounts
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
             .Select(item => $"{item.Key}: {item.Value:N0}")
             .ToArray();
         var skippedExtensionItems = state.SkippedExtensionCounts
             .OrderByDescending(item => item.Value)
             .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
             .Select(item => $"{item.Key}: {item.Value:N0}")
             .ToArray();
 
@@ -132,7 +129,7 @@ public static partial class ProjectStackScanner
         AppendSection(builder, "Already counted LOC file types", coveredLoc);
         AppendSection(builder, "Suggested allowed types", supportedSuggestions);
         AppendSection(builder, "Suggested LOC types", locSuggestions);
-        AppendSection(builder, "Suggested skipped folders", skippedDirectorySuggestions);
+        AppendSection(builder, "Autosetup plan", autoPlan);
         AppendSection(builder, "Skipped samples", state.SkippedDirectorySamples.Concat(state.SkippedFileSamples).Take(8));
 
         var metrics = new[]
@@ -141,8 +138,8 @@ public static partial class ProjectStackScanner
             new ProjectStackMetric("Scanned", state.FilesSeen.ToString("N0"), "project files considered"),
             new ProjectStackMetric("Visible", state.VisibleFiles.ToString("N0"), "after skip rules"),
             new ProjectStackMetric("Matched", state.TrackedFiles.ToString("N0"), "allowed code/context files"),
-            new ProjectStackMetric("Hidden", (state.FilesSkippedByRules + state.DirectoriesSkippedByRules).ToString("N0"), "current rules hide"),
-            new ProjectStackMetric("Excluded", state.DirectoriesExcluded.ToString("N0"), "generated/dependency folders")
+            new ProjectStackMetric("Code", state.Files.Count(file => file.IsCode).ToString("N0"), "all discovered source files"),
+            new ProjectStackMetric("Excluded", state.DirectoriesExcluded.ToString("N0"), "dependencies, build output, caches and links")
         };
 
         var sections = new List<ProjectStackSection>
@@ -156,7 +153,7 @@ public static partial class ProjectStackScanner
             new("Skipped File Types", skippedExtensionItems),
             new("Already Allowed", coveredSupported.ToArray()),
             new("Already Counted LOC", coveredLoc.ToArray()),
-            new("Autosetup Plan", BuildAutosetupDeltaItems(supportedSuggestions, locSuggestions, skippedDirectorySuggestions)),
+            new("Autosetup Plan", autoPlan),
             new("Skipped Samples", state.SkippedDirectorySamples.Concat(state.SkippedFileSamples).Take(8).ToArray())
         };
 
@@ -169,7 +166,12 @@ public static partial class ProjectStackScanner
             scanSummary,
             metrics,
             sections,
-            BuildAutoSetupRuleSet(state, stacks.Select(item => item.Key), supportedSuggestions, locSuggestions, skippedDirectorySuggestions));
+            autoRules)
+        {
+            Files = state.Files.OrderBy(file => file.RelativePath, NameComparer).ToArray(),
+            Notices = state.Notices.OrderBy(value => value, NameComparer).ToArray(),
+            IsComplete = state.IsComplete
+        };
     }
 
     private static string[] BuildUseItems(ScanState state)
@@ -290,27 +292,20 @@ public static partial class ProjectStackScanner
         }
     }
 
-    private static IReadOnlyList<string> BuildAutosetupDeltaItems(
-        IEnumerable<string> supportedSuggestions,
-        IEnumerable<string> locSuggestions,
-        IEnumerable<string> skippedDirectorySuggestions)
+    private static IReadOnlyList<string> BuildAutosetupDeltaItems(ProjectFileRules current, ProjectStackRuleSet next)
     {
         var items = new List<string>();
-        AddDelta("Allowed types", supportedSuggestions);
-        AddDelta("LOC types", locSuggestions);
-        AddDelta("Skipped folders", skippedDirectorySuggestions);
-        return items.Count == 0 ? ["No missing stack rules detected"] : items;
-
-        void AddDelta(string label, IEnumerable<string> values)
+        Add("Allow types", next.SupportedExtensions.Except(current.SupportedExtensions, NameComparer));
+        Add("Count lines", next.LocExtensions.Except(current.LocExtensions, NameComparer));
+        Add("Restore types", current.IgnoredExtensions.Except(next.IgnoredExtensions, NameComparer));
+        Add("Restore source folders", current.IgnoredDirectories.Except(next.IgnoredDirectories, NameComparer));
+        Add("Skip folders", next.IgnoredDirectories.Except(current.IgnoredDirectories, NameComparer));
+        Add("Include named scripts", next.ShownFiles.Except(current.ShownFileNames, NameComparer));
+        return items.Count == 0 ? ["Rules already match the detected project code"] : items;
+        void Add(string label, IEnumerable<string> values)
         {
-            var clean = values
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Take(14)
-                .ToArray();
-            if (clean.Length > 0)
-            {
-                items.Add($"{label}: {string.Join(", ", clean)}");
-            }
+            var entries = values.OrderBy(value => value, NameComparer).ToArray();
+            if (entries.Length > 0) items.Add($"{label}: {string.Join(", ", entries)}");
         }
     }
 
@@ -318,99 +313,52 @@ public static partial class ProjectStackScanner
         ScanState state,
         IEnumerable<string> stacks,
         IEnumerable<string> supportedSuggestions,
-        IEnumerable<string> locSuggestions,
-        IEnumerable<string> skippedDirectorySuggestions)
+        IEnumerable<string> locSuggestions)
     {
-        var ignoredDirectories = new SortedSet<string>(AlwaysSkippedDirectories, NameComparer);
-        foreach (var value in state.AutoSkippedDirectoryRules)
-        {
-            ignoredDirectories.Add(value);
-        }
-
+        // Keep custom context types and LOC settings. Counting lines is independent of visibility.
+        var supported = new SortedSet<string>(state.Rules.SupportedExtensions, NameComparer);
+        var loc = new SortedSet<string>(state.Rules.LocExtensions, NameComparer);
         foreach (var stack in stacks)
         {
-            AddKnownValues(ignoredDirectories, SuggestedSkippedDirectoriesByStack, stack);
+            AddKnownExtensions(supported, SuggestedSupportedByStack, stack);
+            AddKnownExtensions(loc, SuggestedLocByStack, stack);
         }
-
-        foreach (var value in skippedDirectorySuggestions)
+        foreach (var extension in state.ExtensionCounts.Keys.Where(ShouldSuggestObservedExtension)) supported.Add(extension);
+        foreach (var file in state.Files.Where(file => file.IsCode))
         {
-            ignoredDirectories.Add(value);
+            var extension = Path.GetExtension(file.RelativePath);
+            if (extension.Length > 0 && !IsNamedSourceFile(file.Name)) { supported.Add(extension); loc.Add(extension); }
         }
-
-        var supportedExtensions = new SortedSet<string>(NameComparer);
-        var locExtensions = new SortedSet<string>(NameComparer);
-        foreach (var stack in stacks)
+        supported.UnionWith(supportedSuggestions);
+        supported.UnionWith(loc);
+        loc.UnionWith(locSuggestions);
+        var ignoredTypes = new SortedSet<string>(state.Rules.IgnoredExtensions.Concat(AutoSetupIgnoredExtensions), NameComparer);
+        ignoredTypes.ExceptWith(supported);
+        var ignoredDirectories = new SortedSet<string>(state.Rules.IgnoredDirectories.Concat(InventoryMetadataDirectories)
+            .Concat(DependencyDirectories).Concat(state.AutoSkippedDirectoryRules), NameComparer);
+        // Remove only directory rules demonstrated to hide source; retain unrelated exclusions.
+        var sourceDirectories = new HashSet<string>(NameComparer);
+        foreach (var file in state.Files.Where(file => file.IsCode))
         {
-            AddKnownExtensions(supportedExtensions, SuggestedSupportedByStack, stack);
-            AddKnownExtensions(locExtensions, SuggestedLocByStack, stack);
-        }
-
-        foreach (var extension in state.ExtensionCounts.Keys.Where(ShouldSuggestObservedExtension))
-        {
-            supportedExtensions.Add(NormalizeExtension(extension));
-            if (LanguageByExtension.ContainsKey(extension))
+            var directory = Path.GetDirectoryName(file.RelativePath)?.Replace('\\', '/');
+            while (!string.IsNullOrEmpty(directory))
             {
-                locExtensions.Add(NormalizeExtension(extension));
+                sourceDirectories.Add(directory);
+                directory = Path.GetDirectoryName(directory)?.Replace('\\', '/');
             }
         }
-
-        foreach (var value in supportedSuggestions)
+        ignoredDirectories.RemoveWhere(rule =>
         {
-            supportedExtensions.Add(NormalizeExtension(value));
-        }
-
-        foreach (var value in locSuggestions)
-        {
-            locExtensions.Add(NormalizeExtension(value));
-        }
-
-        var codeSupportedExtensions = new SortedSet<string>(
-            locExtensions
-                .Select(NormalizeExtension)
-                .Where(value => !string.IsNullOrWhiteSpace(value)),
-            NameComparer);
-        supportedExtensions.Clear();
-        foreach (var extension in codeSupportedExtensions)
-        {
-            supportedExtensions.Add(extension);
-        }
-
-        var ignoredExtensions = new SortedSet<string>(
-            AutoSetupIgnoredExtensions.Select(NormalizeExtension).Where(value => !string.IsNullOrWhiteSpace(value)),
-            NameComparer);
-        foreach (var extension in state.ExtensionCounts.Keys)
-        {
-            var normalized = NormalizeExtension(extension);
-            if (!string.IsNullOrWhiteSpace(normalized) && !supportedExtensions.Contains(normalized))
-            {
-                ignoredExtensions.Add(normalized);
-            }
-        }
-
-        foreach (var extension in supportedExtensions)
-        {
-            ignoredExtensions.Remove(extension);
-        }
-
-        return new ProjectStackRuleSet(
-            ignoredDirectories.ToArray(),
-            AutoSetupIgnoredFileNames.OrderBy(value => value, NameComparer).ToArray(),
-            ignoredExtensions.ToArray(),
-            supportedExtensions.ToArray(),
-            locExtensions.Where(extension => supportedExtensions.Contains(extension)).ToArray());
-    }
-
-    private static void PruneAllowedSuggestionsToLocTypes(
-        SortedSet<string> supportedSuggestions,
-        IReadOnlyCollection<string> locSuggestions,
-        IReadOnlyCollection<string> currentLocExtensions)
-    {
-        supportedSuggestions.RemoveWhere(extension =>
-        {
-            var normalized = NormalizeExtension(extension);
-            return !locSuggestions.Contains(normalized, NameComparer)
-                && !currentLocExtensions.Contains(normalized, NameComparer);
+            var matcher = state.Rules.CreateSnapshot(rule, "", "", "", "");
+            return sourceDirectories.Any(path => matcher.ShouldSkipDirectory(Path.GetFileName(path), path));
         });
+        var shown = state.Rules.ShownFileNames.Concat(state.Files.Where(file => file.IsCode
+                && (Path.GetExtension(file.RelativePath).Length == 0 || IsNamedSourceFile(file.Name))
+                && !state.Rules.GetVisibilityDecision(file.RelativePath, file.Name, Path.GetExtension(file.RelativePath)).IgnoredReason.StartsWith("ignored file:", StringComparison.OrdinalIgnoreCase))
+            .Select(file => file.RelativePath))
+            .Distinct(NameComparer).OrderBy(value => value, NameComparer).ToArray();
+        return new ProjectStackRuleSet(ignoredDirectories.ToArray(), state.Rules.IgnoredFileNames.ToArray(),
+            ignoredTypes.ToArray(), supported.ToArray(), loc.ToArray()) { ShownFiles = shown };
     }
 
     private static void AddKnownExtensions(

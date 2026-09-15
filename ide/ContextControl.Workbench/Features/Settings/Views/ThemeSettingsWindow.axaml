@@ -6,8 +6,8 @@
     xmlns:vm="clr-namespace:ContextControl.Workbench.ViewModels"
     xmlns:parts="clr-namespace:ContextControl.Workbench.Views.ThemeSettingsWindowParts"
     Width="1080"
-    Height="640"
-    MinWidth="940"
+    Height="740"
+    MinWidth="900"
     MinHeight="560"
     CanResize="True"
     SystemDecorations="None"
@@ -40,51 +40,67 @@
       </Grid>
     </Border>
 
-  <Border Grid.Row="1" Classes="settings-panel" Margin="10">
+  <Border Grid.Row="1" Classes="settings-panel" Margin="12">
     <Grid RowDefinitions="Auto,*" RowSpacing="8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
         <StackPanel Spacing="1">
           <TextBlock Classes="settings-title" Text="Settings" />
-          <TextBlock Classes="muted" Text="Workbench preferences" />
+          <TextBlock Classes="muted" Text="Make the workspace yours. Project rules are saved separately for each project." />
         </StackPanel>
 
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
           <TextBlock
               Classes="muted"
-              Text="{Binding FileRulesSummary}"
+              Text="Local preferences"
               VerticalAlignment="Center"
               TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </Grid>
 
-      <ScrollViewer x:Name="SettingsPagesScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-      <Grid ColumnDefinitions="152,*" ColumnSpacing="12" MinWidth="900" MinHeight="450" Width="{Binding Bounds.Width, ElementName=SettingsPagesScroll}">
+      <Grid Grid.Row="1" ColumnDefinitions="178,*" ColumnSpacing="16">
         <Border Classes="side-rail">
           <StackPanel Spacing="6" HorizontalAlignment="Stretch">
             <Button
                 x:Name="AppearanceNavButton"
                 Classes="settings-nav active"
-                Content="Appearance"
-                Click="OnAppearanceNavClick" />
+                Click="OnAppearanceNavClick" >
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" Data="M 3,3 L 17,3 L 17,17 L 3,17 Z M 3,10 L 17,10 M 10,3 L 10,17" />
+                    <TextBlock Text="Appearance" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
             <Button
                 x:Name="FileRulesNavButton"
                 Classes="settings-nav"
-                Content="Project Rules"
-                Click="OnFileRulesNavClick" />
+                Click="OnFileRulesNavClick" >
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" Data="M 4,4 L 16,4 M 4,10 L 16,10 M 4,16 L 16,16 M 7,1 L 7,7 M 13,7 L 13,13 M 8,13 L 8,19" />
+                    <TextBlock Text="Project Rules" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
             <Button
                 x:Name="PromptWindowNavButton"
                 Classes="settings-nav"
-                Content="Prompt Window"
-                Click="OnPromptWindowNavClick" />
+                Click="OnPromptWindowNavClick" >
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" Data="M 2,3 L 18,3 L 18,14 L 8,14 L 3,18 L 3,14 L 2,14 Z" />
+                    <TextBlock Text="Prompt Window" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
             <Button
                 x:Name="LlmsNavButton"
                 Classes="settings-nav"
-                Content="LLMs"
-                Click="OnLlmsNavClick" />
+                Click="OnLlmsNavClick" >
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" Data="M 5,5 L 15,5 L 15,15 L 5,15 Z M 8,0 L 8,5 M 12,0 L 12,5 M 8,15 L 8,20 M 12,15 L 12,20 M 0,8 L 5,8 M 15,8 L 20,8 M 0,12 L 5,12 M 15,12 L 20,12" />
+                    <TextBlock Text="LLMs" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
           </StackPanel>
         </Border>
 
-        <Grid Grid.Column="1">
+        <ScrollViewer x:Name="SettingsPagesScroll" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Grid MinWidth="620" Width="{Binding Viewport.Width, ElementName=SettingsPagesScroll}">
           <parts:AppearanceSettingsPage x:Name="AppearancePage" />
 
           <parts:LlmsSettingsPage x:Name="LlmsPage" IsVisible="False" />
@@ -93,8 +109,8 @@
 
           <parts:FileRulesSettingsPage x:Name="FileRulesPage" IsVisible="False" />
         </Grid>
+        </ScrollViewer>
       </Grid>
-      </ScrollViewer>
     </Grid>
   </Border>
     <Border Classes="resize-edge resize-left" Grid.RowSpan="2" Width="8" HorizontalAlignment="Left" VerticalAlignment="Stretch" PointerPressed="OnResizeLeftPointerPressed" />
