@@ -86,6 +86,9 @@ public sealed partial class LocalLlmService
         if (!_runtimeBindings.TryGetValue(request.ModelId, out var binding))
             return new(false, "This model's runtime is unavailable. Start its server and refresh LLMs.");
         if (string.IsNullOrWhiteSpace(request.Prompt)) return new(false, "Write a chat message first.");
+        var answer = new StringBuilder();
+        var thinking = new StringBuilder();
+        LocalLlmChatResult Failure(string status) => IncompleteChatResult(status, answer, thinking);
         try
         {
             var stopwatch = Stopwatch.StartNew();
@@ -108,10 +111,9 @@ public sealed partial class LocalLlmService
                 ["max_tokens"] = request.MaxOutputTokens is > 0 ? request.MaxOutputTokens.Value : Math.Clamp(profile.ContextTokens / 3, 256, 4096)
             };
             if (request.Think is { } think) payload["chat_template_kwargs"] = new { enable_thinking = think };
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(TimeSpan.FromMinutes(15));
-            var token = deadline.Token;
-            using var http = _chatHandler is null ? new HttpClient { Timeout = Timeout.InfiniteTimeSpan } : new HttpClient(_chatHandler, disposeHandler: false);
+            // No wall-clock deadline: CPU/offloaded models can remain productive for hours.
+            var token = cancellationToken;
+            using var http = _chatHandler is null ? new HttpClient { Timeout = Timeout.InfiniteTimeSpan } : new HttpClient(_chatHandler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan };
             using var outgoing = new HttpRequestMessage(HttpMethod.Post, profile.ApiUri("chat/completions"))
             { Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json") };
             AddRuntimeAuthorization(outgoing, profile);
@@ -120,8 +122,6 @@ public sealed partial class LocalLlmService
             using var response = await http.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 return new(false, $"{profile.Name} returned {(int)response.StatusCode}: {FirstLine(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false))}");
-            var answer = new StringBuilder();
-            var thinking = new StringBuilder();
             string? finishReason = null;
             long? inputTokens = null, outputTokens = null, cachedTokens = null, reasoningTokens = null;
             var completed = false;
@@ -184,7 +184,7 @@ public sealed partial class LocalLlmService
             // visible chunk would claim impossible speeds; report conservative end-to-end throughput.
             var stats = new LocalLlmUsageStats(inputTokens, outputTokens, (long)(elapsed * 1e9), null, null,
                 (long)(elapsed * 1e9), cachedTokens, reasoningTokens);
-            if (!completed) return new(false, "The runtime's response stream ended before completion. Please retry.", Stats: stats);
+            if (!completed) return Failure("The runtime's response stream ended before completion. Please retry.");
             var visible = System.Text.RegularExpressions.Regex.Replace(answer.ToString(), @"<think>.*?(?:</think>|$)", "", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
             if (visible.Length == 0) return new(false, thinking.Length > 0 || answer.Length > 0 ? ThinkingOnlyStatus + " Try thinking off or a larger context window." : "The runtime returned no answer.", Stats: stats);
             var message = BuildFinalChatAnswer(answer.ToString(), thinking.ToString());
@@ -193,9 +193,9 @@ public sealed partial class LocalLlmService
             terminal?.Report($"done: {stats.Summary}");
             return new(true, $"Local chat completed with {profile.Name} / {binding.ModelId}.", message, stats);
         }
-        catch (OperationCanceledException) { return new(false, cancellationToken.IsCancellationRequested ? "Response was stopped by the user." : "Local chat timed out."); }
+        catch (OperationCanceledException) { return Failure(cancellationToken.IsCancellationRequested ? "Response was stopped by the user." : "The local runtime cancelled the response before completion."); }
         catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or InvalidOperationException or NotSupportedException)
-        { return new(false, "The local runtime could not complete this request: " + ex.Message); }
+        { return Failure("The local runtime could not complete this request: " + ex.Message); }
     }
 
     internal static string ImageMimeType(string value) => value.StartsWith("/9j/", StringComparison.Ordinal) ? "image/jpeg"

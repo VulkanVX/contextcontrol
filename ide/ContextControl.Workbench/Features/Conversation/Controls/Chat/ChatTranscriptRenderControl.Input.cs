@@ -722,6 +722,7 @@ public sealed partial class ChatTranscriptRenderControl
         {
             ChatTranscriptHitKind.OpenAttachment => OpenAttachmentCommand,
             ChatTranscriptHitKind.OpenArticle => OpenArticleCommand,
+            ChatTranscriptHitKind.RunGame => RunGameCommand,
             ChatTranscriptHitKind.CopyMessage => CopyChatTextCommand,
             ChatTranscriptHitKind.CreateProject => CreateProjectFromMessageCommand,
             ChatTranscriptHitKind.ToggleSnippet => ToggleSnippetCommand,

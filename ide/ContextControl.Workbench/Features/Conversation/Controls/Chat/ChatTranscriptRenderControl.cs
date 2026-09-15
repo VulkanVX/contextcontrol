@@ -24,6 +24,7 @@ public enum ChatTranscriptHitKind
     None,
     OpenAttachment,
     OpenArticle,
+    RunGame,
     OpenImagePreview,
     DownloadAttachment,
     CopyMessage,
@@ -48,6 +49,10 @@ public sealed partial class ChatTranscriptRenderControl : Control
 
     public static readonly StyledProperty<ICommand?> OpenAttachmentCommandProperty =
         AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(OpenAttachmentCommand));
+
+    public static readonly StyledProperty<ICommand?> RunGameCommandProperty =
+        AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(RunGameCommand));
+    public ICommand? RunGameCommand { get => GetValue(RunGameCommandProperty); set => SetValue(RunGameCommandProperty, value); }
 
     public static readonly StyledProperty<ICommand?> OpenArticleCommandProperty =
         AvaloniaProperty.Register<ChatTranscriptRenderControl, ICommand?>(nameof(OpenArticleCommand));
@@ -377,6 +382,7 @@ public sealed partial class ChatTranscriptRenderControl : Control
         }
         else if (change.Property == OpenAttachmentCommandProperty
             || change.Property == CopyChatTextCommandProperty
+            || change.Property == RunGameCommandProperty
             || change.Property == CreateProjectFromMessageCommandProperty
             || change.Property == ToggleSnippetCommandProperty
             || change.Property == CopySnippetCommandProperty

@@ -136,6 +136,7 @@
                       ChatFontSize="{Binding ChatWindowFontSize}"
                       OpenAttachmentCommand="{Binding OpenAttachmentCommand}"
                       OpenArticleCommand="{Binding ContextControl.OpenResearchArticleCommand}"
+                      RunGameCommand="{Binding ContextControl.RunGameCommand}"
                       CopyChatTextCommand="{Binding ContextControl.CopyChatTextCommand}"
                       CreateProjectFromMessageCommand="{Binding ContextControl.CreateProjectFromMessageCommand}"
                       ToggleSnippetCommand="{Binding ContextControl.ToggleSnippetCommand}"

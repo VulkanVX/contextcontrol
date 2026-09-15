@@ -1,5 +1,11 @@
 # Local models and runtimes
 
+## Game Lab and long generations
+
+Turn on **Create game** in the Local composer, or ask it to create a browser game. Completed HTML games gain a **Game Lab** button. The lab supports inline HTML/CSS/JavaScript and simple answers split into HTML, CSS and JavaScript blocks. It provides desktop/mobile previews, editable source, Run/Restart/Stop, screenshots and an error console. **Improve / fix with model** prepares a draft in the original chat for review; it does not automatically send it. Other languages and engine projects use Create Project / file export.
+
+Local Ollama and compatible chat streams have no total or idle-duration deadline. Loading, thinking and generation can continue as long as needed. Stop remains available, runtime errors are shown, and partial responses are kept but marked incomplete. Managed runtimes also wait for readiness while their owned process is alive. This does not remove model context/output limits or change a server's own limits.
+
 ContextControl 0.5.0 includes 544 catalog entries and discovers additional models from enabled compatible servers. The metadata snapshot covers 443 verified tags across 240 families from the [official Ollama library](https://ollama.com/library?sort=newest), checked on September 14, 2026. The curated catalog also includes Hugging Face GGUF, image generation and other specialized routes. These are catalog entries, not a claim that every model has been run or that every license is open source.
 
 New coverage includes Granite 4.2, Qwen 3.8 and Flash Next, Ornith 1.5, Nemotron 3.5 Lightning, Muse Glimmer, Laguna 2.1, North Mini Code, LFM 2.5, and MiniCPM V4.6. Hosted-only tags remain labeled as cloud models. Source pages and published download sizes accompany discovered entries; memory estimates include overhead and do not assume that MoE active parameter counts equal weight memory.

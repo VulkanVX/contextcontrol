@@ -172,7 +172,7 @@ public sealed partial class ChatTranscriptRenderControl
             timeRect,
             new Point(timeRect.X, CenterTextY(timeRect, time)));
 
-        foreach (var hit in layout.Hits.Where(hit => hit.Kind is ChatTranscriptHitKind.CopyMessage or ChatTranscriptHitKind.CreateProject or ChatTranscriptHitKind.DownloadAttachment or ChatTranscriptHitKind.OpenArticle))
+        foreach (var hit in layout.Hits.Where(hit => hit.Kind is ChatTranscriptHitKind.CopyMessage or ChatTranscriptHitKind.CreateProject or ChatTranscriptHitKind.DownloadAttachment or ChatTranscriptHitKind.OpenArticle or ChatTranscriptHitKind.RunGame))
         {
             if (hit.Kind == ChatTranscriptHitKind.CopyMessage)
             {
@@ -181,6 +181,10 @@ public sealed partial class ChatTranscriptRenderControl
             else if (hit.Kind == ChatTranscriptHitKind.DownloadAttachment)
             {
                 DrawDownloadIconButton(context, OffsetY(hit.Rect, rowTop), CanExecuteHit(hit), ReferenceEquals(hit, _hoveredHit));
+            }
+            else if (hit.Kind == ChatTranscriptHitKind.RunGame)
+            {
+                DrawButton(context, OffsetY(hit.Rect, rowTop), "▶ Game Lab", CanExecuteHit(hit), ReferenceEquals(hit, _hoveredHit));
             }
             else if (hit.Kind == ChatTranscriptHitKind.OpenArticle)
             {

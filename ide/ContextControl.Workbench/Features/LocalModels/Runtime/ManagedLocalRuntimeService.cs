@@ -138,20 +138,18 @@ internal sealed class ManagedLocalRuntimeService : IDisposable
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             progress.Report("Loading model…");
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(TimeSpan.FromMinutes(10));
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
             while (!process.HasExited)
             {
-                deadline.Token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    using var response = await http.GetAsync(endpoint, deadline.Token).ConfigureAwait(false);
+                    using var response = await http.GetAsync(endpoint, cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode) return LastPlan is { } plan
                         ? $"Running · {plan.ContextTokens:N0} context · {plan.CpuThreads} threads · {plan.GpuLayers} GPU layers (auto estimate)" : "Running · model ready";
                 }
                 catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException) { }
-                await Task.Delay(500, deadline.Token).ConfigureAwait(false);
+                await Task.Delay(500, cancellationToken).ConfigureAwait(false);
             }
             return $"Runtime exited ({process.ExitCode}): {_lastOutput}";
         }

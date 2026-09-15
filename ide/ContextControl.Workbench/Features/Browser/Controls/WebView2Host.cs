@@ -31,6 +31,7 @@ public sealed class WebView2Host : NativeControlHost
     // Optional restrictions for the research reader; ordinary browser panes keep their existing behavior.
     public Func<string, bool>? NavigationFilter { get; set; }
     public bool AllowDownloads { get; set; } = true;
+    public bool BlockExternalResources { get; set; }
     public bool IsReady => _webView is not null;
     public bool IsNavigating { get; private set; }
     public ulong StartedNavigationId { get; private set; }
@@ -41,7 +42,7 @@ public sealed class WebView2Host : NativeControlHost
     public Task<string> ExecuteScriptAsync(string script) => _webView?.ExecuteScriptAsync(script)
         ?? throw new InvalidOperationException("The embedded browser is still starting.");
     public void Stop() => _webView?.Stop();
-    public async Task<Avalonia.Media.Imaging.Bitmap?> CaptureActionPreviewAsync()
+    public async Task<Avalonia.Media.Imaging.Bitmap?> CaptureActionPreviewAsync(int maxWidth = 360)
     {
         if (_webView is null || _isDisposed) return null;
         try
@@ -50,7 +51,7 @@ public sealed class WebView2Host : NativeControlHost
             await _webView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
             if (_isDisposed) return null;
             stream.Position = 0;
-            return Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 360);
+            return maxWidth > 0 ? Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, maxWidth) : new Avalonia.Media.Imaging.Bitmap(stream);
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException or ArgumentException) { return null; }
     }
@@ -182,6 +183,24 @@ public sealed class WebView2Host : NativeControlHost
             _webView = _controller.CoreWebView2;
             _controller.IsVisible = true;
 
+            if (BlockExternalResources)
+            {
+                _webView.Settings.AreHostObjectsAllowed = false;
+                _webView.Settings.IsWebMessageEnabled = false;
+                _webView.Settings.AreDefaultScriptDialogsEnabled = false;
+                _webView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                _webView.WebResourceRequested += (_, e) =>
+                {
+                    if (!e.Request.Uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                        && !e.Request.Uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+                        && !e.Request.Uri.StartsWith("blob:", StringComparison.OrdinalIgnoreCase))
+                        e.Response = _environment.CreateWebResourceResponse(null, 403, "Offline preview", "");
+                };
+                _webView.FrameNavigationStarting += (_, e) =>
+                {
+                    if (e.Uri is not ("about:blank" or "about:srcdoc")) e.Cancel = true;
+                };
+            }
             HookEvents(_webView);
             ResizeController(Bounds.Size);
 

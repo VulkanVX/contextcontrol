@@ -4,7 +4,7 @@ ContextControl is a native desktop workbench for keeping local code context, loc
 
 The current release focuses on a Windows x64 desktop app that can be opened like a normal EXE, then used to install local LLM dependencies and download model weights on demand. The older PowerShell CLI pipeline is still included as the core deterministic context engine.
 
-Version 0.5.8 improves measured speed tuning for models whose GPU allocation changes with speculative decoding. It verifies each configuration independently and recognizes both baseline and tuned allocations. Progressing model downloads still have no fixed duration cutoff and can resume cached data. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.5.8.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
+Version 0.5.9 adds **Game Lab**: create a browser game in Local chat, then play, edit, restart, inspect errors and prepare repairs from its response. Local model generation and managed model loading have no fixed duration cutoff. Releases are built locally without GitHub Actions. See the [release notes](docs/releases/v0.5.9.md) and [local runtime guide](docs/LOCAL_MODEL_RUNTIMES.md).
 
 ## Install On Windows
 

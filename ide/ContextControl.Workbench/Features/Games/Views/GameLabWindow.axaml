@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:ContextControl.Workbench.Controls"
+        xmlns:editor="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
+        x:Class="ContextControl.Workbench.Views.GameLabWindow" Title="Game Lab · ContextControl"
+        Width="1200" Height="820" MinWidth="760" MinHeight="540" Background="#0B1020" Foreground="#E5ECFA">
+  <Window.Styles>
+    <Style Selector="Button"><Setter Property="CornerRadius" Value="9"/><Setter Property="Padding" Value="13,8"/><Setter Property="Background" Value="#202B43"/><Setter Property="Foreground" Value="#E5ECFA"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#74E1C0"/><Setter Property="Foreground" Value="#08251D"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#A1AEC8"/><Setter Property="FontSize" Value="12"/></Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20" RowSpacing="14">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="15">
+      <StackPanel Spacing="5">
+        <TextBlock Text="◈  GAME LAB" Foreground="#74E1C0" FontSize="12" FontWeight="Bold" LetterSpacing="2"/>
+        <TextBlock x:Name="GameTitle" Text="Your next playable idea" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Text="Play, inspect, change, repeat." Classes="muted"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+        <Button x:Name="RunButton" Content="▶  Run" Classes="primary" Click="OnRun"/>
+        <Button x:Name="RestartButton" Content="↻  Restart" Click="OnRestart"/>
+        <Button x:Name="StopButton" Content="■  Stop" Click="OnStop"/>
+        <Button Content="Save HTML" Click="OnSave"/>
+        <Button Content="▣" Click="OnScreenshot" ToolTip.Tip="Save a screenshot of the game"/>
+      </StackPanel>
+    </Grid>
+    <Grid x:Name="WorkspaceGrid" Grid.Row="1" ColumnDefinitions="*,10,360">
+      <Border Background="#121B2D" CornerRadius="16" BorderBrush="#293550" BorderThickness="1" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Border Background="#19372F" CornerRadius="6" Padding="8,4"><TextBlock x:Name="StateLabel" Text="READY" Foreground="#74E1C0" FontSize="11" FontWeight="Bold"/></Border>
+              <TextBlock x:Name="ViewportLabel" Text="Responsive stage" Classes="muted" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
+              <Button Content="Desktop" Click="OnDesktop" Padding="10,5"/>
+              <Button Content="Mobile" Click="OnMobile" Padding="10,5"/>
+              <Button Content="⛶" Click="OnExpand" ToolTip.Tip="Expand stage / show source" Padding="10,5"/>
+            </StackPanel>
+          </Grid>
+          <Border x:Name="StageFrame" Grid.Row="1" Background="#080C16" CornerRadius="10" ClipToBounds="True">
+            <controls:WebView2Host x:Name="GameBrowser"/>
+          </Border>
+          <TextBlock Grid.Row="2" Text="Click the game to focus · use its keyboard or touch controls" Classes="muted" TextWrapping="Wrap"/>
+        </Grid>
+      </Border>
+      <GridSplitter Grid.Column="1" Width="8" ResizeDirection="Columns" Background="Transparent"/>
+      <Border x:Name="SourcePanel" Grid.Column="2" Background="#121B2D" CornerRadius="16" BorderBrush="#293550" BorderThickness="1" Padding="14">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="SOURCE" FontWeight="Bold" FontSize="11" Foreground="#A1AEC8"/><TextBlock Grid.Column="1" Text="index.html" Classes="muted"/></Grid>
+          <editor:TextEditor x:Name="SourceEditor" Grid.Row="1" ShowLineNumbers="True" SyntaxHighlighting="HTML" FontFamily="Cascadia Code,Consolas" FontSize="12" Background="#0B1020" Foreground="#DAE6FF" Padding="8" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/>
+          <TextBlock Grid.Row="2" Text="Edit the code, then Run. Restart replays the last run." Classes="muted" TextWrapping="Wrap"/>
+          <Button x:Name="FixButton" Grid.Row="3" Content="✦  Improve / fix with model" Click="OnFix" HorizontalAlignment="Stretch"/>
+        </Grid>
+      </Border>
+    </Grid>
+    <Border Grid.Row="2" Background="#121B2D" CornerRadius="12" Padding="14,10" BorderBrush="#293550" BorderThickness="1">
+      <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+        <Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="ConsoleTitle" Text="CONSOLE · no errors reported" FontSize="11" FontWeight="Bold" Foreground="#A1AEC8"/><TextBlock x:Name="RevisionLabel" Grid.Column="1" Text="Offline browser preview" Classes="muted"/></Grid>
+        <TextBox x:Name="ConsoleText" Grid.Row="1" Text="Run a complete HTML game from any chat response. No package installation needed." IsReadOnly="True" TextWrapping="Wrap" MaxHeight="115" Background="Transparent" BorderThickness="0" Padding="0" Foreground="#B6C5E0" FontSize="12"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

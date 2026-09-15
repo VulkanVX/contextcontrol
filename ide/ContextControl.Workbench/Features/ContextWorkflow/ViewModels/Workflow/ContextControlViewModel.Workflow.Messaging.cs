@@ -1400,7 +1400,7 @@ public sealed partial class ContextControlViewModel
 
     private async Task SendLocalChatAsync(string message)
     {
-        if (!IsAutopilotEnabled)
+        if (!IsAutopilotEnabled || IsGameCreationEnabled)
         {
             await SendRawLocalChatAsync(message);
             return;
@@ -1600,8 +1600,14 @@ public sealed partial class ContextControlViewModel
 
     private async Task SendRawLocalChatAsync(string message)
     {
-        var useGoogle = IsGoogleSearchEnabled;
         var targetSession = EnsureSelectedChatSession();
+        var previousGame = ChatMessages.Select(GameArtifact.FromMessage).LastOrDefault(game => game is not null);
+        if (GameArtifact.RequestsNativeRuntime(message)) IsGameCreationEnabled = false;
+        else if (GameArtifact.IsCreationRequest(message)) IsGameCreationEnabled = true;
+        var creatingGame = IsGameCreationEnabled || GameArtifact.IsCreationRequest(message);
+        var gamePrompt = creatingGame && !message.StartsWith("Create a playable browser game for ContextControl Game Lab.", StringComparison.Ordinal)
+            ? GameArtifact.Prompt(message, previousGame) : message;
+        var useGoogle = IsGoogleSearchEnabled && !creatingGame;
         var model = ResolveModelForPhase(ContextCapsulePhase.Chat);
         if (model is not { IsInstalled: true })
         {
@@ -1642,10 +1648,10 @@ public sealed partial class ContextControlViewModel
         try
         {
             terminal.Report($"Sending raw prompt to {model.DisplayName} ({model.Id})...");
-            terminal.Report("No ContextControl capsule, attachments, skillbook, or workflow instructions included.");
+            terminal.Report(creatingGame ? "Game Lab: complete offline HTML game requested." : "No ContextControl capsule, attachments, skillbook, or workflow instructions included.");
             terminal.Report($"Requested local context window: {requestedContextTokens:N0} tokens.");
 
-            var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, message, useGoogle,
+            var preparedPrompt = await PrepareGooglePromptAsync(model.Id, message, gamePrompt, useGoogle,
                 targetSession, liveAssistant, generationProgress.Item, chatCancellation.Token, requestedContextTokens);
             var liveProgress = CreateLiveAssistantProgress(liveAssistant, generationProgress.Progress);
             var chatRequest = new LocalLlmRequest(

@@ -63,6 +63,11 @@ internal static class LocalLlmChatTests
             Check(!partial.Succeeded && partial.OutputLimited && partial.Message!.Contains("Response incomplete") && partial.Message.Contains("Pizza answer"), "Keep partial text but explicitly flag truncation.");
         }
         await CheckStreamingAndCancellation();
+        using (var lost = new ReplyHandler(_ => new StringContent(Answer)))
+        {
+            var interrupted = await new LocalLlmService(lost).SendChatAsync(Request(), null, null);
+            Check(interrupted.Message?.Contains("Pizza answer") == true && interrupted.Message.Contains("**Response incomplete.**"), "Keep generated code/text when the runtime disconnects, explicitly marked incomplete.");
+        }
         Console.WriteLine($"Local chat regression passed: {_checks} checks.");
     }
 

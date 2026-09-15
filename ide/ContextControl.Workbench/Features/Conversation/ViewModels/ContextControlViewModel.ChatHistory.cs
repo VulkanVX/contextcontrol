@@ -185,6 +185,7 @@ public sealed partial class ContextControlViewModel
             SelectedChatSession = session;
             session.ClearNewResponse();
             ChatMessages.Load(session);
+            RefreshGameMode();
 
             LoadPromptDraftForSession(session);
             LoadPendingAttachmentsForSession(session);

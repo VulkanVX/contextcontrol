@@ -112,6 +112,9 @@ public sealed partial class LocalLlmService
             Options: await PerformanceOptionsAsync(request, cancellationToken).ConfigureAwait(false),
             Think: request.Think);
 
+        var answerBuilder = new StringBuilder();
+        var thinkingBuilder = new StringBuilder();
+        LocalLlmChatResult Failure(string status) => IncompleteChatResult(status, answerBuilder, thinkingBuilder);
         try
         {
             var thinkFlag = request.Think is null ? "" : requestThinking ? " --think" : " --think=false";
@@ -119,12 +122,10 @@ public sealed partial class LocalLlmService
                 ? $"> ollama chat {chatRequest.Model} --num-ctx {request.ContextWindowTokens.Value}{thinkFlag}"
                 : $"> ollama chat {chatRequest.Model}{thinkFlag}");
             progress?.Report(new LocalLlmGenerationProgress("Loading model and preparing prompt...", null, null, null, null, null, null, null, false));
-            // HttpClient's timeout ends at the headers with ResponseHeadersRead. Keep
-            // a deadline around the entire stream, including a stalled body read.
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(request.ContextWindowTokens is > 8192 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(10));
-            var token = deadline.Token;
-            using var http = _chatHandler is null ? CreateHttpClient(Timeout.InfiniteTimeSpan) : new HttpClient(_chatHandler, disposeHandler: false);
+            // Loading, prefill and CPU generation may legitimately take a long time.
+            // Only user cancellation or a real transport/runtime failure ends the stream.
+            var token = cancellationToken;
+            using var http = _chatHandler is null ? CreateHttpClient(Timeout.InfiniteTimeSpan) : new HttpClient(_chatHandler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan };
             using var content = new StringContent(JsonSerializer.Serialize(chatRequest, JsonOptions), Encoding.UTF8, "application/json");
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(OllamaBaseUri, "/api/chat")) { Content = content };
             using var response = await http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
@@ -135,8 +136,6 @@ public sealed partial class LocalLlmService
                 return new LocalLlmChatResult(false, $"Ollama returned {(int)response.StatusCode}: {FirstLine(responseText)}");
             }
 
-            var answerBuilder = new StringBuilder();
-            var thinkingBuilder = new StringBuilder();
             OllamaChatResponse? finalResponse = null;
             await using var responseStream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             using var reader = new StreamReader(responseStream);
@@ -149,7 +148,7 @@ public sealed partial class LocalLlmService
 
                 var chatResponse = JsonSerializer.Deserialize<OllamaChatResponse>(line, JsonOptions);
                 if (!string.IsNullOrWhiteSpace(chatResponse?.Error))
-                    return new LocalLlmChatResult(false, "Ollama generation failed: " + FirstLine(chatResponse.Error));
+                    return Failure("Ollama generation failed: " + FirstLine(chatResponse.Error));
                 var delta = chatResponse?.Message?.Content;
                 var thinkingDelta = chatResponse?.Message?.Thinking;
                 if (!string.IsNullOrEmpty(delta))
@@ -185,7 +184,7 @@ public sealed partial class LocalLlmService
             var answer = BuildFinalChatAnswer(answerBuilder.ToString(), thinkingBuilder.ToString());
             var stats = finalResponse is null ? null : BuildUsageStats(finalResponse);
             if (finalResponse is null)
-                return new LocalLlmChatResult(false, "Ollama's response stream ended before completion. Please retry.", Stats: stats);
+                return Failure("Ollama's response stream ended before completion. Please retry.");
             var visibleAnswer = Regex.Replace(answerBuilder.ToString(), @"<think>.*?(?:</think>|$)", "", RegexOptions.Singleline | RegexOptions.IgnoreCase).Trim();
             if (visibleAnswer.Length == 0)
                 return new LocalLlmChatResult(false, answer.Length == 0 ? "Ollama returned an empty response. Please retry."
@@ -202,20 +201,26 @@ public sealed partial class LocalLlmService
         }
         catch (HttpRequestException ex)
         {
-            return new LocalLlmChatResult(false, $"Ollama is not reachable at {OllamaBaseUri}: {ex.Message}");
+            return Failure($"Ollama is not reachable at {OllamaBaseUri}: {ex.Message}");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new LocalLlmChatResult(false, "Response was stopped by the user.");
+            return Failure("Response was stopped by the user.");
         }
         catch (OperationCanceledException)
         {
-            return new LocalLlmChatResult(false, "Local chat timed out.");
+            return Failure("The local runtime cancelled the response before completion.");
         }
         catch (Exception ex) when (ex is IOException or JsonException)
         {
-            return new LocalLlmChatResult(false, "Could not finish reading Ollama's response: " + ex.Message);
+            return Failure("Could not finish reading Ollama's response: " + ex.Message);
         }
+    }
+
+    private static LocalLlmChatResult IncompleteChatResult(string status, StringBuilder answer, StringBuilder thinking)
+    {
+        var partial = BuildFinalChatAnswer(answer.ToString(), thinking.ToString());
+        return new(false, status, partial.Length == 0 ? null : partial + "\n\n**Response incomplete.** " + status);
     }
 
     private static string BuildFinalChatAnswer(string answerText, string thinkingText)

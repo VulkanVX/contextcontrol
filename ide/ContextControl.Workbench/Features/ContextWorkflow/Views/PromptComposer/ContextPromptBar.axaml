@@ -207,12 +207,18 @@
                     </Grid>
   
                     <StackPanel Grid.Row="1" Spacing="3">
+                      <WrapPanel Orientation="Horizontal">
+                      <Button Classes="cc-prompt-mode" Margin="0,0,6,0" HorizontalAlignment="Left"
+                              IsVisible="{Binding ContextControl.IsLocalPromptMode}" Classes.active="{Binding ContextControl.IsGameCreationEnabled}"
+                              Content="{Binding ContextControl.GameCreationLabel}" Command="{Binding ContextControl.ToggleGameCreationCommand}"
+                              ToolTip.Tip="Create a complete browser game with a Game Lab Run button. Follow-up messages can revise the previous game."/>
                       <Button Classes="cc-prompt-mode" HorizontalAlignment="Left"
                               IsVisible="{Binding ContextControl.CanUseGoogleSearch}"
                               Classes.active="{Binding ContextControl.IsGoogleSearchEnabled}"
                               Content="{Binding ContextControl.GoogleSearchLabel}"
                               ToolTip.Tip="{Binding ContextControl.GoogleSearchToolTip}"
                               Command="{Binding ContextControl.ToggleGoogleSearchCommand}" />
+                      </WrapPanel>
                       <Border Classes="cc-transfer-progress" IsVisible="{Binding ContextControl.IsCodexPromptAuthBlocked}">
                         <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                           <StackPanel>

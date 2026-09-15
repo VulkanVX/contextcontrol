@@ -10,6 +10,11 @@ using ContextControl.Workbench.Services;
 using ContextControl.Workbench.ViewModels;
 using static SmokeTestHelpers;
 
+if (args.Contains("--game-regression")) { GameLabTests.Run(); return; }
+if (args.Contains("--game-ui")) { GameLabUiTests.Run(args[Array.IndexOf(args, "--game-ui") + 1]); return; }
+if (args.Contains("--game-browser")) { var at = Array.IndexOf(args, "--game-browser"); GameLabBrowserTests.Run(args[at + 1], args.Length > at + 2 ? args[at + 2] : null); return; }
+if (args.Contains("--game-live")) { var at = Array.IndexOf(args, "--game-live"); await GameLabTests.Live(args[at + 1], args[at + 2]); return; }
+
 if (args.Contains("--download-regression")) { await OllamaDownloadTests.Run(); return; }
 
 if (args.Contains("--performance-regression")) { await LocalPerformanceTests.Run(); return; }

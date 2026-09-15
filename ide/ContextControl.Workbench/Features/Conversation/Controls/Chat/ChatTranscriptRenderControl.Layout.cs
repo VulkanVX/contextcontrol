@@ -356,6 +356,12 @@ public sealed partial class ChatTranscriptRenderControl
             right = downloadRect.X - 4.0;
         }
 
+        if (ContextControl.Workbench.Services.GameArtifact.FromMessage(message) is not null)
+        {
+            var gameRect = new Rect(right - 82, centerY - ButtonHeight * .5, 78, ButtonHeight);
+            layout.Hits.Add(new HitRegion(gameRect, ChatTranscriptHitKind.RunGame, message));
+            right = gameRect.X - 5;
+        }
         if (message.CanCreateProject)
         {
             var createRect = new Rect(
