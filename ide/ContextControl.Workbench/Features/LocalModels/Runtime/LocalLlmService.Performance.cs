@@ -27,7 +27,7 @@ public sealed partial class LocalLlmService
             var identity = await tuner.IdentityAsync(request.ModelId, timeout.Token).ConfigureAwait(false);
             if (profile.Digest != identity.Digest || profile.RuntimeVersion != identity.Version) return options;
             // A cold model or changed split uses the ordinary planner. Apply measurements only to the matching warm allocation.
-            if (await tuner.AllocationAsync(request.ModelId, profile.ContextTokens, timeout.Token).ConfigureAwait(false) != profile.VramBytes) return options;
+            if (!profile.MatchesAllocation(await tuner.AllocationAsync(request.ModelId, profile.ContextTokens, timeout.Token).ConfigureAwait(false))) return options;
             return options with { CpuThreads = profile.Options.CpuThreads, DraftTokens = profile.Options.DraftTokens };
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or IOException or KeyNotFoundException)

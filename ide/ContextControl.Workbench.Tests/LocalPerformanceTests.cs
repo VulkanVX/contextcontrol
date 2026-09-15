@@ -32,6 +32,8 @@ internal static class LocalPerformanceTests
             catch (Exception ex) when (ex is InvalidOperationException or IOException) { rejected = true; }
             Check(mode == "mtp" ? measured?.Profile?.Options.DraftTokens == 2 : mode == "flat" ? measured is { Profile: null } : rejected,
                 "Validate benchmark outcome: " + mode);
+            if (mode == "mtp") Check(measured?.Profile is { VramBytes: 2048, BaselineVramBytes: 1024 },
+                "Speculation may change GPU placement; both baseline and tuned allocations are verified and saved.");
         }
         using (var canceled = new CancellationTokenSource())
         {
@@ -63,18 +65,18 @@ internal static class LocalPerformanceTests
         Check(!LocalPerformanceTuner.IsImprovement([baseline, baseline], [faster, faster with { FirstTokenSeconds = 2 }]), "Reject first-token regressions.");
         Check(!LocalPerformanceTuner.IsImprovement([baseline, baseline], [faster, faster with { Seconds = double.NaN }]), "Reject invalid timing.");
         Check(!LocalPerformanceTuner.IsLocalModel("runtime:llama-cpp") && !LocalPerformanceTuner.IsLocalModel("qwen:cloud"), "Exclude hosted and unmanaged runtimes.");
-        foreach (var mode in new[] { "apply", "disabled", "manual", "threads", "gpu", "context", "digest", "version", "hardware", "placement", "cold" })
+        foreach (var mode in new[] { "apply", "baselineplacement", "tunedplacement", "disabled", "manual", "threads", "gpu", "context", "digest", "version", "hardware", "placement", "cold" })
         {
             using var route = new Fixture { Mode = mode };
             var service = new LocalLlmService(route);
             service.ConfigureResources(new(Enabled: mode != "manual", AutoThreads: mode != "threads", AutoGpuLayers: mode != "gpu"),
                 mode == "hardware" ? hardware with { CpuName = "Different CPU" } : hardware);
-            service.ConfigurePerformance([profile], mode != "disabled");
+            service.ConfigurePerformance([mode is "baselineplacement" or "tunedplacement" ? profile with { VramBytes = 2048, BaselineVramBytes = 1024 } : profile], mode != "disabled");
             var reply = await service.SendChatAsync(Request(mode == "context" ? 4096 : 8192), null, null);
             Check(reply.Succeeded, "Real chat works: " + mode);
             using var payload = JsonDocument.Parse(route.Payloads.Last());
             var options = payload.RootElement.GetProperty("options");
-            Check((options.TryGetProperty("num_thread", out var thread) && thread.GetInt32() == 6) == (mode == "apply"), "Apply only a matching profile: " + mode);
+            Check((options.TryGetProperty("num_thread", out var thread) && thread.GetInt32() == 6) == (mode is "apply" or "baselineplacement" or "tunedplacement"), "Apply only a matching profile: " + mode);
             Check(options.GetProperty("num_predict").GetInt32() == 345 && payload.RootElement.GetProperty("think").GetBoolean()
                 && payload.RootElement.GetProperty("messages")[0].GetProperty("content").GetString() == Request().Prompt,
                 "Preserve output budget, thinking and actual prompt.");
@@ -91,16 +93,16 @@ internal static class LocalPerformanceTests
         Check(LocalPerformanceProfile.HardwareFingerprint(hardware) == LocalPerformanceProfile.HardwareFingerprint(hardware with { AvailableRamBytes = 1 }), "Stable hardware identity excludes current free RAM.");
         Console.WriteLine($"PERFORMANCE_REGRESSION_PASS {_checks} checks");
     }
-    internal static async Task Live(string model, string output)
+    internal static async Task Live(string model, string output, int context = 8192)
     {
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         var hardware = await LocalLlmService.DetectHardwareAsync(cancellation.Token);
-        var result = await new LocalPerformanceTuner(http).TuneAsync(model, 8192, hardware, new Progress(Console.WriteLine), cancellation.Token);
+        var result = await new LocalPerformanceTuner(http).TuneAsync(model, context, hardware, new Progress(Console.WriteLine), cancellation.Token);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var identity = await new LocalPerformanceTuner(http).IdentityAsync(model, cancellation.Token);
-        var allocation = await new LocalPerformanceTuner(http).AllocationAsync(model, 8192, cancellation.Token);
-        await File.WriteAllTextAsync(output, JsonSerializer.Serialize(new { Model = model, ContextTokens = 8192, Hardware = hardware,
+        var allocation = await new LocalPerformanceTuner(http).AllocationAsync(model, context, cancellation.Token);
+        await File.WriteAllTextAsync(output, JsonSerializer.Serialize(new { Model = model, ContextTokens = context, Hardware = hardware,
             Identity = identity, VramBytes = allocation, MeasuredUtc = DateTime.UtcNow, Result = result }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(result.Status);
         Console.WriteLine("PERFORMANCE_LIVE_PASS: " + output);
@@ -110,6 +112,7 @@ internal static class LocalPerformanceTests
         public List<string> Payloads { get; } = [];
         public string Mode { get; init; } = "";
         private int _tags;
+        private int? _lastDraft;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -124,13 +127,15 @@ internal static class LocalPerformanceTests
                 case "/api/show": json = JsonSerializer.Serialize(new { capabilities = new[] { "completion", "thinking" }, parameters = Mode == "mtp" ? "draft_num_predict    4\n" : "" }); break;
                 case "/api/ps":
                     json = JsonSerializer.Serialize(new { models = Mode == "cold" ? Array.Empty<object>() : new object[] {
-                        new { name = "test:2b", size_vram = Mode == "placement" || Mode == "allocation" && Payloads.Count > 3 ? 1 : 1024, context_length = 8192 } } }); break;
+                        new { name = "test:2b", size_vram = Mode == "placement" || Mode == "allocation" && Payloads.Count > 3 ? 1
+                            : Mode == "tunedplacement" || Mode == "mtp" && _lastDraft == 2 ? 2048 : 1024, context_length = 8192 } } }); break;
                 default:
                     var body = await request.Content!.ReadAsStringAsync(token);
                     Payloads.Add(body);
                     using (var parsed = JsonDocument.Parse(body))
                     {
                         var options = parsed.RootElement.GetProperty("options");
+                        _lastDraft = options.TryGetProperty("draft_num_predict", out var draftSetting) ? draftSetting.GetInt32() : null;
                         var threads = options.TryGetProperty("num_thread", out var thread) ? thread.GetInt32() : 0;
                         var tokens = options.GetProperty("num_predict").GetInt32();
                         var speed = Mode == "flat" ? 10d : threads == 6 ? 20d : threads == 12 ? 12d : 10d;

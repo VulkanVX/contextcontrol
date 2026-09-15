@@ -8,7 +8,7 @@ public sealed record LocalPerformanceOptions(int CpuThreads, int? DraftTokens = 
 public sealed record LocalPerformanceProfile(
     string ModelId, string Digest, string RuntimeVersion, string HardwareKey, int ContextTokens,
     LocalPerformanceOptions Options, double BaselineTokensPerSecond, double TokensPerSecond,
-    long VramBytes, DateTime MeasuredUtc)
+    long VramBytes, DateTime MeasuredUtc, long? BaselineVramBytes = null)
 {
     public double Improvement => TokensPerSecond / BaselineTokensPerSecond - 1;
     public bool IsValid => !string.IsNullOrWhiteSpace(ModelId) && !string.IsNullOrWhiteSpace(Digest)
@@ -16,7 +16,10 @@ public sealed record LocalPerformanceProfile(
         && ContextTokens is >= 1024 and <= 32768 && Options is { CpuThreads: >= 1 and <= 64 }
         && (Options.DraftTokens is null or 0 or 2 or 4 or 8)
         && double.IsFinite(TokensPerSecond) && double.IsFinite(BaselineTokensPerSecond)
-        && BaselineTokensPerSecond > 0 && TokensPerSecond >= BaselineTokensPerSecond * 1.05 && VramBytes >= 0;
+        && BaselineTokensPerSecond > 0 && TokensPerSecond >= BaselineTokensPerSecond * 1.05 && VramBytes >= 0
+        && BaselineVramBytes is null or >= 0;
+
+    public bool MatchesAllocation(long? bytes) => bytes is not null && (bytes == VramBytes || bytes == BaselineVramBytes);
 
     public static string HardwareFingerprint(LocalLlmHardwareProfile hardware)
     {

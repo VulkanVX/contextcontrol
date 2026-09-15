@@ -82,6 +82,7 @@ internal sealed class LocalPerformanceTuner(HttpClient http)
             await SampleAsync(id, context, baseline, thinking, 8, 0, token).ConfigureAwait(false);
             var allocation = await AllocationAsync(id, context, token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Ollama did not report the requested context allocation.");
+            var allocations = new Dictionary<LocalPerformanceOptions, long> { [baseline] = allocation };
             var initial = await Measure(baseline, 48, 0, "Baseline").ConfigureAwait(false);
             var best = initial;
             foreach (var candidate in candidates)
@@ -119,10 +120,11 @@ internal sealed class LocalPerformanceTuner(HttpClient http)
             if (!Regex.IsMatch(answer.Text.Trim(), @"^4[.!]?\s*$"))
                 throw new InvalidOperationException("The candidate failed the answer check (2 + 2). No override saved.");
             var finalIdentity = await IdentityAsync(id, token).ConfigureAwait(false);
-            if (identity != finalIdentity || await AllocationAsync(id, context, token).ConfigureAwait(false) != allocation)
+            if (identity != finalIdentity || await AllocationAsync(id, context, token).ConfigureAwait(false) != allocations[best.Options])
                 throw new InvalidOperationException("Model identity or GPU placement changed during measurement. Run tuning again when resources are stable.");
             var profile = new LocalPerformanceProfile(id, identity.Digest, identity.Version,
-                LocalPerformanceProfile.HardwareFingerprint(hardware), context, best.Options, baseSpeed, speed, allocation, DateTime.UtcNow);
+                LocalPerformanceProfile.HardwareFingerprint(hardware), context, best.Options, baseSpeed, speed,
+                allocations[best.Options], DateTime.UtcNow, allocation);
             return new(profile, $"{id}: {baseSpeed:0.0} → {speed:0.0} tok/s ({profile.Improvement:P0} faster) in warm test prompts. "
                 + $"{best.Options.CpuThreads} threads; draft {best.Options.DraftTokens?.ToString() ?? "model default"}; {context:N0} context. Other workloads can differ.", samples);
 
@@ -131,10 +133,17 @@ internal sealed class LocalPerformanceTuner(HttpClient http)
                 progress?.Report($"{phase}: {options.CpuThreads} threads · draft {options.DraftTokens?.ToString() ?? "default"} · {tokens} tokens. Cancel anytime; up to 15 minutes.");
                 // Thread changes may reload the runner. Warm each configuration; don't time loading as decoding.
                 await SampleAsync(id, context, options, thinking, 8, prompt, token).ConfigureAwait(false);
+                var before = await AllocationAsync(id, context, token).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("Ollama stopped reporting the requested context allocation.");
+                // Draft length can legitimately change GPU placement. Compare repeated measurements
+                // of the same configuration, not different configurations with different memory needs.
+                if (allocations.TryGetValue(options, out var expected) && before != expected)
+                    throw new InvalidOperationException("GPU placement changed for the same configuration. No override saved.");
+                allocations[options] = before;
                 var sample = await SampleAsync(id, context, options, thinking, tokens, prompt, token).ConfigureAwait(false);
                 if (sample.Tokens < tokens / 2 || sample.Text.Trim().Length < 24 || !double.IsFinite(sample.TokensPerSecond) || sample.Seconds <= 0)
                     throw new InvalidOperationException("The model stopped too early for a reliable speed measurement. No override saved.");
-                if (await AllocationAsync(id, context, token).ConfigureAwait(false) != allocation)
+                if (await AllocationAsync(id, context, token).ConfigureAwait(false) != before)
                     throw new InvalidOperationException("GPU placement changed during tuning. No override saved.");
                 samples.Add(sample);
                 progress?.Report($"{phase}: {sample.TokensPerSecond:0.0} tok/s · first text {sample.FirstTokenSeconds:0.00}s.");

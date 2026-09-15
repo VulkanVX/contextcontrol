@@ -13,7 +13,7 @@ using static SmokeTestHelpers;
 if (args.Contains("--download-regression")) { await OllamaDownloadTests.Run(); return; }
 
 if (args.Contains("--performance-regression")) { await LocalPerformanceTests.Run(); return; }
-if (args.Contains("--performance-live")) { var at = Array.IndexOf(args, "--performance-live"); await LocalPerformanceTests.Live(args[at + 1], args[at + 2]); return; }
+if (args.Contains("--performance-live")) { var at = Array.IndexOf(args, "--performance-live"); await LocalPerformanceTests.Live(args[at + 1], args[at + 2], args.Length > at + 3 ? int.Parse(args[at + 3]) : 8192); return; }
 
 if (args.Contains("--scanner-regression")) { ProjectScannerTests.Run(); return; }
 if (args.Contains("--scanner-project")) { ProjectScannerTests.Run(args[Array.IndexOf(args, "--scanner-project") + 1]); return; }
